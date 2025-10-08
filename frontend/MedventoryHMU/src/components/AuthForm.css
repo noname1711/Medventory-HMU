@@ -1,0 +1,190 @@
+/* --- NỀN CHUNG --- */
+.auth-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #0077b6, #00b4d8, #90e0ef);
+  background-size: 300% 300%;
+  animation: gradientFlow 8s ease infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* --- BADGE GÓC --- */
+.demo-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #0077b6;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* --- FORM CHÍNH --- */
+.auth-wrapper {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 40px;
+  border-radius: 24px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.6s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* --- HEADER --- */
+.auth-header {
+  margin-bottom: 20px;
+}
+
+.logo-circle {
+  width: 80px;
+  height: 80px;
+  background: white;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.logo-img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.auth-header h1 {
+  margin: 8px 0 4px;
+  color: #005f73;
+}
+
+.auth-header p {
+  color: #0a9396;
+  margin: 0;
+  font-weight: 500;
+}
+
+.auth-header .sub {
+  font-size: 13px;
+  color: #0077b6;
+}
+
+/* --- TABS --- */
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: #e0fbfc;
+  color: #0077b6;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab.active {
+  background: #0077b6;
+  color: white;
+}
+
+.tab:hover {
+  background: #00b4d8;
+  color: white;
+}
+
+/* --- FORM --- */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.auth-form input,
+.auth-form select {
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border 0.2s;
+}
+
+.auth-form input:focus,
+.auth-form select:focus {
+  border-color: #00b4d8;
+  outline: none;
+}
+
+.remember-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.remember-row a {
+  color: #0077b6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.remember-row a:hover {
+  text-decoration: underline;
+}
+
+/* --- BUTTON --- */
+.submit-btn {
+  background: #0077b6;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.submit-btn:hover {
+  background: #0096c7;
+}
+
+/* --- FOOTER --- */
+.footer {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #555;
+}
