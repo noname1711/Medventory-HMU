@@ -1,15 +1,45 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import "./AuthForm.css";
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Fake login 
-    navigate("/dashboard");
+
+    // Cho phép admin đăng nhập không cần email thật
+    if (isLogin) {
+      if (email === "admin" && password === "12345") {
+        toast.success("Xin chào Admin 👑");
+        setTimeout(() => navigate("/admin"), 800);
+        return;
+      }
+
+      // Kiểm tra email người dùng thường
+      if (!email.endsWith("@gmail.com")) {
+        toast.error("Vui lòng dùng email @gmail.com để đăng nhập!");
+        return;
+      }
+
+      toast.success("Chào mừng đến Medventory-HMU 👋");
+      setTimeout(() => navigate("/dashboard"), 800);
+    } else {
+      // Kiểm tra email hợp lệ khi đăng ký
+      if (!email.endsWith("@gmail.com")) {
+        toast.error("Email phải có đuôi @gmail.com");
+        return;
+      }
+
+      toast.success("Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.");
+      setIsLogin(true);
+      setEmail("");
+      setPassword("");
+    }
   };
 
   return (
@@ -44,24 +74,54 @@ export default function AuthForm() {
 
           <form onSubmit={handleSubmit} className="auth-form">
             {!isLogin && (
-              <div className="grid-2">
-                <input type="text" placeholder="Họ" required />
-                <input type="text" placeholder="Tên" required />
-              </div>
+              <>
+                <input type="text" placeholder="Họ và tên" required />
+
+                <div className="grid-2">
+                  <input type="date" placeholder="Ngày sinh" required />
+                  <select required>
+                    <option value="">Phòng ban</option>
+                    <option>Khoa Ngoại</option>
+                    <option>Khoa Nội</option>
+                    <option>Khoa Nhi</option>
+                    <option>Khoa Sản</option>
+                    <option>Khoa Xét nghiệm</option>
+                    <option>Kho Vật tư</option>
+                    <option>Hành chính</option>
+                  </select>
+                </div>
+              </>
             )}
 
-            <input type="email" placeholder="Email @hmu.edu.vn" required />
-            <input type="password" placeholder="Mật khẩu" required />
+            {/*Nếu là admin thì cho phép nhập text thường, còn người khác thì dùng email */}
+            <input
+              type={email === "admin" ? "text" : "email"}
+              placeholder={
+                email === "admin" ? "Tài khoản admin" : "Email @gmail.com"
+              }
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+
+            <input
+              type="password"
+              placeholder="Mật khẩu"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
 
             {!isLogin && (
               <>
                 <input type="password" placeholder="Xác nhận mật khẩu" required />
-                <select>
+                <select required>
+                  <option value="">Phân quyền</option>
                   <option>Bác sĩ</option>
                   <option>Điều dưỡng</option>
                   <option>Kỹ thuật viên</option>
                   <option>Quản lý kho</option>
-                  <option>Khác</option>
+                  <option>Admin</option>
                 </select>
               </>
             )}

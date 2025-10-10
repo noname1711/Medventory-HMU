@@ -86,7 +86,7 @@ export default function AddEquipment({ onAdd }) {
 
         <div className="ae-actions">
           <button type="button" className="btn cancel" onClick={reset}>Hủy</button>
-          <button type="submit" className="btn primary">Thêm thiết bị</button>
+          <button type="submit" className="btn primary">Thêm vật tư</button>
         </div>
       </form>
     </div>

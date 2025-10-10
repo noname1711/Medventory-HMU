@@ -22,7 +22,6 @@ export default function EquipmentList({ equipmentData, onDelete, onEdit }) {
       <div className="el-header">
         <h3>Danh sách Vật tư Y tế</h3>
         <div className="el-actions">
-          <button className="el-export" onClick={() => alert("Chức năng xuất Excel đang được phát triển!")}>📤 Xuất Excel</button>
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="el-filter">
             <option value="">Tất cả trạng thái</option>
             <option value="Hoạt động tốt">Hoạt động tốt</option>

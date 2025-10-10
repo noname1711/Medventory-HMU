@@ -5,10 +5,10 @@ import EquipmentList from "./EquipmentList";
 import AddEquipment from "./AddEquipment";
 import ExportEquipment from "./ExportEquipment";
 import Chart from "chart.js/auto";
+import Swal from "sweetalert2";
 import "./Dashboard.css";
 
 export default function Dashboard() {
-  // initial sample data (same as HTML)
   const initialData = [
     { id: 1, code: "TB001", name: "Máy X-quang", department: "Khoa Nội", status: "Hoạt động tốt", date: "2023-01-15", value: 500000000 },
     { id: 2, code: "TB002", name: "Máy siêu âm", department: "Khoa Sản", status: "Hoạt động tốt", date: "2023-02-20", value: 300000000 },
@@ -21,29 +21,23 @@ export default function Dashboard() {
   const [nextId, setNextId] = useState(6);
   const [activeTab, setActiveTab] = useState("dashboard");
 
-  // chart refs for overview
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
+  // Cập nhật chart khi data thay đổi
   useEffect(() => {
-    // update chart whenever data changes and when on dashboard tab
-    if (activeTab === "dashboard") {
-      updateStatusChart();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (activeTab === "dashboard") updateStatusChart();
   }, [equipmentData, activeTab]);
 
   function updateStatusChart() {
-    const ctx = chartRef.current && chartRef.current.getContext("2d");
+    const ctx = chartRef.current?.getContext("2d");
     if (!ctx) return;
+
     const working = equipmentData.filter((e) => e.status === "Hoạt động tốt").length;
     const maintenance = equipmentData.filter((e) => e.status === "Cần bảo trì").length;
     const broken = equipmentData.filter((e) => e.status === "Hỏng hóc").length;
 
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
-      chartInstance.current = null;
-    }
+    if (chartInstance.current) chartInstance.current.destroy();
 
     chartInstance.current = new Chart(ctx, {
       type: "doughnut",
@@ -52,7 +46,7 @@ export default function Dashboard() {
         datasets: [{
           data: [working, maintenance, broken],
           backgroundColor: ["#10B981", "#F59E0B", "#EF4444"],
-          borderColor: "#ffffff",
+          borderColor: "#fff",
           borderWidth: 3
         }]
       },
@@ -62,10 +56,10 @@ export default function Dashboard() {
           legend: { position: "bottom" },
           tooltip: {
             callbacks: {
-              label: function (context) {
-                const label = context.label || "";
-                const value = context.parsed;
-                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              label: (ctx) => {
+                const label = ctx.label || "";
+                const value = ctx.parsed;
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
                 const perc = total ? ((value / total) * 100).toFixed(1) : 0;
                 return `${label}: ${value} vật tư (${perc}%)`;
               }
@@ -77,127 +71,134 @@ export default function Dashboard() {
     });
   }
 
-  // actions
+  // === HÀNH ĐỘNG ===
+
   function addEquipment(newEq) {
-    setEquipmentData(prev => [...prev, { ...newEq, id: nextId }]);
-    setNextId(id => id + 1);
+    setEquipmentData((prev) => [...prev, { ...newEq, id: nextId }]);
+    setNextId((id) => id + 1);
     setActiveTab("equipment");
-    alert("Thêm vật tư thành công!");
+
+    Swal.fire({
+      title: "🎉 Thêm vật tư thành công!",
+      text: `Đã thêm “${newEq.name}” vào danh sách.`,
+      icon: "success",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+      position: "center",
+      backdrop: true,
+    });
   }
 
   function deleteEquipment(id) {
-    if (confirm("Bạn có chắc chắn muốn xóa vật tư này?")) {
-      setEquipmentData(prev => prev.filter(e => e.id !== id));
-      alert("Xóa vật tư thành công!");
-    }
+    const eq = equipmentData.find((e) => e.id === id);
+    Swal.fire({
+      title: "🗑️ Xác nhận xóa?",
+      text: `Bạn có chắc chắn muốn xóa vật tư “${eq.name}”?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Xóa",
+      cancelButtonText: "Hủy",
+      reverseButtons: true,
+      backdrop: true,
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setEquipmentData((prev) => prev.filter((e) => e.id !== id));
+        Swal.fire({
+          title: "✅ Đã xóa!",
+          text: `Vật tư “${eq.name}” đã bị xóa.`,
+          icon: "success",
+          position: "center",
+          timer: 2000,
+          showConfirmButton: false,
+          backdrop: true,
+        });
+      }
+    });
   }
 
   function editEquipment(id) {
-    alert(`Chỉnh sửa vật tư ID: ${id}`);
-    // placeholder — có thể mở modal để chỉnh sửa
+    const eq = equipmentData.find((e) => e.id === id);
+    Swal.fire({
+      title: "🛠️ Sắp có!",
+      text: `Tính năng chỉnh sửa vật tư “${eq.name}” đang được phát triển.`,
+      icon: "info",
+      confirmButtonText: "OK",
+      backdrop: true,
+      position: "center",
+    });
   }
 
-  // Export callback: download file
-  function handleExport(content, filename, contentType = "text/csv") {
+  function handleExport(content, filename, contentType) {
+    if (contentType === "empty") {
+      Swal.fire({
+        title: "⚠️ Không có dữ liệu để xuất!",
+        text: "Vui lòng chọn bộ lọc khác hoặc kiểm tra lại.",
+        icon: "warning",
+        position: "center",
+        showConfirmButton: false,
+        timer: 2000,
+        backdrop: true,
+      });
+      return;
+    }
+
     const blob = new Blob([content], { type: contentType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
     URL.revokeObjectURL(url);
+
+    Swal.fire({
+      title: "📦 Xuất dữ liệu thành công!",
+      text: `File ${filename} đã được tải xuống.`,
+      icon: "success",
+      showConfirmButton: false,
+      timer: 2000,
+      position: "center",
+      backdrop: true,
+    });
   }
 
-  // dashboard stats
+  // === THỐNG KÊ ===
   const total = equipmentData.length;
   const working = equipmentData.filter(e => e.status === "Hoạt động tốt").length;
   const maintenance = equipmentData.filter(e => e.status === "Cần bảo trì").length;
   const broken = equipmentData.filter(e => e.status === "Hỏng hóc").length;
 
+  // === GIAO DIỆN ===
   return (
     <div className="dashboard-page">
       <DashboardHeader />
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardTabs active={activeTab} setActive={setActiveTab} />
 
-        {/* Dashboard content area */}
         <div className="mt-4">
           {activeTab === "dashboard" && (
             <div className="overview-grid">
               <div className="stats-grid">
-                <div className="stat card">
-                  <div className="stat-left">
-                    <div className="stat-icon blue">
-                      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/></svg>
-                    </div>
-                    <div>
-                      <div className="muted">Tổng vật tư</div>
-                      <div className="big">{total}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="stat card">
-                  <div className="stat-left">
-                    <div className="stat-icon greenish">
-                      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>
-                    </div>
-                    <div>
-                      <div className="muted">Hoạt động tốt</div>
-                      <div className="big green-text">{working}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="stat card">
-                  <div className="stat-left">
-                    <div className="stat-icon yellow">
-                      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/></svg>
-                    </div>
-                    <div>
-                      <div className="muted">Cần bảo trì</div>
-                      <div className="big yellow-text">{maintenance}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="stat card">
-                  <div className="stat-left">
-                    <div className="stat-icon red">
-                      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/></svg>
-                    </div>
-                    <div>
-                      <div className="muted">Hỏng hóc</div>
-                      <div className="big red-text">{broken}</div>
-                    </div>
-                  </div>
-                </div>
+                <div className="stat card"><div className="muted">Tổng vật tư</div><div className="big">{total}</div></div>
+                <div className="stat card"><div className="muted">Hoạt động tốt</div><div className="big green-text">{working}</div></div>
+                <div className="stat card"><div className="muted">Cần bảo trì</div><div className="big yellow-text">{maintenance}</div></div>
+                <div className="stat card"><div className="muted">Hỏng hóc</div><div className="big red-text">{broken}</div></div>
               </div>
-
               <div className="main-grid">
                 <div className="chart card">
                   <h3>Phân bố theo trạng thái</h3>
-                  <div className="chart-wrap">
-                    <canvas ref={chartRef} width="300" height="300" />
-                  </div>
+                  <div className="chart-wrap"><canvas ref={chartRef} width="300" height="300" /></div>
                 </div>
-
                 <div className="activity card">
                   <h3>Hoạt động gần đây</h3>
                   <div className="activity-list">
-                    <div className="act blue">
-                      <div className="dot" />
-                      <div className="text">Thêm mới vật tư TB005 - Máy xét nghiệm máu</div>
-                      <div className="time">2 giờ trước</div>
-                    </div>
-                    <div className="act yellow">
-                      <div className="dot" />
-                      <div className="text">Cập nhật trạng thái TB003 - Cần bảo trì</div>
-                      <div className="time">1 ngày trước</div>
-                    </div>
-                    <div className="act green">
-                      <div className="dot" />
-                      <div className="text">Hoàn thành bảo trì TB002 - Máy siêu âm</div>
-                      <div className="time">3 ngày trước</div>
-                    </div>
+                    <div className="act blue"><div className="dot" /><div className="text">Thêm mới vật tư TB005 - Máy xét nghiệm máu</div></div>
+                    <div className="act yellow"><div className="dot" /><div className="text">Cập nhật TB003 - Cần bảo trì</div></div>
+                    <div className="act green"><div className="dot" /><div className="text">Hoàn thành bảo trì TB002 - Máy siêu âm</div></div>
                   </div>
                 </div>
               </div>
@@ -205,22 +206,11 @@ export default function Dashboard() {
           )}
 
           {activeTab === "equipment" && (
-            <div>
-              <EquipmentList equipmentData={equipmentData} onDelete={deleteEquipment} onEdit={editEquipment} />
-            </div>
+            <EquipmentList equipmentData={equipmentData} onDelete={deleteEquipment} onEdit={editEquipment} />
           )}
 
-          {activeTab === "add" && (
-            <div>
-              <AddEquipment onAdd={addEquipment} />
-            </div>
-          )}
-
-          {activeTab === "export" && (
-            <div>
-              <ExportEquipment equipmentData={equipmentData} onExport={handleExport} />
-            </div>
-          )}
+          {activeTab === "add" && <AddEquipment onAdd={addEquipment} />}
+          {activeTab === "export" && <ExportEquipment equipmentData={equipmentData} onExport={handleExport} />}
         </div>
       </div>
     </div>
