@@ -115,7 +115,7 @@ export default function Admin() {
     <div className="admin-page">
       <header className="admin-header">
         <div className="title">
-          <h1>👑 Bảng điều khiển Admin</h1>
+          <h1>Bảng điều khiển Admin</h1>
           <p>Duyệt & quản lý tài khoản đăng ký hệ thống</p>
         </div>
         <div className="badge">Quản trị viên</div>
