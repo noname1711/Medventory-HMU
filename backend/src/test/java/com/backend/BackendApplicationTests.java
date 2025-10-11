@@ -1,10 +1,10 @@
-package com.hospitalequipment.behospital;
+package com.backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class BehospitalApplicationTests {
+class BackendApplicationTests {
 
 	@Test
 	void contextLoads() {
