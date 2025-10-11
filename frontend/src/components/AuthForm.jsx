@@ -15,7 +15,7 @@ export default function AuthForm() {
   const passwordTimeoutRef = useRef(null);
   const confirmPasswordTimeoutRef = useRef(null);
 
-  // Danh sách phòng ban đầy đủ từ HMU
+  // Danh sách phân khoa HMU
   const departments = [
     "Khoa xét nghiệm",
     "Khoa phục hồi chức năng",
