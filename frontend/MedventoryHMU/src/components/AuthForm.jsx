@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "./AuthForm.css";
@@ -7,10 +7,77 @@ export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
+  
+  const passwordTimeoutRef = useRef(null);
+  const confirmPasswordTimeoutRef = useRef(null);
+
+  // Danh sách phòng ban đầy đủ từ HMU
+  const departments = [
+    "Khoa xét nghiệm",
+    "Khoa phục hồi chức năng",
+    "Khoa gây mê hồi sức và chống đau",
+    "Khoa cấp cứu",
+    "Khoa mắt",
+    "Khoa ngoại tim mạch và lồng ngực",
+    "Khoa ngoại tiết niệu",
+    "Khoa dược",
+    "Khoa hồi sức tích cực",
+    "Khoa khám chữa bệnh theo yêu cầu",
+    "Khoa giải phẫu bệnh",
+    "Khoa nội thần kinh",
+    "Khoa vi sinh - ký sinh trùng",
+    "Khoa nội tổng hợp",
+    "Khoa dinh dưỡng và tiết chế",
+    "Khoa phẫu thuật tạo hình thẩm mỹ",
+    "Khoa hô hấp",
+    "Khoa kiểm soát nhiễm khuẩn",
+    "Khoa thăm dò chức năng",
+    "Khoa phụ sản",
+    "Khoa nam học và y học giới tính",
+    "Khoa ngoại tổng hợp",
+    "Khoa nhi",
+    "Khoa ngoại thần kinh - cột sống",
+    "Khoa dị ứng - miễn dịch lâm sàng",
+    "Khoa nội tiết",
+    "Khoa huyết học và truyền máu",
+    "Khoa y học cổ truyền",
+    "Khoa răng hàm mặt",
+    "Khoa chấn thương chỉnh hình và y học thể thao",
+    "Khoa khám bệnh",
+    "Khoa nội thận - tiết niệu",
+    "Khoa bệnh nhiệt đới và can thiệp giảm hại"
+  ];
+
+  // Clear timeout khi component unmount
+  useEffect(() => {
+    return () => {
+      if (passwordTimeoutRef.current) {
+        clearTimeout(passwordTimeoutRef.current);
+      }
+      if (confirmPasswordTimeoutRef.current) {
+        clearTimeout(confirmPasswordTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Kiểm tra email hợp lệ cho cả đăng nhập và đăng ký (trừ admin)
+    if (!email.endsWith("@gmail.com") && email !== "admin") {
+      toast.error("Vui lòng dùng email @gmail.com để đăng nhập/đăng ký!");
+      return;
+    }
+
+    // Kiểm tra xác nhận mật khẩu khi đăng ký
+    if (!isLogin && password !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp!");
+      return;
+    }
 
     // Cho phép admin đăng nhập không cần email thật
     if (isLogin) {
@@ -20,25 +87,48 @@ export default function AuthForm() {
         return;
       }
 
-      // Kiểm tra email người dùng thường
-      if (!email.endsWith("@gmail.com")) {
-        toast.error("Vui lòng dùng email @gmail.com để đăng nhập!");
-        return;
-      }
-
       toast.success("Chào mừng đến Medventory-HMU 👋");
       setTimeout(() => navigate("/dashboard"), 800);
     } else {
-      // Kiểm tra email hợp lệ khi đăng ký
-      if (!email.endsWith("@gmail.com")) {
-        toast.error("Email phải có đuôi @gmail.com");
-        return;
-      }
-
       toast.success("Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.");
       setIsLogin(true);
       setEmail("");
       setPassword("");
+      setConfirmPassword("");
+    }
+  };
+
+  const togglePasswordVisibility = () => {
+    // Clear existing timeout
+    if (passwordTimeoutRef.current) {
+      clearTimeout(passwordTimeoutRef.current);
+    }
+
+    const newShowPassword = !showPassword;
+    setShowPassword(newShowPassword);
+
+    // Nếu đang bật hiện mật khẩu, set timeout để tắt sau 3 giây
+    if (newShowPassword) {
+      passwordTimeoutRef.current = setTimeout(() => {
+        setShowPassword(false);
+      }, 3000);
+    }
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    // Clear existing timeout
+    if (confirmPasswordTimeoutRef.current) {
+      clearTimeout(confirmPasswordTimeoutRef.current);
+    }
+
+    const newShowConfirmPassword = !showConfirmPassword;
+    setShowConfirmPassword(newShowConfirmPassword);
+
+    // Nếu đang bật hiện mật khẩu, set timeout để tắt sau 3 giây
+    if (newShowConfirmPassword) {
+      confirmPasswordTimeoutRef.current = setTimeout(() => {
+        setShowConfirmPassword(false);
+      }, 3000);
     }
   };
 
@@ -79,15 +169,13 @@ export default function AuthForm() {
 
                 <div className="grid-2">
                   <input type="date" placeholder="Ngày sinh" required />
-                  <select required>
+                  <select required className="department-select">
                     <option value="">Phòng ban</option>
-                    <option>Khoa Ngoại</option>
-                    <option>Khoa Nội</option>
-                    <option>Khoa Nhi</option>
-                    <option>Khoa Sản</option>
-                    <option>Khoa Xét nghiệm</option>
-                    <option>Kho Vật tư</option>
-                    <option>Hành chính</option>
+                    {departments.map((dept, index) => (
+                      <option key={index} value={dept} title={dept}>
+                        {dept.length > 30 ? dept.substring(0, 30) + "..." : dept}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </>
@@ -104,24 +192,55 @@ export default function AuthForm() {
               required
             />
 
-            <input
-              type="password"
-              placeholder="Mật khẩu"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Mật khẩu"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <span 
+                className={`password-toggle ${showPassword ? 'visible' : ''}`}
+                onClick={togglePasswordVisibility}
+              >
+                {showPassword ? "🔓" : "🔒"}
+              </span>
+              {showPassword && (
+                <div className="password-timer">
+                  <div className="timer-bar"></div>
+                </div>
+              )}
+            </div>
 
             {!isLogin && (
               <>
-                <input type="password" placeholder="Xác nhận mật khẩu" required />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Xác nhận mật khẩu"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                  <span 
+                    className={`password-toggle ${showConfirmPassword ? 'visible' : ''}`}
+                    onClick={toggleConfirmPasswordVisibility}
+                  >
+                    {showConfirmPassword ? "🔓" : "🔒"}
+                  </span>
+                  {showConfirmPassword && (
+                    <div className="password-timer">
+                      <div className="timer-bar"></div>
+                    </div>
+                  )}
+                </div>
+                
                 <select required>
                   <option value="">Phân quyền</option>
-                  <option>Bác sĩ</option>
-                  <option>Điều dưỡng</option>
-                  <option>Kỹ thuật viên</option>
-                  <option>Quản lý kho</option>
-                  <option>Admin</option>
+                  <option>Lãnh đạo</option>
+                  <option>Thủ kho</option>
+                  <option>Cán bộ khác</option>
                 </select>
               </>
             )}
