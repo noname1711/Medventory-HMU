@@ -25,13 +25,13 @@ export default function ForgotPassword() {
           Quên mật khẩu
         </h2>
         <p className="text-center text-gray-500 mb-6">
-          Nhập email <span className="font-medium">@hmu.edu.vn</span> để nhận liên kết đặt lại mật khẩu
+          Nhập email <span className="font-medium">@gmail.com</span> để nhận liên kết đặt lại mật khẩu
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="email"
-            placeholder="Email @hmu.edu.vn"
+            placeholder="Email @gmail.com"
             required
             className="border border-gray-300 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
