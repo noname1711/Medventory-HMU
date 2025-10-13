@@ -64,10 +64,10 @@ export default function AuthForm() {
     };
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Kiểm tra email hợp lệ cho cả đăng nhập và đăng ký (trừ admin)
+    // Kiểm tra email hợp lệ
     if (!email.endsWith("@gmail.com") && email !== "admin") {
       toast.error("Vui lòng dùng email @gmail.com để đăng nhập/đăng ký!");
       return;
@@ -79,22 +79,63 @@ export default function AuthForm() {
       return;
     }
 
-    // Cho phép admin đăng nhập không cần email thật
-    if (isLogin) {
-      if (email === "admin" && password === "12345") {
-        toast.success("Xin chào Admin 👑");
-        setTimeout(() => navigate("/admin"), 800);
-        return;
-      }
+    try {
+      if (isLogin) {
+        // Đăng nhập
+        const response = await fetch('http://localhost:8080/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
 
-      toast.success("Chào mừng đến Medventory-HMU 👋");
-      setTimeout(() => navigate("/dashboard"), 800);
-    } else {
-      toast.success("Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.");
-      setIsLogin(true);
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
+        const data = await response.json();
+
+        if (data.success) {
+          toast.success(data.message);
+          if (email === "admin") {
+            setTimeout(() => navigate("/admin"), 800);
+          } else {
+            setTimeout(() => navigate("/dashboard"), 800);
+          }
+        } else {
+          toast.error(data.message);
+        }
+      } else {
+        // Đăng ký
+        const registerData = {
+          fullName: document.querySelector('input[placeholder="Họ và tên"]').value,
+          email,
+          password,
+          confirmPassword,
+          dateOfBirth: document.querySelector('input[type="date"]').value,
+          department: document.querySelector('.department-select').value,
+          role: document.querySelector('select:last-child').value,
+        };
+
+        const response = await fetch('http://localhost:8080/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(registerData),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          toast.success(data.message);
+          setIsLogin(true);
+          setEmail("");
+          setPassword("");
+          setConfirmPassword("");
+        } else {
+          toast.error(data.message);
+        }
+      }
+    } catch (error) {
+      toast.error("Lỗi kết nối đến server!");
     }
   };
 
