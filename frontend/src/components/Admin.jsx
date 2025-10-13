@@ -4,19 +4,26 @@ import Swal from "sweetalert2";
 import "./Admin.css";
 
 export default function Admin() {
-  // Fake data người dùng đăng ký
-  const initialUsers = [
-    { id: 1, name: "Nguyễn Văn A", email: "a@hmu.edu.vn", department: "Khoa Nội", role: "Bác sĩ", status: "Chờ duyệt" },
-    { id: 2, name: "Trần Thị B", email: "b@hmu.edu.vn", department: "Khoa Sản", role: "Điều dưỡng", status: "Chờ duyệt" },
-    { id: 3, name: "Lê Văn C", email: "c@hmu.edu.vn", department: "Khoa Xét nghiệm", role: "Kỹ thuật viên", status: "Đã duyệt" },
-    { id: 4, name: "Phạm Thị D", email: "d@hmu.edu.vn", department: "Kho Vật tư", role: "Quản lý kho", status: "Từ chối" },
-  ];
-
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
-  // === Cập nhật biểu đồ khi thay đổi trạng thái ===
+  // Lấy danh sách người dùng từ API
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/admin/users/all');
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách người dùng:", error);
+    }
+  };
+
+  // Cập nhật biểu đồ
   useEffect(() => {
     updateChart();
   }, [users]);
@@ -25,9 +32,9 @@ export default function Admin() {
     const ctx = chartRef.current?.getContext("2d");
     if (!ctx) return;
 
-    const approved = users.filter((u) => u.status === "Đã duyệt").length;
-    const pending = users.filter((u) => u.status === "Chờ duyệt").length;
-    const rejected = users.filter((u) => u.status === "Từ chối").length;
+    const approved = users.filter((u) => u.status === "approved").length;
+    const pending = users.filter((u) => u.status === "pending").length;
+    const rejected = users.filter((u) => u.status === "rejected").length;
 
     if (chartInstance.current) chartInstance.current.destroy();
 
@@ -63,28 +70,39 @@ export default function Admin() {
     });
   };
 
-  // === HÀNH ĐỘNG DUYỆT / TỪ CHỐI ===
-  const approveUser = (id) => {
-    const user = users.find((u) => u.id === id);
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, status: "Đã duyệt" } : u))
-    );
-    Swal.fire({
-      title: "✅ Đã duyệt!",
-      text: `${user.name} đã được cấp quyền truy cập.`,
-      icon: "success",
-      timer: 2000,
-      showConfirmButton: false,
-      position: "center",
-      backdrop: true,
-    });
+  // Duyệt người dùng
+  const approveUser = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/admin/users/${id}/approve`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        const user = users.find((u) => u.id === id);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === id ? { ...u, status: "approved" } : u))
+        );
+        Swal.fire({
+          title: "✅ Đã duyệt!",
+          text: `${user.fullName} đã được cấp quyền truy cập.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          position: "center",
+          backdrop: true,
+        });
+      }
+    } catch (error) {
+      toast.error("Lỗi khi duyệt người dùng!");
+    }
   };
 
-  const rejectUser = (id) => {
+  // Từ chối người dùng
+  const rejectUser = async (id) => {
     const user = users.find((u) => u.id === id);
     Swal.fire({
       title: "⚠️ Xác nhận từ chối?",
-      text: `Bạn có chắc chắn muốn từ chối “${user.name}”?`,
+      text: `Bạn có chắc chắn muốn từ chối "${user.fullName}"?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -93,20 +111,30 @@ export default function Admin() {
       cancelButtonText: "Hủy",
       reverseButtons: true,
       backdrop: true,
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, status: "Từ chối" } : u))
-        );
-        Swal.fire({
-          title: "❌ Đã từ chối!",
-          text: `${user.name} đã bị từ chối đăng ký.`,
-          icon: "error",
-          timer: 2000,
-          showConfirmButton: false,
-          position: "center",
-          backdrop: true,
-        });
+        try {
+          const response = await fetch(`http://localhost:8080/api/admin/users/${id}/reject`, {
+            method: 'POST',
+          });
+          
+          if (response.ok) {
+            setUsers((prev) =>
+              prev.map((u) => (u.id === id ? { ...u, status: "rejected" } : u))
+            );
+            Swal.fire({
+              title: "❌ Đã từ chối!",
+              text: `${user.fullName} đã bị từ chối đăng ký.`,
+              icon: "error",
+              timer: 2000,
+              showConfirmButton: false,
+              position: "center",
+              backdrop: true,
+            });
+          }
+        } catch (error) {
+          toast.error("Lỗi khi từ chối người dùng!");
+        }
       }
     });
   };
@@ -140,23 +168,26 @@ export default function Admin() {
                   <th>Phòng ban</th>
                   <th>Vai trò</th>
                   <th>Trạng thái</th>
+                  <th>Thứ tự ưu tiên</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className={u.status === "Đã duyệt" ? "approved" : u.status === "Từ chối" ? "rejected" : ""}>
-                    <td>{u.name}</td>
+                  <tr key={u.id} className={u.status === "approved" ? "approved" : u.status === "rejected" ? "rejected" : ""}>
+                    <td>{u.fullName}</td>
                     <td>{u.email}</td>
                     <td>{u.department}</td>
                     <td>{u.role}</td>
                     <td>
-                      <span className={`status-badge ${u.status.toLowerCase().replace(" ", "-")}`}>
-                        {u.status}
+                      <span className={`status-badge ${u.status.toLowerCase()}`}>
+                        {u.status === 'approved' ? 'Đã duyệt' : 
+                         u.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
                       </span>
                     </td>
+                    <td>{u.priority}</td>
                     <td>
-                      {u.status === "Chờ duyệt" ? (
+                      {u.status === "pending" ? (
                         <div className="actions">
                           <button className="approve-btn" onClick={() => approveUser(u.id)}>Duyệt</button>
                           <button className="reject-btn" onClick={() => rejectUser(u.id)}>Từ chối</button>
