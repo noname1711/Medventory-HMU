@@ -1,9 +1,3 @@
--- Tạo database
-CREATE DATABASE medventory_hmu;
-
--- Kết nối đến database vừa tạo
-\c medventory_hmu;
-
 -- Tạo bảng users
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
