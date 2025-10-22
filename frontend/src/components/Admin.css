@@ -10,6 +10,15 @@ body {
   background: linear-gradient(135deg, #d0f0ff 0%, #e9fff5 100%);
   min-height: 100vh;
   color: #1e293b;
+  /* Đảm bảo body có thể cuộn */
+  overflow-x: hidden;
+}
+
+/* ==== ADMIN PAGE CONTAINER ==== */
+.admin-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ==== HEADER ==== */
@@ -22,6 +31,8 @@ body {
   align-items: center;
   border-bottom: 3px solid #0ea5e9;
   flex-wrap: wrap;
+  /* Header cố định */
+  flex-shrink: 0;
 }
 
 .admin-header .title h1 {
@@ -49,12 +60,18 @@ body {
 /* ==== CONTAINER ==== */
 .admin-container {
   padding: 2rem;
+  /* Container chính có thể cuộn */
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* Quan trọng cho flexbox scrolling */
 }
 
 .grid-layout {
   display: grid;
   grid-template-columns: 1.2fr 2.8fr;
   gap: 2rem;
+  min-height: min-content;
+  align-items: start; /* Căn các item lên trên */
 }
 
 /* ==== CARD ==== */
@@ -64,6 +81,7 @@ body {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   padding: 1.5rem;
   transition: all 0.3s ease;
+  height: fit-content; /* Chiều cao tự động fit content */
 }
 
 .card:hover {
@@ -71,26 +89,52 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-/* ==== CHART ==== */
+/* ==== CHART CARD ==== */
+.chart-card {
+  min-height: 450px; /* Tăng chiều cao tối thiểu */
+  display: flex;
+  flex-direction: column;
+}
+
 .chart-card h3 {
-  font-size: 1.2rem;
+  font-size: 1.4rem; /* Tiêu đề lớn hơn */
   color: #0369a1;
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
 }
 
 .chart-wrap {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 280px;
+  height: 350px; /* Tăng chiều cao biểu đồ */
+  flex: 1;
+  position: relative;
 }
 
-/* ==== TABLE ==== */
+/* Canvas biểu đồ  */
+.chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 400px;
+  max-height: 400px;
+}
+
+/* ==== TABLE CONTAINER ==== */
+.user-list {
+  /* Container cho bảng với cuộn */
+  display: flex;
+  flex-direction: column;
+  max-height: 600px; /* Hoặc chiều cao bạn muốn */
+}
+
 .user-list h3 {
-  font-size: 1.2rem;
+  font-size: 1.4rem; /* Đồng bộ kích thước tiêu đề */
   color: #0369a1;
   margin-bottom: 1rem;
+  flex-shrink: 0;
+  font-weight: 700;
 }
 
 .user-list table {
@@ -98,6 +142,15 @@ body {
   border-collapse: collapse;
   border-radius: 12px;
   overflow: hidden;
+  flex: 1;
+}
+
+/* Container cho bảng cuộn */
+.user-list .table-container {
+  overflow-y: auto;
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
 }
 
 .user-list th {
@@ -107,6 +160,9 @@ body {
   text-align: left;
   font-weight: 600;
   font-size: 0.95rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .user-list td {
@@ -189,6 +245,18 @@ button.reject-btn {
   .grid-layout {
     grid-template-columns: 1fr;
   }
+  
+  .user-list {
+    max-height: 400px;
+  }
+  
+  .chart-card {
+    min-height: 400px;
+  }
+  
+  .chart-wrap {
+    height: 300px;
+  }
 }
 
 @media (max-width: 600px) {
@@ -209,5 +277,21 @@ button.reject-btn {
   .approve-btn, .reject-btn {
     padding: 0.4rem 0.7rem;
     font-size: 0.8rem;
+  }
+  
+  .user-list {
+    max-height: 300px;
+  }
+  
+  .chart-card {
+    min-height: 350px;
+  }
+  
+  .chart-wrap {
+    height: 250px;
+  }
+  
+  .chart-card h3 {
+    font-size: 1.2rem;
   }
 }
