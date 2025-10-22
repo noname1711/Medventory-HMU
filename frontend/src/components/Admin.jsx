@@ -154,12 +154,21 @@ export default function Admin() {
           <div className="chart-card card">
             <h3>Thống kê trạng thái tài khoản</h3>
             <div className="chart-wrap">
-              <canvas ref={chartRef} width="280" height="280"></canvas>
+              <canvas 
+                ref={chartRef} 
+                width="400" 
+                height="400"
+                style={{ 
+                  maxWidth: '100%', 
+                  height: 'auto' 
+                }}
+              ></canvas>
             </div>
           </div>
 
           <div className="user-list card">
             <h3>Danh sách tài khoản chờ duyệt</h3>
+            <div className="table-container">
             <table>
               <thead>
                 <tr>
@@ -204,5 +213,6 @@ export default function Admin() {
         </div>
       </div>
     </div>
+  </div>
   );
 }
