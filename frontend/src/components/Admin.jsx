@@ -93,38 +93,37 @@ export default function Admin() {
         });
       }
     } catch (error) {
-      toast.error("Lỗi khi duyệt người dùng!");
+      console.error("Lỗi khi duyệt người dùng:", error);
     }
   };
 
-  // Từ chối người dùng
+  // Từ chối người dùng - TỰ ĐỘNG XÓA SAU KHI TỪ CHỐI
   const rejectUser = async (id) => {
     const user = users.find((u) => u.id === id);
     Swal.fire({
       title: "⚠️ Xác nhận từ chối?",
-      text: `Bạn có chắc chắn muốn từ chối "${user.fullName}"?`,
+      text: `"${user.fullName}" sẽ bị từ chối và xóa khỏi hệ thống. Hành động này không thể hoàn tác!`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Từ chối",
+      confirmButtonText: "Từ chối & Xóa",
       cancelButtonText: "Hủy",
       reverseButtons: true,
       backdrop: true,
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const response = await fetch(`http://localhost:8080/api/admin/users/${id}/reject`, {
-            method: 'POST',
+          const response = await fetch(`http://localhost:8080/api/admin/users/${id}`, {
+            method: 'DELETE',
           });
           
           if (response.ok) {
-            setUsers((prev) =>
-              prev.map((u) => (u.id === id ? { ...u, status: "rejected" } : u))
-            );
+            // Xóa người dùng khỏi danh sách
+            setUsers((prev) => prev.filter((u) => u.id !== id));
             Swal.fire({
-              title: "❌ Đã từ chối!",
-              text: `${user.fullName} đã bị từ chối đăng ký.`,
+              title: "❌ Đã từ chối & xóa!",
+              text: `${user.fullName} đã bị từ chối và xóa khỏi hệ thống.`,
               icon: "error",
               timer: 2000,
               showConfirmButton: false,
@@ -133,7 +132,59 @@ export default function Admin() {
             });
           }
         } catch (error) {
-          toast.error("Lỗi khi từ chối người dùng!");
+          console.error("Lỗi khi từ chối người dùng:", error);
+        }
+      }
+    });
+  };
+
+  // Xóa tài khoản đã được phê duyệt
+  const deleteUser = async (id) => {
+    const user = users.find((u) => u.id === id);
+    
+    Swal.fire({
+      title: "Xác nhận xóa tài khoản?",
+      html: `
+        <div style="text-align: left;">
+          <p><strong>Họ tên:</strong> ${user.fullName}</p>
+          <p><strong>Email:</strong> ${user.email}</p>
+          <p><strong>Phòng ban:</strong> ${user.department}</p>
+          <p><strong>Vai trò:</strong> ${user.role}</p>
+        </div>
+        <p style="color: #ef4444; margin-top: 15px;">
+          ⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!
+        </p>
+      `,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Xóa vĩnh viễn",
+      cancelButtonText: "Hủy",
+      reverseButtons: true,
+      backdrop: true,
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const response = await fetch(`http://localhost:8080/api/admin/users/${id}`, {
+            method: 'DELETE',
+          });
+          
+          if (response.ok) {
+            // Xóa người dùng khỏi danh sách
+            setUsers((prev) => prev.filter((u) => u.id !== id));
+            Swal.fire({
+              title: "✅ Đã xóa!",
+              text: `Tài khoản "${user.fullName}" đã bị xóa khỏi hệ thống.`,
+              icon: "success",
+              timer: 2000,
+              showConfirmButton: false,
+              position: "center",
+              backdrop: true,
+            });
+          }
+        } catch (error) {
+          console.error("Lỗi khi xóa người dùng:", error);
         }
       }
     });
@@ -167,52 +218,60 @@ export default function Admin() {
           </div>
 
           <div className="user-list card">
-            <h3>Danh sách tài khoản chờ duyệt</h3>
+            <h3>Danh sách tài khoản hệ thống</h3>
             <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Họ tên</th>
-                  <th>Email</th>
-                  <th>Phòng ban</th>
-                  <th>Vai trò</th>
-                  <th>Trạng thái</th>
-                  <th>Thứ tự ưu tiên</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className={u.status === "approved" ? "approved" : u.status === "rejected" ? "rejected" : ""}>
-                    <td>{u.fullName}</td>
-                    <td>{u.email}</td>
-                    <td>{u.department}</td>
-                    <td>{u.role}</td>
-                    <td>
-                      <span className={`status-badge ${u.status.toLowerCase()}`}>
-                        {u.status === 'approved' ? 'Đã duyệt' : 
-                         u.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
-                      </span>
-                    </td>
-                    <td>{u.priority}</td>
-                    <td>
-                      {u.status === "pending" ? (
-                        <div className="actions">
-                          <button className="approve-btn" onClick={() => approveUser(u.id)}>Duyệt</button>
-                          <button className="reject-btn" onClick={() => rejectUser(u.id)}>Từ chối</button>
-                        </div>
-                      ) : (
-                        <small className="muted">Đã xử lý</small>
-                      )}
-                    </td>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Họ tên</th>
+                    <th>Email</th>
+                    <th>Phòng ban</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Thứ tự ưu tiên</th>
+                    <th>Thao tác</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id} className={u.status === "approved" ? "approved" : u.status === "rejected" ? "rejected" : ""}>
+                      <td>{u.fullName}</td>
+                      <td>{u.email}</td>
+                      <td>{u.department}</td>
+                      <td>{u.role}</td>
+                      <td>
+                        <span className={`status-badge ${u.status.toLowerCase()}`}>
+                          {u.status === 'approved' ? 'Đã duyệt' : 
+                           u.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
+                        </span>
+                      </td>
+                      <td>{u.priority}</td>
+                      <td>
+                        {u.status === "pending" ? (
+                          <div className="actions">
+                            <button className="approve-btn" onClick={() => approveUser(u.id)}>Duyệt</button>
+                            <button className="reject-btn" onClick={() => rejectUser(u.id)}>Từ chối</button>
+                          </div>
+                        ) : (
+                          <div className="actions">
+                            <button 
+                              className="delete-btn" 
+                              onClick={() => deleteUser(u.id)}
+                              title="Xóa tài khoản khỏi hệ thống"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }

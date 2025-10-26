@@ -10,6 +10,13 @@ export default function AuthForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // THÊM STATE CHO CÁC TRƯỜNG ĐĂNG KÝ
+  const [fullName, setFullName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [department, setDepartment] = useState("");
+  const [role, setRole] = useState("");
+
   const navigate = useNavigate();
   
   const passwordTimeoutRef = useRef(null);
@@ -64,6 +71,15 @@ export default function AuthForm() {
     };
   }, []);
 
+  // Reset form khi chuyển tab
+  const resetForm = () => {
+    setFullName("");
+    setDateOfBirth("");
+    setDepartment("");
+    setRole("");
+    setConfirmPassword("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -76,6 +92,12 @@ export default function AuthForm() {
     // Kiểm tra xác nhận mật khẩu khi đăng ký
     if (!isLogin && password !== confirmPassword) {
       toast.error("Mật khẩu xác nhận không khớp!");
+      return;
+    }
+
+    // Kiểm tra các trường bắt buộc khi đăng ký
+    if (!isLogin && (!fullName || !dateOfBirth || !department || !role)) {
+      toast.error("Vui lòng điền đầy đủ thông tin đăng ký!");
       return;
     }
 
@@ -94,6 +116,9 @@ export default function AuthForm() {
 
         if (data.success) {
           toast.success(data.message);
+          if (data.user) {
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+          }
           if (email === "admin") {
             setTimeout(() => navigate("/admin"), 800);
           } else {
@@ -103,16 +128,18 @@ export default function AuthForm() {
           toast.error(data.message);
         }
       } else {
-        // Đăng ký
+        // Đăng ký - SỬ DỤNG STATE THAY VÌ QUERYSELECTOR
         const registerData = {
-          fullName: document.querySelector('input[placeholder="Họ và tên"]').value,
+          fullName,
           email,
           password,
           confirmPassword,
-          dateOfBirth: document.querySelector('input[type="date"]').value,
-          department: document.querySelector('.department-select').value,
-          role: document.querySelector('select:last-child').value,
+          dateOfBirth,
+          department,
+          role,
         };
+
+        console.log("Register data:", registerData); // Debug
 
         const response = await fetch('http://localhost:8080/api/auth/register', {
           method: 'POST',
@@ -127,9 +154,10 @@ export default function AuthForm() {
         if (data.success) {
           toast.success(data.message);
           setIsLogin(true);
+          // Reset toàn bộ form
           setEmail("");
           setPassword("");
-          setConfirmPassword("");
+          resetForm();
         } else {
           toast.error(data.message);
         }
@@ -173,6 +201,13 @@ export default function AuthForm() {
     }
   };
 
+  const handleTabChange = (isLoginTab) => {
+    setIsLogin(isLoginTab);
+    if (isLoginTab) {
+      resetForm();
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="demo-badge">Medventory-HMU</div>
@@ -191,13 +226,13 @@ export default function AuthForm() {
           <div className="tabs">
             <button
               className={isLogin ? "tab active" : "tab"}
-              onClick={() => setIsLogin(true)}
+              onClick={() => handleTabChange(true)}
             >
               Đăng nhập
             </button>
             <button
               className={!isLogin ? "tab active" : "tab"}
-              onClick={() => setIsLogin(false)}
+              onClick={() => handleTabChange(false)}
             >
               Đăng ký
             </button>
@@ -206,11 +241,28 @@ export default function AuthForm() {
           <form onSubmit={handleSubmit} className="auth-form">
             {!isLogin && (
               <>
-                <input type="text" placeholder="Họ và tên" required />
+                <input 
+                  type="text" 
+                  placeholder="Họ và tên" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required 
+                />
 
                 <div className="grid-2">
-                  <input type="date" placeholder="Ngày sinh" required />
-                  <select required className="department-select">
+                  <input 
+                    type="date" 
+                    placeholder="Ngày sinh" 
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    required 
+                  />
+                  <select 
+                    required 
+                    className="department-select"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                  >
                     <option value="">Phòng ban</option>
                     {departments.map((dept, index) => (
                       <option key={index} value={dept} title={dept}>
@@ -222,7 +274,7 @@ export default function AuthForm() {
               </>
             )}
 
-            {/*Nếu là admin thì cho phép nhập text thường, còn người khác thì dùng email */}
+            {/* Email input */}
             <input
               type={email === "admin" ? "text" : "email"}
               placeholder={
@@ -233,6 +285,7 @@ export default function AuthForm() {
               required
             />
 
+            {/* Password input */}
             <div className="password-input-wrapper">
               <input
                 type={showPassword ? "text" : "password"}
@@ -256,6 +309,7 @@ export default function AuthForm() {
 
             {!isLogin && (
               <>
+                {/* Confirm Password */}
                 <div className="password-input-wrapper">
                   <input
                     type={showConfirmPassword ? "text" : "password"}
@@ -277,11 +331,17 @@ export default function AuthForm() {
                   )}
                 </div>
                 
-                <select required>
+                {/* Role select - SỬ DỤNG STATE RIÊNG */}
+                <select 
+                  required
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="role-select"
+                >
                   <option value="">Phân quyền</option>
-                  <option>Lãnh đạo</option>
-                  <option>Thủ kho</option>
-                  <option>Cán bộ khác</option>
+                  <option value="Lãnh đạo">Lãnh đạo</option>
+                  <option value="Thủ kho">Thủ kho</option>
+                  <option value="Cán bộ">Cán bộ khác</option>
                 </select>
               </>
             )}
