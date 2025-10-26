@@ -9,6 +9,8 @@ import Swal from "sweetalert2";
 import "./Dashboard.css";
 
 export default function Dashboard() {
+  const [userInfo, setUserInfo] = useState(null); // THÊM DÒNG NÀY
+
   const initialData = [
     { id: 1, code: "TB001", name: "Máy X-quang", department: "Khoa Nội", status: "Hoạt động tốt", date: "2023-01-15", value: 500000000 },
     { id: 2, code: "TB002", name: "Máy siêu âm", department: "Khoa Sản", status: "Hoạt động tốt", date: "2023-02-20", value: 300000000 },
@@ -23,6 +25,14 @@ export default function Dashboard() {
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+
+  // LẤY THÔNG TIN USER KHI COMPONENT MOUNT
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      setUserInfo(JSON.parse(savedUser));
+    }
+  }, []);
 
   // Cập nhật chart khi data thay đổi
   useEffect(() => {
@@ -175,7 +185,7 @@ export default function Dashboard() {
   // === GIAO DIỆN ===
   return (
     <div className="dashboard-page">
-      <DashboardHeader />
+      <DashboardHeader userInfo={userInfo} />
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardTabs active={activeTab} setActive={setActiveTab} />
 

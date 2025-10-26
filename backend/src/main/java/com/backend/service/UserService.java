@@ -75,4 +75,11 @@ public class UserService {
     public boolean emailExists(String email) {
         return userRepository.existsByEmail(email);
     }
+
+    public void deleteUser(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Người dùng không tồn tại");
+        }
+        userRepository.deleteById(userId);
+    }
 }

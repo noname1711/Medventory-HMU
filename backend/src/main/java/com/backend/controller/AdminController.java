@@ -47,4 +47,15 @@ public class AdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "Không tìm thấy người dùng"));
         }
     }
+
+    @DeleteMapping("/users/{userId}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
+        try {
+            userService.deleteUser(userId);
+            return ResponseEntity.ok().body("Xóa người dùng thành công");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body("Lỗi khi xóa người dùng: " + e.getMessage());
+        }
+    }
 }

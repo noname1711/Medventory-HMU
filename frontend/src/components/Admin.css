@@ -295,3 +295,95 @@ button.reject-btn {
     font-size: 1.2rem;
   }
 }
+
+/* Thêm styles cho nút xóa */
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.delete-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.approve-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.approve-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.reject-btn {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.reject-btn:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+
+/* Status badges */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-badge.approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Table row styles */
+tr.approved {
+  background: #f0fdf4;
+}
+
+tr.rejected {
+  background: #fef2f2;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}

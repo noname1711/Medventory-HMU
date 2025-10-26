@@ -3,6 +3,7 @@ package com.backend.controller;
 import com.backend.dto.AuthResponse;
 import com.backend.dto.LoginRequest;
 import com.backend.dto.RegisterRequest;
+import com.backend.dto.UserDTO;
 import com.backend.entity.User;
 import com.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,16 +55,22 @@ public class AuthController {
         try {
             // Xử lý đăng nhập admin đặc biệt
             if ("admin".equals(request.getEmail()) && "12345".equals(request.getPassword())) {
-                AuthResponse response = new AuthResponse(true, "Xin chào Admin 👑");
-                response.setToken("admin-token");
+                // Tạo UserDTO cho admin
+                UserDTO adminUser = new UserDTO();
+                adminUser.setFullName("Admin");
+                adminUser.setRole("admin");
+                adminUser.setDepartment("Quản trị hệ thống");
+
+                AuthResponse response = new AuthResponse(true, "Xin chào Admin 👑", "admin-token", adminUser);
                 return ResponseEntity.ok(response);
             }
 
             User user = userService.authenticateUser(request.getEmail(), request.getPassword());
 
             if (user != null) {
-                AuthResponse response = new AuthResponse(true, "Đăng nhập thành công!");
-                response.setToken("user-token-" + user.getId());
+                // Convert User entity to UserDTO
+                UserDTO userDTO = convertToDTO(user);
+                AuthResponse response = new AuthResponse(true, "Đăng nhập thành công!", "user-token-" + user.getId(), userDTO);
                 return ResponseEntity.ok(response);
             } else {
                 return ResponseEntity.badRequest()
@@ -74,5 +81,18 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(new AuthResponse(false, "Lỗi hệ thống: " + e.getMessage()));
         }
+    }
+
+    private UserDTO convertToDTO(User user) {
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setFullName(user.getFullName());
+        dto.setEmail(user.getEmail());
+        dto.setDateOfBirth(user.getDateOfBirth());
+        dto.setDepartment(user.getDepartment());
+        dto.setRole(user.getRole());
+        dto.setStatus(user.getStatus());
+        dto.setPriority(user.getPriority());
+        return dto;
     }
 }
