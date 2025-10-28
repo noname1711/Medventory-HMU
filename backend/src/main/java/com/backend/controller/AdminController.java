@@ -58,4 +58,26 @@ public class AdminController {
                     .body("Lỗi khi xóa người dùng: " + e.getMessage());
         }
     }
+
+    @PutMapping("/users/{userId}/role")
+    public ResponseEntity<?> updateUserRole(@PathVariable Long userId, @RequestBody Map<String, Object> request) {
+        try {
+            String newRole = (String) request.get("role");
+            Integer newPriority = (Integer) request.get("priority");
+
+            if (newRole == null || newRole.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Role không được để trống");
+            }
+
+            boolean success = userService.updateUserRoleAndPriority(userId, newRole, newPriority);
+            if (success) {
+                return ResponseEntity.ok().body("Cập nhật quyền và độ ưu tiên thành công");
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body("Lỗi khi cập nhật quyền: " + e.getMessage());
+        }
+    }
 }

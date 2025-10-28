@@ -27,7 +27,7 @@ VALUES
 ('Trần Thị B', 'tranthib@gmail.com', '12345', '1985-08-20', 'Khoa phục hồi chức năng', 'thukho', 'pending', 2),
 ('Lê Văn C', 'levanc@gmail.com', '12345', '1992-12-10', 'Khoa gây mê hồi sức và chống đau', 'lanhdao', 'pending', 1),
 ('Phạm Thị D', 'phamthid@gmail.com', '12345', '1988-03-25', 'Khoa cấp cứu', 'canbo', 'approved', 3),
-('Hoàng Văn E', 'hoangvane@gmail.com', '12345', '1995-07-30', 'Khoa mắt', 'canbo', 'rejected', 3);
+('Hoàng Văn E', 'hoangvane@gmail.com', '12345', '1995-07-30', 'Khoa mắt', 'canbo', 'pending', 3);
 
 -- Tạo indexes cho hiệu suất
 CREATE INDEX idx_users_email ON users(email);
