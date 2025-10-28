@@ -82,4 +82,15 @@ public class UserService {
         }
         userRepository.deleteById(userId);
     }
+
+    public boolean updateUserRoleAndPriority(Long userId, String newRole, Integer newPriority) {
+        return userRepository.findById(userId)
+                .map(user -> {
+                    user.setRole(newRole);
+                    user.setPriority(newPriority);
+                    userRepository.save(user);
+                    return true;
+                })
+                .orElse(false);
+    }
 }

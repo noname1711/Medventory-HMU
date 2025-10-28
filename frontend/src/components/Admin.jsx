@@ -5,8 +5,23 @@ import "./Admin.css";
 
 export default function Admin() {
   const [users, setUsers] = useState([]);
+  const [editingUser, setEditingUser] = useState(null);
+  const [newRole, setNewRole] = useState("");
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+
+  // Danh sách các quyền có thể chọn và priority tương ứng
+  const availableRoles = [
+    { value: "Lãnh đạo", label: "Lãnh đạo", priority: 1 },
+    { value: "Thủ kho", label: "Thủ kho", priority: 2 },
+    { value: "Cán bộ", label: "Cán bộ khác", priority: 3 }
+  ];
+
+  // Lấy priority theo role
+  const getPriorityByRole = (role) => {
+    const roleConfig = availableRoles.find(r => r.value === role);
+    return roleConfig ? roleConfig.priority : 3; // Mặc định là 3 nếu không tìm thấy
+  };
 
   // Lấy danh sách người dùng từ API
   useEffect(() => {
@@ -34,17 +49,16 @@ export default function Admin() {
 
     const approved = users.filter((u) => u.status === "approved").length;
     const pending = users.filter((u) => u.status === "pending").length;
-    const rejected = users.filter((u) => u.status === "rejected").length;
 
     if (chartInstance.current) chartInstance.current.destroy();
 
     chartInstance.current = new Chart(ctx, {
       type: "doughnut",
       data: {
-        labels: ["Đã duyệt", "Chờ duyệt", "Từ chối"],
+        labels: ["Đã duyệt", "Chờ duyệt"],
         datasets: [{
-          data: [approved, pending, rejected],
-          backgroundColor: ["#10B981", "#FACC15", "#EF4444"],
+          data: [approved, pending],
+          backgroundColor: ["#10B981", "#FACC15"],
           borderColor: "#fff",
           borderWidth: 3,
         }],
@@ -190,6 +204,84 @@ export default function Admin() {
     });
   };
 
+  // Thay đổi quyền của user (CẬP NHẬT CẢ ROLE VÀ PRIORITY)
+  const changeUserRole = async (id, newRole) => {
+    try {
+      const newPriority = getPriorityByRole(newRole);
+      
+      const response = await fetch(`http://localhost:8080/api/admin/users/${id}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          role: newRole,
+          priority: newPriority 
+        }),
+      });
+      
+      if (response.ok) {
+        setUsers((prev) =>
+          prev.map((u) => 
+            u.id === id ? { ...u, role: newRole, priority: newPriority } : u
+          )
+        );
+        setEditingUser(null);
+        setNewRole("");
+        
+        Swal.fire({
+          title: "✅ Đã cập nhật!",
+          html: `
+            <div style="text-align: left;">
+              <p><strong>Quyền mới:</strong> ${newRole}</p>
+              <p><strong>Độ ưu tiên mới:</strong> ${newPriority}</p>
+            </div>
+          `,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          position: "center",
+          backdrop: true,
+        });
+      } else {
+        const errorText = await response.text();
+        Swal.fire({
+          title: "❌ Lỗi!",
+          text: `Không thể thay đổi quyền: ${errorText}`,
+          icon: "error",
+          timer: 3000,
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi khi thay đổi quyền:", error);
+      Swal.fire({
+        title: "❌ Lỗi kết nối!",
+        text: "Không thể kết nối đến server",
+        icon: "error",
+        timer: 3000,
+      });
+    }
+  };
+
+  // Mở modal thay đổi quyền
+  const openRoleChangeModal = (user) => {
+    setEditingUser(user);
+    setNewRole(user.role);
+  };
+
+  // Đóng modal
+  const closeRoleChangeModal = () => {
+    setEditingUser(null);
+    setNewRole("");
+  };
+
+  // Xử lý thay đổi quyền
+  const handleRoleChange = () => {
+    if (editingUser && newRole) {
+      changeUserRole(editingUser.id, newRole);
+    }
+  };
+
   return (
     <div className="admin-page">
       <header className="admin-header">
@@ -234,18 +326,32 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {users.map((u) => (
-                    <tr key={u.id} className={u.status === "approved" ? "approved" : u.status === "rejected" ? "rejected" : ""}>
+                    <tr key={u.id} className={u.status === "approved" ? "approved" : ""}>
                       <td>{u.fullName}</td>
                       <td>{u.email}</td>
                       <td>{u.department}</td>
-                      <td>{u.role}</td>
+                      <td>
+                        {u.role}
+                        {u.status === "approved" && (
+                          <button 
+                            className="edit-role-btn"
+                            onClick={() => openRoleChangeModal(u)}
+                            title="Thay đổi quyền"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                      </td>
                       <td>
                         <span className={`status-badge ${u.status.toLowerCase()}`}>
-                          {u.status === 'approved' ? 'Đã duyệt' : 
-                           u.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
+                          {u.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
                         </span>
                       </td>
-                      <td>{u.priority}</td>
+                      <td>
+                        <span className={`priority-number priority-${u.priority}`}>
+                          {u.priority}
+                        </span>
+                      </td>
                       <td>
                         {u.status === "pending" ? (
                           <div className="actions">
@@ -272,6 +378,70 @@ export default function Admin() {
           </div>
         </div>
       </div>
+
+      {/* Modal thay đổi quyền */}
+      {editingUser && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Thay đổi quyền người dùng</h3>
+              <button className="modal-close" onClick={closeRoleChangeModal}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="user-info">
+                <p><strong>Họ tên:</strong> {editingUser.fullName}</p>
+                <p><strong>Email:</strong> {editingUser.email}</p>
+                <p><strong>Phòng ban:</strong> {editingUser.department}</p>
+                <p><strong>Quyền hiện tại:</strong> {editingUser.role}</p>
+                <p><strong>Độ ưu tiên hiện tại:</strong> 
+                  <span className={`priority-number priority-${editingUser.priority}`}>
+                    {editingUser.priority}
+                  </span>
+                </p>
+              </div>
+              
+              <div className="role-selection">
+                <label htmlFor="role-select">Chọn quyền mới:</label>
+                <select 
+                  id="role-select"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                >
+                  {availableRoles.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label} (Ưu tiên: {role.priority})
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Hiển thị thông tin priority sẽ thay đổi */}
+                {newRole && (
+                  <div className="priority-preview">
+                    <p><strong>Độ ưu tiên sẽ thay đổi thành:</strong></p>
+                    <span className={`priority-number priority-${getPriorityByRole(newRole)}`}>
+                      {getPriorityByRole(newRole)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeRoleChangeModal}>
+                Hủy
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleRoleChange}
+                disabled={!newRole || newRole === editingUser.role}
+              >
+                Cập nhật quyền & Ưu tiên
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
