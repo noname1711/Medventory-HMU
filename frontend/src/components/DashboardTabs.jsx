@@ -10,6 +10,8 @@ export default function DashboardTabs({ active, setActive }) {
       <button className={btnClass("equipment")} onClick={() => setActive("equipment")}>🏥 Danh sách vật tư</button>
       <button className={btnClass("add")} onClick={() => setActive("add")}>➕ Thêm vật tư</button>
       <button className={btnClass("export")} onClick={() => setActive("export")}>📤 Xuất vật tư</button>
+      <button className={btnClass("replenish")} onClick={() => setActive("replenish")}>📦 Đề nghị bổ sung</button>
+
     </nav>
   );
 }

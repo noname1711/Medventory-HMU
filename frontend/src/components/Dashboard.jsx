@@ -4,6 +4,7 @@ import DashboardTabs from "./DashboardTabs";
 import EquipmentList from "./EquipmentList";
 import AddEquipment from "./AddEquipment";
 import ExportEquipment from "./ExportEquipment";
+import ReplenishmentRequest from "./ReplenishmentRequest";
 import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
 import "./Dashboard.css";
@@ -221,6 +222,8 @@ export default function Dashboard() {
 
           {activeTab === "add" && <AddEquipment onAdd={addEquipment} />}
           {activeTab === "export" && <ExportEquipment equipmentData={equipmentData} onExport={handleExport} />}
+          {activeTab === "replenish" && <ReplenishmentRequest />}
+
         </div>
       </div>
     </div>
