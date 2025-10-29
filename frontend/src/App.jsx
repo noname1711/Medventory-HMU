@@ -3,6 +3,7 @@ import AuthForm from "./components/AuthForm";
 import ForgotPassword from "./components/ForgotPassword";
 import Dashboard from "./components/Dashboard";
 import Admin from "./components/Admin"; 
+import ResetPassword from "./components/ResetPassword";
 import "./App.css";
 
 export default function App() {
@@ -10,9 +11,10 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<AuthForm />} />
-        <Route path="/forgot" element={<ForgotPassword />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin" element={<Admin />} /> 
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </Router>
   );

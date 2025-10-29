@@ -93,4 +93,14 @@ public class UserService {
                 })
                 .orElse(false);
     }
+
+    public boolean updatePassword(String email, String newPassword) {
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    user.setPassword(newPassword); // Lưu password trực tiếp (không encode)
+                    userRepository.save(user);
+                    return true;
+                })
+                .orElse(false);
+    }
 }
