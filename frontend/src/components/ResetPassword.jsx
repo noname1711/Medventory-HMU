@@ -1,24 +1,40 @@
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import "./ForgotPassword.css";
 
+
 export default function ResetPassword() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     token: "",
     newPassword: "",
     confirmPassword: ""
   });
+
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get("token");
+    if (tokenFromUrl) {
+      setFormData(prev => ({
+        ...prev,
+        token: tokenFromUrl
+      }));
+    }
+  }, [searchParams]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    // Chỉ cho phép thay đổi password fields, không cho thay đổi token
+    if (e.target.name !== "token") {
+      setFormData({
+        ...formData,
+        [e.target.name]: e.target.value
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -29,9 +45,13 @@ export default function ResetPassword() {
       return;
     }
 
-    // Bỏ validate độ dài mật khẩu
     if (!formData.newPassword) {
       toast.error("Vui lòng nhập mật khẩu mới!");
+      return;
+    }
+
+    if (!formData.token) {
+      toast.error("Không tìm thấy mã đặt lại!");
       return;
     }
 
@@ -83,7 +103,7 @@ export default function ResetPassword() {
             </svg>
           </div>
           <h2>Đặt lại mật khẩu</h2>
-          <p>Nhập mã và mật khẩu mới của bạn</p>
+          <p>Nhập mật khẩu mới của bạn</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -91,9 +111,11 @@ export default function ResetPassword() {
             <input
               type="text"
               name="token"
-              placeholder="Dán mã bạn đã copy ở đây..."
+              placeholder="Mã đặt lại..."
               value={formData.token}
               onChange={handleChange}
+              readOnly // Không thể chỉnh sửa
+              className="readonly-input" 
               required
             />
             <div className="input-icon">
@@ -131,7 +153,7 @@ export default function ResetPassword() {
             <input
               type={showConfirmPassword ? "text" : "password"}
               name="confirmPassword"
-              placeholder="Nhập lại mật khẩu mới..."
+              placeholder="Xác nhận lại mật khẩu mới..."
               value={formData.confirmPassword}
               onChange={handleChange}
               required

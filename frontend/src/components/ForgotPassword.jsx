@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import "./ForgotPassword.css";
 
@@ -8,6 +8,46 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [resetToken, setResetToken] = useState("");
+  const [countdown, setCountdown] = useState(60);
+  
+  // Dùng useRef để track xem component có còn mounted không
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showTokenModal) return;
+
+    setCountdown(60);
+    
+    const timer = setInterval(() => {
+      // Kiểm tra component còn mounted trước khi setState
+      if (!isMounted.current) {
+        clearInterval(timer);
+        return;
+      }
+
+      setCountdown(prev => {
+        const newCountdown = prev - 1;
+        
+        if (newCountdown <= 0) {
+          clearInterval(timer);
+          if (isMounted.current) {
+            setShowTokenModal(false);
+          }
+          return 0;
+        }
+        return newCountdown;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showTokenModal]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +72,7 @@ export default function ForgotPassword() {
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success === "true" || data.success === true) {
         setResetToken(data.resetToken);
         setShowTokenModal(true);
       } else {
@@ -50,7 +90,7 @@ export default function ForgotPassword() {
     navigator.clipboard.writeText(resetToken);
     toast.success("✅ Đã copy mã vào clipboard!");
     setShowTokenModal(false);
-    setTimeout(() => navigate("/reset-password"), 500);
+    navigate(`/reset-password?token=${encodeURIComponent(resetToken)}`);
   };
 
   const handleCloseModal = () => {
@@ -69,7 +109,7 @@ export default function ForgotPassword() {
               </svg>
             </div>
             <h2>Quên mật khẩu</h2>
-            <p>Nhập email <span className="highlight">@gmail.com</span> để nhận mã đặt lại</p>
+            <p>Nhập email <span className="highlight">@gmail.com</span> đã đăng ký</p>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -108,32 +148,33 @@ export default function ForgotPassword() {
         </div>
       </div>
 
-      {/* Token Modal */}
+      {/* Token Modal với Countdown */}
       {showTokenModal && (
         <div className="modal-overlay">
           <div className="token-modal">
-            {/* Header */}
             <div className="modal-header">
               <div className="modal-icon">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p>Mã đặt lại đã sẵn sàng!</p>
+              <p>Mã có hiệu lực trong 1 phút!</p>
             </div>
 
-            {/* Token Content */}
             <div className="modal-content">
               <div className="token-box">
                 <p className="token-label">Mã đặt lại mật khẩu của bạn:</p>
                 <div className="token-display">
                   <code className="token-text">{resetToken}</code>
                 </div>
+                <div className="countdown-timer">
+                  ⏰ Hộp thoại sẽ tự động đóng sau: <span className="countdown-number">{countdown}</span> giây
+                </div>
               </div>
 
               <div className="modal-actions">
                 <button onClick={handleCloseModal} className="close-btn">
-                  Đóng
+                  Đóng ngay
                 </button>
                 <button onClick={handleCopyToken} className="copy-action-btn">
                   <svg className="copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

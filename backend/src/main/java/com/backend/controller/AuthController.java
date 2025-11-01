@@ -99,32 +99,26 @@ public class AuthController {
 
             // Kiểm tra email có tồn tại không
             if (!userService.emailExists(email)) {
-                Map<String, String> response = new HashMap<>();
-                response.put("success", "false");
-                response.put("message", "Email không tồn tại trong hệ thống");
-                return ResponseEntity.badRequest().body(response);
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                return ResponseEntity.status(404).body(response); // 404 Not Found - Không tìm thấy email
             }
 
-            // Tạo reset token
+            // Tạo token reset
             String resetToken = UUID.randomUUID().toString();
-
-            // Lưu token với email
             resetTokens.put(resetToken, email);
 
-            // Tạo response
-            Map<String, String> response = new HashMap<>();
-            response.put("success", "true");
-            response.put("message", "Mã đặt lại mật khẩu đã được tạo");
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
             response.put("resetToken", resetToken);
-            response.put("expiresIn", "15 phút");
 
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);  // 200 OK - Yêu cầu thành công
 
         } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("success", "false");
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.internalServerError().body(response); // 500 Internal Server Error - Lỗi server
         }
     }
 
@@ -138,8 +132,7 @@ public class AuthController {
             if (!resetTokens.containsKey(token)) {
                 Map<String, String> response = new HashMap<>();
                 response.put("success", "false");
-                response.put("message", "Mã đặt lại không hợp lệ hoặc đã hết hạn");
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.badRequest().body(response); // 400 Bad Request - Client gửi token sai
             }
 
             // Lấy email từ token
@@ -154,20 +147,18 @@ public class AuthController {
 
                 Map<String, String> response = new HashMap<>();
                 response.put("success", "true");
-                response.put("message", "Đặt lại mật khẩu thành công");
-                return ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);  // 200 OK - Reset mật khẩu thành công
             } else {
                 Map<String, String> response = new HashMap<>();
                 response.put("success", "false");
-                response.put("message", "Không thể cập nhật mật khẩu");
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.badRequest().body(response); // 400 Bad Request - Lỗi cập nhật
             }
 
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("success", "false");
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(response); // 400 Bad Request - Lỗi xử lý
         }
     }
 
