@@ -3,6 +3,40 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "./AuthForm.css";
 
+// COOKIE MANAGER UTILITIES
+const cookieManager = {
+  setCookie: (name, value, days = 30) => {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+  },
+
+  getCookie: (name) => {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [cookieName, cookieValue] = cookie.trim().split('=');
+      if (cookieName === name) {
+        return decodeURIComponent(cookieValue);
+      }
+    }
+    return null;
+  },
+
+  deleteCookie: (name) => {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+  },
+
+  clearAllAuthCookies: () => {
+    const cookiesToDelete = [
+      "rememberedEmail", "rememberedPassword", "rememberMe",
+      "rememberedAdmin", "rememberedAdminPassword", "rememberAdmin"
+    ];
+    cookiesToDelete.forEach(cookieName => {
+      cookieManager.deleteCookie(cookieName);
+    });
+  }
+};
+
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -10,8 +44,10 @@ export default function AuthForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isAutoLogging, setIsAutoLogging] = useState(false);
   
-  // THÊM STATE CHO CÁC TRƯỜNG ĐĂNG KÝ
+  // STATE CHO CÁC TRƯỜNG ĐĂNG KÝ
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [department, setDepartment] = useState("");
@@ -59,6 +95,89 @@ export default function AuthForm() {
     "Khoa bệnh nhiệt đới và can thiệp giảm hại"
   ];
 
+  // AUTO LOGIN - CHỈ CHO USER THƯỜNG, KHÔNG CHO ADMIN
+  useEffect(() => {
+    const attemptAutoLogin = async () => {
+      // CHỈ KIỂM TRA COOKIES USER THƯỜNG
+      const savedEmail = cookieManager.getCookie("rememberedEmail");
+      const savedPassword = cookieManager.getCookie("rememberedPassword");
+      const savedRememberMe = cookieManager.getCookie("rememberMe") === "true";
+      
+      console.log("Auto Login Check - User only:", {
+        savedEmail, 
+        savedRememberMe,
+        isAdmin: savedEmail === "admin"
+      });
+      
+      // QUAN TRỌNG: KHÔNG auto login cho admin
+      if (savedEmail === "admin") {
+        console.log("Admin detected - Skipping auto login");
+        // Xóa cookies admin cũ nếu có
+        cookieManager.deleteCookie("rememberedEmail");
+        cookieManager.deleteCookie("rememberedPassword");
+        cookieManager.deleteCookie("rememberMe");
+        return;
+      }
+      
+      // CHỈ AUTO LOGIN CHO USER THƯỜNG
+      if (savedRememberMe && savedEmail && savedPassword) {
+        console.log("Attempting user auto login");
+        setIsAutoLogging(true);
+        
+        try {
+          const response = await fetch('http://localhost:8080/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              email: savedEmail, 
+              password: savedPassword 
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            console.log("User auto login successful");
+            
+            if (data.user) {
+              localStorage.setItem('currentUser', JSON.stringify(data.user));
+            }
+            
+            // CHỈ chuyển hướng đến dashboard, KHÔNG đến admin
+            setTimeout(() => navigate("/dashboard"), 500);
+          } else {
+            // Nếu auto login thất bại, chỉ điền email
+            setEmail(savedEmail);
+            setRememberMe(true);
+          }
+        } catch (error) {
+          console.error("User auto login error:", error);
+          // Nếu có lỗi, chỉ điền email
+          setEmail(savedEmail);
+          setRememberMe(true);
+        } finally {
+          setIsAutoLogging(false);
+        }
+      } else if (savedRememberMe && savedEmail) {
+        // Chỉ có email, không có password -> chỉ điền email
+        setEmail(savedEmail);
+        setRememberMe(true);
+        
+        // Auto-focus password field
+        setTimeout(() => {
+          const passwordInput = document.querySelector('input[type="password"]');
+          if (passwordInput) {
+            passwordInput.focus();
+          }
+        }, 500);
+      }
+    };
+
+    attemptAutoLogin();
+  }, [navigate]);
+
   // Clear timeout khi component unmount
   useEffect(() => {
     return () => {
@@ -78,6 +197,19 @@ export default function AuthForm() {
     setDepartment("");
     setRole("");
     setConfirmPassword("");
+  };
+
+  // HANDLE REMEMBER ME CHANGE - CHỈ CHO USER THƯỜNG
+  const handleRememberMeChange = (e) => {
+    const isChecked = e.target.checked;
+    setRememberMe(isChecked);
+    
+    if (!isChecked) {
+      // Xóa cookies user thường
+      cookieManager.deleteCookie("rememberedEmail");
+      cookieManager.deleteCookie("rememberedPassword");
+      cookieManager.deleteCookie("rememberMe");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -103,6 +235,21 @@ export default function AuthForm() {
 
     try {
       if (isLogin) {
+        // XỬ LÝ GHI NHỚ ĐĂNG NHẬP - CHỈ CHO USER THƯỜNG
+        if (rememberMe && email !== "admin") {
+          // CHỈ lưu cookies cho user thường
+          cookieManager.setCookie("rememberedEmail", email, 30);
+          cookieManager.setCookie("rememberedPassword", password, 30);
+          cookieManager.setCookie("rememberMe", "true", 30);
+          // Xóa cookies admin nếu có
+          cookieManager.deleteCookie("rememberedAdmin");
+          cookieManager.deleteCookie("rememberedAdminPassword");
+          cookieManager.deleteCookie("rememberAdmin");
+        } else {
+          // Xóa tất cả cookies khi không chọn remember me hoặc là admin
+          cookieManager.clearAllAuthCookies();
+        }
+
         // Đăng nhập
         const response = await fetch('http://localhost:8080/api/auth/login', {
           method: 'POST',
@@ -119,16 +266,24 @@ export default function AuthForm() {
           if (data.user) {
             localStorage.setItem('currentUser', JSON.stringify(data.user));
           }
+          
+          // CHUYỂN HƯỚNG
           if (email === "admin") {
+            // THÊM SESSION FLAG CHO ADMIN
+            sessionStorage.setItem('adminJustLoggedIn', 'true');
             setTimeout(() => navigate("/admin"), 800);
           } else {
             setTimeout(() => navigate("/dashboard"), 800);
           }
         } else {
           toast.error(data.message);
+          // Nếu đăng nhập thất bại, xóa password khỏi cookies
+          if (rememberMe && email !== "admin") {
+            cookieManager.deleteCookie("rememberedPassword");
+          }
         }
       } else {
-        // Đăng ký - SỬ DỤNG STATE THAY VÌ QUERYSELECTOR
+        // Đăng ký (chỉ cho user thường)
         const registerData = {
           fullName,
           email,
@@ -138,8 +293,6 @@ export default function AuthForm() {
           department,
           role,
         };
-
-        console.log("Register data:", registerData); // Debug
 
         const response = await fetch('http://localhost:8080/api/auth/register', {
           method: 'POST',
@@ -154,7 +307,6 @@ export default function AuthForm() {
         if (data.success) {
           toast.success(data.message);
           setIsLogin(true);
-          // Reset toàn bộ form
           setEmail("");
           setPassword("");
           resetForm();
@@ -168,7 +320,6 @@ export default function AuthForm() {
   };
 
   const togglePasswordVisibility = () => {
-    // Clear existing timeout
     if (passwordTimeoutRef.current) {
       clearTimeout(passwordTimeoutRef.current);
     }
@@ -176,7 +327,6 @@ export default function AuthForm() {
     const newShowPassword = !showPassword;
     setShowPassword(newShowPassword);
 
-    // Nếu đang bật hiện mật khẩu, set timeout để tắt sau 3 giây
     if (newShowPassword) {
       passwordTimeoutRef.current = setTimeout(() => {
         setShowPassword(false);
@@ -185,7 +335,6 @@ export default function AuthForm() {
   };
 
   const toggleConfirmPasswordVisibility = () => {
-    // Clear existing timeout
     if (confirmPasswordTimeoutRef.current) {
       clearTimeout(confirmPasswordTimeoutRef.current);
     }
@@ -193,7 +342,6 @@ export default function AuthForm() {
     const newShowConfirmPassword = !showConfirmPassword;
     setShowConfirmPassword(newShowConfirmPassword);
 
-    // Nếu đang bật hiện mật khẩu, set timeout để tắt sau 3 giây
     if (newShowConfirmPassword) {
       confirmPasswordTimeoutRef.current = setTimeout(() => {
         setShowConfirmPassword(false);
@@ -208,10 +356,23 @@ export default function AuthForm() {
     }
   };
 
+  // LOADING KHI AUTO LOGIN 
+  if (isAutoLogging) {
+    return (
+      <div className="auth-page">
+        <div className="auth-wrapper">
+          <div className="auto-login-loading">
+            <div className="loading-spinner"></div>
+            <p>Đang tải...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-page">
       <div className="demo-badge">Medventory-HMU</div>
-
       <div className="auth-wrapper">
         <div className="auth-header">
           <div className="logo-circle">
@@ -285,7 +446,7 @@ export default function AuthForm() {
               required
             />
 
-            {/* Password input với con mắt */}
+            {/* Password input */}
             <div className="input-group">
               <input
                 type={showPassword ? "text" : "password"}
@@ -360,15 +521,25 @@ export default function AuthForm() {
               </>
             )}
 
-            {isLogin && (
+            {/* CHỈ HIỂN THỊ REMEMBER ROW CHO USER THƯỜNG */}
+            {isLogin && email !== "admin" && (
               <div className="remember-row">
                 <label>
-                  <input type="checkbox" /> Ghi nhớ đăng nhập
+                  <input 
+                    type="checkbox" 
+                    checked={rememberMe}
+                    onChange={handleRememberMeChange}
+                  /> 
+                  Ghi nhớ đăng nhập
                 </label>
                 <a href="#" onClick={() => navigate("/forgot-password")}>
                   Quên mật khẩu?
                 </a>
               </div>
+            )}
+
+            {isLogin && email === "admin" && (
+              <div style={{ height: '20px' }}></div> 
             )}
 
             <button type="submit" className="submit-btn">

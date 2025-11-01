@@ -1,6 +1,24 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./DashboardHeader.css";
 
+// COOKIE MANAGER UTILITIES
+const cookieManager = {
+  deleteCookie: (name) => {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+  },
+
+  getCookie: (name) => {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [cookieName, cookieValue] = cookie.trim().split('=');
+      if (cookieName === name) {
+        return decodeURIComponent(cookieValue);
+      }
+    }
+    return null;
+  }
+};
+
 export default function DashboardHeader({ userInfo }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -95,12 +113,30 @@ export default function DashboardHeader({ userInfo }) {
     setShowDropdown(false);
   };
 
+  // XÓA COOKIES KHI ĐĂNG XUẤT
   const handleLogout = () => {
-    // Xóa thông tin user khỏi localStorage
+    // XÓA TẤT CẢ COOKIES ĐĂNG NHẬP
+    const cookiesToDelete = [
+      "rememberedEmail",
+      "rememberedPassword", 
+      "rememberMe",
+      "authToken",
+      "refreshToken"
+    ];
+    
+    cookiesToDelete.forEach(cookieName => {
+      cookieManager.deleteCookie(cookieName);
+    });
+    
+    // XÓA LOCAL STORAGE
     localStorage.removeItem('currentUser');
     localStorage.removeItem('token');
-    // Chuyển hướng về trang login
-    window.location.href = "/";
+    localStorage.removeItem('userData');
+    
+    // CHUYỂN HƯỚNG VỀ TRANG LOGIN
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 300);
   };
 
   const displayName = getDisplayName(userInfo);
