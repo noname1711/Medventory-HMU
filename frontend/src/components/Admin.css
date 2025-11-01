@@ -1,160 +1,225 @@
-/* ==== RESET & BASE ==== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: "Inter", "Segoe UI", sans-serif;
 }
 
-body {
-  background: linear-gradient(135deg, #d0f0ff 0%, #e9fff5 100%);
-  min-height: 100vh;
-  color: #1e293b;
-  /* Đảm bảo body có thể cuộn */
-  overflow-x: hidden;
+:root {
+  --admin-primary-blue: #0284c7;
+  --admin-secondary-blue: #06b6d4;
+  --admin-accent-blue: #0ea5e9;
+  --admin-dark-blue: #0369a1;
+  --admin-success: #10b981;
+  --admin-success-dark: #059669;
+  --admin-warning: #f59e0b;
+  --admin-warning-dark: #d97706;
+  --admin-error: #ef4444;
+  --admin-error-dark: #dc2626;
+  --admin-text-primary: #1e293b;
+  --admin-text-secondary: #64748b;
+  --admin-text-light: #9ca3af;
+  --admin-bg-white: #ffffff;
+  --admin-bg-light: #f8fafc;
+  --admin-bg-hover: #f0f9ff;
+  --admin-border-light: #e2e8f0;
+  --admin-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --admin-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --admin-radius-sm: 6px;
+  --admin-radius-md: 12px;
+  --admin-radius-lg: 16px;
+  --admin-radius-xl: 20px;
 }
 
-/* ==== ADMIN PAGE CONTAINER ==== */
 .admin-page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: linear-gradient(135deg, #d0f0ff 0%, #e9fff5 100%);
+  font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--admin-text-primary);
+  line-height: 1.6;
 }
 
-/* ==== HEADER ==== */
 .admin-header {
-  background: linear-gradient(90deg, #0284c7, #06b6d4);
+  background: linear-gradient(90deg, var(--admin-primary-blue), var(--admin-secondary-blue));
   color: white;
   padding: 1.5rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 3px solid #0ea5e9;
+  border-bottom: 3px solid var(--admin-accent-blue);
   flex-wrap: wrap;
-  /* Header cố định */
   flex-shrink: 0;
 }
 
-.admin-header .title h1 {
+.admin-title h1 {
   font-size: 1.8rem;
   font-weight: 700;
   letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
 }
 
-.admin-header .title p {
+.admin-title p {
   font-size: 0.95rem;
   opacity: 0.9;
+  font-weight: 400;
 }
 
-.badge {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-logout-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  padding: 0.7rem 1.5rem;
+  border-radius: var(--admin-radius-md);
   font-weight: 600;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  backdrop-filter: blur(4px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  backdrop-filter: blur(8px);
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
 }
 
-/* ==== CONTAINER ==== */
+.admin-logout-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+}
+
+.admin-logout-text {
+  font-size: 0.9rem;
+  opacity: 0.95;
+  font-weight: 600;
+}
+
 .admin-container {
   padding: 2rem;
-  /* Container chính có thể cuộn */
   flex: 1;
   overflow-y: auto;
-  min-height: 0; /* Quan trọng cho flexbox scrolling */
+  min-height: 0;
 }
 
-.grid-layout {
+.admin-grid-layout {
   display: grid;
   grid-template-columns: 1.2fr 2.8fr;
   gap: 2rem;
-  min-height: min-content;
-  align-items: start; /* Căn các item lên trên */
+  align-items: stretch;
+  min-height: 600px;
 }
 
-/* ==== CARD ==== */
-.card {
-  background: #ffffffcc;
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+.admin-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: var(--admin-radius-lg);
+  box-shadow: var(--admin-shadow);
   padding: 1.5rem;
   transition: all 0.3s ease;
-  height: fit-content; /* Chiều cao tự động fit content */
-}
-
-.card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-/* ==== CHART CARD ==== */
-.chart-card {
-  min-height: 450px; /* Tăng chiều cao tối thiểu */
+  height: 100%;
+  backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
 }
 
-.chart-card h3 {
-  font-size: 1.4rem; /* Tiêu đề lớn hơn */
-  color: #0369a1;
-  text-align: center;
+.admin-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--admin-shadow-hover);
+}
+
+.admin-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.admin-card-header h3 {
+  font-size: 1.4rem;
+  color: var(--admin-dark-blue);
+  margin: 0;
   font-weight: 700;
 }
 
-.chart-wrap {
+.admin-chart-card h3 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+}
+
+.admin-chart-wrap {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 350px; /* Tăng chiều cao biểu đồ */
   flex: 1;
   position: relative;
+  min-height: 300px;
 }
 
-/* Canvas biểu đồ  */
-.chart-wrap canvas {
+.admin-chart-wrap canvas {
+  max-width: 320px;
+  max-height: 320px;
   width: 100% !important;
   height: 100% !important;
-  max-width: 400px;
-  max-height: 400px;
 }
 
-/* ==== TABLE CONTAINER ==== */
-.user-list {
-  /* Container cho bảng với cuộn */
+.admin-user-count-badge {
   display: flex;
-  flex-direction: column;
-  max-height: 600px; /* Hoặc chiều cao bạn muốn */
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, var(--admin-primary-blue), var(--admin-secondary-blue));
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: var(--admin-radius-md);
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
 }
 
-.user-list h3 {
-  font-size: 1.4rem; /* Đồng bộ kích thước tiêu đề */
-  color: #0369a1;
-  margin-bottom: 1rem;
-  flex-shrink: 0;
+.admin-count-number {
+  font-size: 1.4rem;
   font-weight: 700;
 }
 
-.user-list table {
+.admin-count-text {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.admin-user-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.admin-table-container {
+  overflow-y: auto;
+  flex: 0 1 auto;
+  border-radius: var(--admin-radius-md);
+  border: 1px solid var(--admin-border-light);
+  background: white;
+  min-height: 200px;
+  max-height: none;
+}
+
+.admin-user-list table {
   width: 100%;
   border-collapse: collapse;
-  border-radius: 12px;
-  overflow: hidden;
-  flex: 1;
+  border-spacing: 0;
+  height: auto;
 }
 
-/* Container cho bảng cuộn */
-.user-list .table-container {
-  overflow-y: auto;
-  flex: 1;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.user-list th {
-  background-color: #0284c7;
+.admin-user-list th {
+  background-color: var(--admin-primary-blue);
   color: white;
   padding: 0.8rem;
   text-align: left;
@@ -163,21 +228,28 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  border-bottom: 1px solid var(--admin-border-light);
 }
 
-.user-list td {
+.admin-user-list td {
   padding: 0.8rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--admin-border-light);
   font-size: 0.95rem;
+  background: white;
+  vertical-align: middle;
+  height: auto;
 }
 
-.user-list tr:hover {
-  background-color: #f0f9ff;
+.admin-user-list tbody tr:last-child td {
+  border-bottom: 1px solid var(--admin-border-light);
+}
+
+.admin-user-list tr:hover td {
+  background-color: var(--admin-bg-hover);
   transition: background-color 0.2s ease;
 }
 
-/* ==== STATUS BADGE ==== */
-.status-badge {
+.admin-status-badge {
   display: inline-block;
   padding: 0.35rem 0.7rem;
   border-radius: 10px;
@@ -186,225 +258,137 @@ body {
   text-transform: capitalize;
 }
 
-.status-badge.đã-duyệt {
-  background-color: #10b98133;
+.admin-status-badge.admin-approved {
+  background-color: rgba(16, 185, 129, 0.2);
   color: #047857;
 }
 
-.status-badge.chờ-duyệt {
-  background-color: #facc1533;
+.admin-status-badge.admin-pending {
+  background-color: rgba(250, 204, 21, 0.2);
   color: #92400e;
 }
 
-.status-badge.từ-chối {
-  background-color: #ef444433;
-  color: #991b1b;
+.admin-priority-number {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  line-height: 24px;
+  text-align: center;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 2px solid;
+  vertical-align: middle;
 }
 
-/* ==== ACTION BUTTONS ==== */
-.actions {
+.admin-priority-1 {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.admin-priority-2 {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.admin-priority-3 {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.admin-actions {
   display: flex;
   gap: 0.5rem;
-}
-
-button.approve-btn,
-button.reject-btn {
-  border: none;
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.approve-btn {
-  background-color: #10b981;
-  color: white;
-}
-
-.approve-btn:hover {
-  background-color: #059669;
-}
-
-.reject-btn {
-  background-color: #ef4444;
-  color: white;
-}
-
-.reject-btn:hover {
-  background-color: #dc2626;
-}
-
-.muted {
-  color: #9ca3af;
-  font-size: 0.85rem;
-}
-
-/* ==== RESPONSIVE ==== */
-@media (max-width: 1024px) {
-  .grid-layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .user-list {
-    max-height: 400px;
-  }
-  
-  .chart-card {
-    min-height: 400px;
-  }
-  
-  .chart-wrap {
-    height: 300px;
-  }
-}
-
-@media (max-width: 600px) {
-  .admin-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.8rem;
-  }
-
-  .card {
-    padding: 1rem;
-  }
-
-  .user-list th, .user-list td {
-    font-size: 0.85rem;
-  }
-
-  .approve-btn, .reject-btn {
-    padding: 0.4rem 0.7rem;
-    font-size: 0.8rem;
-  }
-  
-  .user-list {
-    max-height: 300px;
-  }
-  
-  .chart-card {
-    min-height: 350px;
-  }
-  
-  .chart-wrap {
-    height: 250px;
-  }
-  
-  .chart-card h3 {
-    font-size: 1.2rem;
-  }
-}
-
-/* Thêm styles cho nút xóa */
-.actions {
-  display: flex;
-  gap: 8px;
   justify-content: center;
 }
 
-.delete-btn {
-  background: #ef4444;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
+.admin-approve-btn,
+.admin-reject-btn,
+.admin-delete-btn {
+  border: none !important;
+  outline: none !important;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--admin-radius-sm);
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
   font-size: 0.8rem;
-  transition: all 0.2s;
+  background: transparent;
+  box-shadow: none !important;
 }
 
-.delete-btn:hover {
-  background: #dc2626;
+.admin-approve-btn {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.admin-approve-btn:hover {
+  background: rgba(16, 185, 129, 0.25);
   transform: translateY(-1px);
 }
 
-.approve-btn {
-  background: #10b981;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.2s;
-}
-
-.approve-btn:hover {
-  background: #059669;
-  transform: translateY(-1px);
-}
-
-.reject-btn {
-  background: #f59e0b;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.2s;
-}
-
-.reject-btn:hover {
-  background: #d97706;
-  transform: translateY(-1px);
-}
-
-/* Status badges */
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.status-badge.approved {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.pending {
-  background: #fef3c7;
+.admin-reject-btn {
   color: #92400e;
+  background: rgba(245, 158, 11, 0.15);
 }
 
-.status-badge.rejected {
-  background: #fee2e2;
+.admin-reject-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  transform: translateY(-1px);
+}
+
+.admin-delete-btn {
   color: #991b1b;
+  background: rgba(239, 68, 68, 0.15);
 }
 
-/* Table row styles */
-tr.approved {
-  background: #f0fdf4;
+.admin-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  transform: translateY(-1px);
 }
 
-tr.rejected {
-  background: #fef2f2;
-}
-
-.muted {
-  color: #9ca3af;
-  font-size: 0.8rem;
-}
-
-/* Styles cho nút chỉnh sửa quyền */
-.edit-role-btn {
+.admin-edit-role-btn {
   background: none;
-  border: none;
+  border: none !important;
+  outline: none !important;
   cursor: pointer;
   margin-left: 8px;
   padding: 4px;
   border-radius: 4px;
   transition: background-color 0.2s;
+  opacity: 0.7;
+  box-shadow: none !important;
 }
 
-.edit-role-btn:hover {
-  background-color: #f3f4f6;
+.admin-edit-role-btn:hover {
+  background-color: rgba(243, 244, 246, 0.8);
+  opacity: 1;
 }
 
-/* Modal styles */
-.modal-overlay {
+.admin-user-list table button {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.admin-user-list table th:nth-child(6),
+.admin-user-list table td:nth-child(6),
+.admin-user-list table th:nth-child(7),
+.admin-user-list table td:nth-child(7),
+.admin-user-list table th:nth-child(5),
+.admin-user-list table td:nth-child(5) {
+  text-align: center;
+}
+
+.admin-user-list table td:nth-child(6) {
+  text-align: center;
+  padding: 0.8rem;
+}
+
+.admin-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -415,262 +399,275 @@ tr.rejected {
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  animation: fadeIn 0.3s ease-out;
+  animation: admin-fadeIn 0.3s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes admin-fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-.modal {
+.admin-modal {
   background: white;
-  border-radius: 12px;
+  border-radius: var(--admin-radius-md);
   width: 90%;
   max-width: 500px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s ease-out;
+  animation: admin-slideUp 0.3s ease-out;
 }
 
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+@keyframes admin-slideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.modal-header {
+.admin-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 20px;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--admin-border-light);
+  background: linear-gradient(135deg, var(--admin-bg-light) 0%, #f1f5f9 100%);
 }
 
-.modal-header h3 {
+.admin-modal-header h3 {
   margin: 0;
-  color: #1f2937;
+  color: var(--admin-text-primary);
   font-size: 1.25rem;
 }
 
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #6b7280;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  color: #374151;
-  background-color: #f3f4f6;
-}
-
-.modal-content {
+.admin-modal-content {
   padding: 20px;
 }
 
-.user-info {
+.admin-user-info {
   margin-bottom: 20px;
 }
 
-.user-info p {
+.admin-user-info p {
   margin: 8px 0;
-  color: #374151;
+  color: var(--admin-text-primary);
 }
 
-.role-selection {
+.admin-role-selection {
   margin-top: 15px;
 }
 
-.role-selection label {
+.admin-role-selection label {
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #374151;
+  color: var(--admin-text-primary);
 }
 
-.role-selection select {
+.admin-role-selection select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border: 1px solid var(--admin-border-light);
+  border-radius: var(--admin-radius-sm);
   font-size: 1rem;
   background: white;
 }
 
-.role-selection select:focus {
+.admin-role-selection select:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.modal-footer {
+.admin-modal-footer {
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
-  border-radius: 0 0 12px 12px;
+  border-top: 1px solid var(--admin-border-light);
+  background: var(--admin-bg-light);
+  border-radius: 0 0 var(--admin-radius-md) var(--admin-radius-md);
 }
 
-.btn-primary {
+.admin-btn-primary {
   background: #3b82f6;
   color: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--admin-radius-sm);
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
   flex: 1;
 }
 
-.btn-primary:hover:not(:disabled) {
+.admin-btn-primary:hover:not(:disabled) {
   background: #2563eb;
 }
 
-.btn-primary:disabled {
-  background: #9ca3af;
+.admin-btn-primary:disabled {
+  background: var(--admin-text-light);
   cursor: not-allowed;
 }
 
-.btn-secondary {
-  background: #6b7280;
+.admin-btn-secondary {
+  background: var(--admin-text-light);
   color: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--admin-radius-sm);
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
   flex: 1;
 }
 
-.btn-secondary:hover {
+.admin-btn-secondary:hover {
   background: #4b5563;
 }
 
-/* Responsive */
+.admin-priority-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--admin-bg-light);
+  border-radius: var(--admin-radius-sm);
+  border-left: 4px solid #3b82f6;
+  text-align: center;
+}
+
+.admin-priority-preview p {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: var(--admin-text-primary);
+}
+
+.admin-auto-login-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+}
+
+.admin-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid var(--admin-primary-blue);
+  border-radius: 50%;
+  animation: admin-spin 1s linear infinite;
+}
+
+@keyframes admin-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.admin-auto-login-loading p {
+  color: var(--admin-text-secondary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .admin-grid-layout {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  
+  .admin-table-container {
+    max-height: 400px;
+  }
+  
+  .admin-chart-wrap {
+    min-height: 250px;
+  }
+}
+
 @media (max-width: 768px) {
-  .modal {
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.8rem;
+  }
+  
+  .admin-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .admin-user-count-badge {
+    align-self: flex-start;
+  }
+  
+  .admin-logout-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
+  
+  .admin-logout-text {
+    font-size: 0.85rem;
+  }
+  
+  .admin-modal {
     width: 95%;
     margin: 20px;
   }
   
-  .modal-footer {
+  .admin-modal-footer {
     flex-direction: column;
   }
 }
 
-/* Styles cho priority numbers - CĂN GIỮA */
-.priority-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  font-weight: 600;
-  font-size: 0.9rem;
-  border: 2px solid;
-  margin: 0 auto; /* Căn giữa */
-}
-
-.priority-1 {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fecaca;
-}
-
-.priority-2 {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fde68a;
-}
-
-.priority-3 {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #a7f3d0;
-}
-
-/* Căn giữa cột Thứ tự ưu tiên trong table */
-.user-list table th:nth-child(6),
-.user-list table td:nth-child(6) {
-  text-align: center;
-}
-
-/* Căn giữa nội dung trong ô priority */
-.user-list table td:nth-child(6) {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Preview priority trong modal */
-.priority-preview {
-  margin-top: 12px;
-  padding: 12px;
-  background: #f8fafc;
-  border-radius: 6px;
-  border-left: 4px solid #3b82f6;
-  text-align: center; /* Căn giữa trong modal */
-}
-
-.priority-preview p {
-  margin: 0 0 8px 0;
-  font-size: 0.9rem;
-  color: #374151;
-}
-
-/* Các styles khác giữ nguyên */
-.edit-role-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  margin-left: 8px;
-  padding: 4px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.edit-role-btn:hover {
-  background-color: #f3f4f6;
-}
-
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.status-badge.approved {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-/* Căn giữa các cột khác nếu cần */
-.user-list table th:nth-child(7),
-.user-list table td:nth-child(7) {
-  text-align: center; /* Cột Thao tác */
-}
-
-.user-list table th:nth-child(5),
-.user-list table td:nth-child(5) {
-  text-align: center; /* Cột Trạng thái */
+@media (max-width: 600px) {
+  .admin-container {
+    padding: 1rem;
+  }
+  
+  .admin-card {
+    padding: 1rem;
+    min-height: 350px;
+  }
+  
+  .admin-user-list th, 
+  .admin-user-list td {
+    font-size: 0.85rem;
+    padding: 0.6rem;
+  }
+  
+  .admin-approve-btn,
+  .admin-reject-btn,
+  .admin-delete-btn {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+  }
+  
+  .admin-table-container {
+    max-height: 300px;
+    min-height: 150px;
+  }
+  
+  .admin-chart-wrap {
+    min-height: 200px;
+  }
+  
+  .admin-chart-card h3 {
+    font-size: 1.2rem;
+  }
+  
+  .admin-header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.8rem;
+    width: 100%;
+  }
+  
+  .admin-user-count-badge {
+    padding: 0.5rem 0.8rem;
+  }
+  
+  .admin-count-number {
+    font-size: 1.2rem;
+  }
+  
+  .admin-count-text {
+    font-size: 0.8rem;
+  }
 }

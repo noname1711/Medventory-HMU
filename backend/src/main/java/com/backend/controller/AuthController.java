@@ -70,7 +70,7 @@ public class AuthController {
                 adminUser.setRole("admin");
                 adminUser.setDepartment("Quản trị hệ thống");
 
-                AuthResponse response = new AuthResponse(true, "Xin chào Admin 👑", "admin-token", adminUser);
+                AuthResponse response = new AuthResponse(true, "Xin chào Admin", "admin-token", adminUser);
                 return ResponseEntity.ok(response);
             }
 
