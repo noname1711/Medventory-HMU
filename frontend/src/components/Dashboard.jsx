@@ -20,9 +20,105 @@ export default function Dashboard() {
     { id: 5, code: "TB005", name: "Máy xét nghiệm máu", department: "Khoa Xét nghiệm", status: "Hoạt động tốt", date: "2023-01-30", value: 400000000 }
   ];
 
+  const initialReplenishmentItems = [
+  {
+    id: crypto.randomUUID(),
+    materialName: "Khẩu trang y tế 3 lớp",
+    specification: "Hộp 50 cái",
+    unitId: 1,             // ví dụ: 1 = Hộp
+    qtyAvailable: 120,
+    qtyLastYear: 350,
+    qtyRequested: 500,
+    materialCode: "VT001",
+    manufacturer: "VietMedical",
+    reason: "Dự phòng chống dịch"
+  },
+  {
+    id: crypto.randomUUID(),
+    materialName: "Găng tay y tế không bột",
+    specification: "Size M - Hộp 100 cái",
+    unitId: 1,
+    qtyAvailable: 80,
+    qtyLastYear: 200,
+    qtyRequested: 300,
+    materialCode: "VT002",
+    manufacturer: "GlovesCare",
+    reason: "Dùng cho phòng phẫu thuật"
+  },
+  {
+    id: crypto.randomUUID(),
+    materialName: "Dung dịch sát khuẩn",
+    specification: "Chai 500ml",
+    unitId: 2,             // ví dụ: 2 = Chai
+    qtyAvailable: 25,
+    qtyLastYear: 40,
+    qtyRequested: 60,
+    materialCode: "VT003",
+    manufacturer: "SterilMax",
+    reason: "Bổ sung kho vật tư"
+  },
+  {
+    id: crypto.randomUUID(),
+    materialName: "Băng gạc y tế vô trùng",
+    specification: "20cm x 20cm",
+    unitId: 3,             // ví dụ: 3 = Cái
+    qtyAvailable: 500,
+    qtyLastYear: 850,
+    qtyRequested: 1000,
+    materialCode: "VT004",
+    manufacturer: "MediCare",
+    reason: "Nhu cầu sử dụng tăng"
+  },
+  {
+    id: crypto.randomUUID(),
+    materialName: "Ống tiêm 5ml",
+    specification: "Hộp 100 cái",
+    unitId: 1,
+    qtyAvailable: 60,
+    qtyLastYear: 150,
+    qtyRequested: 300,
+    materialCode: "VT005",
+    manufacturer: "SafeInject",
+    reason: "Chuẩn bị tiêm chủng"
+  },
+];
+
+
+
+  const emptyRow = {
+  id: crypto.randomUUID(),       // tạo id unique
+  materialName: "",
+  specification: "",
+  unitId: "",
+  qtyAvailable: "",
+  qtyLastYear: "",
+  qtyRequested: "",
+  materialCode: "",
+  manufacturer: "",
+  reason: "",
+};
+
+const [items, setItems] = useState(initialReplenishmentItems);
+const [units, setUnits] = useState([]);
+const [materials, setMaterials] = useState([]);
+const fetchMaterials = async () => {
+  try {
+    const response = await fetch("http://localhost:8080/api/materials");
+    const data = await response.json();
+    console.log("Materials từ BE:", data);
+    setMaterials(data);
+  } catch (error) {
+    console.error("Lỗi khi lấy materials:", error);
+  }
+};
+
+
+const [note, setNote] = useState("");
+
   const [equipmentData, setEquipmentData] = useState(initialData);
   const [nextId, setNextId] = useState(6);
   const [activeTab, setActiveTab] = useState("dashboard");
+ 
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -39,6 +135,98 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeTab === "dashboard") updateStatusChart();
   }, [equipmentData, activeTab]);
+
+  useEffect(() => {
+  fetch("http://localhost:8080/api/units")
+    .then((res) => res.json())
+    .then((data) => setUnits(data));
+}, []);
+
+useEffect(() => {
+  fetchMaterials();
+}, []);
+
+
+function addRow() {
+  setItems((prev) => [...prev, { ...emptyRow, id: crypto.randomUUID() }]);
+}
+
+function deleteRow(id) {
+  setItems((prev) => prev.filter((i) => i.id !== id));
+}
+
+function changeItem(index, e) {
+  const { name, value } = e.target;
+  setItems((prev) => {
+    const updated = [...prev];
+    updated[index][name] = value;
+    return updated;
+  });
+}
+
+async function submit(e) {
+  e.preventDefault();
+
+  // Nếu chưa có userInfo, lấy từ localStorage
+  const currentUser = userInfo || JSON.parse(localStorage.getItem("currentUser") || "null");
+
+  const payload = {
+    academicYear: "2025-2026", // hoặc bạn có thể tạo input cho người dùng chọn
+    departmentId: null,         // optional, set nếu bạn có id phòng ban
+    createdByEmail: currentUser?.email || null,
+    items: items.map(it => ({
+      materialId: it.materialId ? Number(it.materialId) : null,  // nếu UI có materialId
+      currentStock: it.qtyAvailable ? Number(it.qtyAvailable) : 0,
+      prevYearQty: it.qtyLastYear ? Number(it.qtyLastYear) : 0,
+      thisYearQty: it.qtyRequested ? Number(it.qtyRequested) : 0,
+      proposedCode: it.materialCode || null,
+      proposedManufacturer: it.manufacturer || null,
+      justification: it.reason || null
+    }))
+  };
+
+  try {
+    const res = await fetch("http://localhost:8080/api/supp-forecasts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // nếu bạn dùng token: Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      Swal.fire({
+        icon: "success",
+        title: "Đã gửi phiếu",
+        text: data.message || "Tạo phiếu thành công",
+        timer: 1800,
+        showConfirmButton: false
+      });
+
+      // reset lại form
+      setItems([ { ...emptyRow, id: crypto.randomUUID() } ]);
+      setNote("");
+      // có thể chuyển tab hay reload danh sách
+    } else {
+      Swal.fire({
+        icon: "error",
+        title: "Gửi thất bại",
+        text: (data && data.message) ? data.message : "Lỗi server"
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    Swal.fire({
+      icon: "error",
+      title: "Lỗi kết nối",
+      text: err.message || "Không thể kết nối tới server"
+    });
+  }
+}
+
 
   function updateStatusChart() {
     const ctx = chartRef.current?.getContext("2d");
@@ -142,6 +330,39 @@ export default function Dashboard() {
     });
   }
 
+  function deleteItem(id) {
+  const item = items.find((i) => i.id === id);
+
+  Swal.fire({
+    title: "🗑️ Xác nhận xóa?",
+    text: `Bạn có chắc chắn muốn xóa vật tư “${item.materialName}”?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Xóa",
+    cancelButtonText: "Hủy",
+    reverseButtons: true,
+    backdrop: true,
+  }).then((result) => {
+    if (result.isConfirmed) {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+
+      Swal.fire({
+        title: "✅ Đã xóa!",
+        text: `Vật tư “${item.materialName}” đã bị xóa khỏi danh sách.`,
+        icon: "success",
+        position: "center",
+        timer: 2000,
+        showConfirmButton: false,
+        backdrop: true,
+      });
+    }
+  });
+}
+
+
+
   function handleExport(content, filename, contentType) {
     if (contentType === "empty") {
       Swal.fire({
@@ -222,7 +443,20 @@ export default function Dashboard() {
 
           {activeTab === "add" && <AddEquipment onAdd={addEquipment} />}
           {activeTab === "export" && <ExportEquipment equipmentData={equipmentData} onExport={handleExport} />}
-          {activeTab === "replenish" && <ReplenishmentRequest />}
+          {activeTab === "replenish" && (
+  <ReplenishmentRequest
+    items={items}
+    units={units}
+    materials={materials}   // ✅ Thêm dòng này
+    note={note}
+    onChangeNote={setNote}
+    onChangeItem={changeItem}
+    onAddRow={addRow}
+    onDeleteRow={deleteRow}
+    onSubmit={submit}
+  />
+)}
+
 
         </div>
       </div>

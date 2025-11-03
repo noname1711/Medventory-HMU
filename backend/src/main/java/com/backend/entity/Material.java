@@ -1,24 +1,26 @@
 package com.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
 
 @Entity
 @Table(name = "materials")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Data
 public class Material {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String materialName;
+    private String name;
 
-    @ManyToOne
-    @JoinColumn(name = "unit_id")
-    private Unit unit; // Liên kết với bảng Unit
+    private String spec;
+
+    @Column(name = "unit_id")
+    private Integer unitId;
+
+    private String code;
+
+    private String manufacturer;
+
+    private String category;
 }

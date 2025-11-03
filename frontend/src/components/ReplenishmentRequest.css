@@ -1,0 +1,192 @@
+/* ============ FORM CONTAINER (FULL WIDTH + CARD UI) ============ */
+.req-root {
+  width: 100%;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.04);
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 2.5rem;
+  box-sizing: border-box;
+}
+
+/* căn giữa khi hiển thị trong dashboard */
+@media (min-width: 1024px) {
+  .req-root {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1300px;
+  }
+}
+
+/* Tiêu đề */
+.req-root h3 {
+  margin: 0 0 1.25rem 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  text-align: left;
+}
+
+/* ============ FORM ============ */
+.req-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Field chung */
+.req-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.req-field.full textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+  background: #f9fafb;
+}
+
+.req-field textarea:focus {
+  outline: none;
+  background: white;
+  border-color: #2563eb;
+}
+
+/* ============ TABLE ============ */
+.req-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.req-table th {
+  background: #2563eb;
+  color: white;
+  padding: 8px;
+  text-align: center;
+  font-weight: 600;
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+.req-table th:last-child {
+  border-right: none;
+}
+
+.req-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px;
+  text-align: center;
+}
+
+/* Input + Select trong bảng */
+.req-table input,
+.req-table select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.req-table input:focus,
+.req-table select:focus {
+  outline: none;
+  background: white;
+  border-color: #2563eb;
+}
+
+/* ============ ACTION BUTTONS ============ */
+.req-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.btn {
+  padding: 0.7rem 1.4rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: white;
+}
+.btn.primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn.secondary {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+.btn.secondary:hover {
+  background: #f3f4f6;
+}
+
+/* Nút xoá dòng */
+.btn.delete {
+  padding: 4px 8px;
+  background: #ef4444;
+  color: white;
+  border-radius: 6px;
+}
+.btn.delete:hover {
+  background: #dc2626;
+}
+
+/* không cho xoá dòng cuối */
+.btn.delete.disabled {
+  background: #9ca3af !important;
+  cursor: not-allowed !important;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 800px) {
+  .req-table {
+    font-size: 0.8rem;
+  }
+
+  .req-root {
+    padding: 1.25rem;
+  }
+}
+/* Giữ màu chữ option trong dropdown */
+select option {
+  color: black !important;
+  background: white;
+}
+
+/* Trong trường hợp select đang bị css override */
+select {
+  color: black;         /* màu chữ */
+  background-color: white;
+}
+
+/* FIX HIỂN THỊ DROPDOWN BỊ TRẮNG */
+.req-table select,
+.req-table option {
+  color: black !important;
+  background-color: white !important;
+}
+
+/* Nếu bảng đang bị style nền xám/đen */
+.req-table select:focus {
+  background-color: white !important;
+}
+
+/* Style input readonly cho đồng bộ */
+.req-table input[readonly] {
+  background: #f2f2f2;
+  cursor: not-allowed;
+}

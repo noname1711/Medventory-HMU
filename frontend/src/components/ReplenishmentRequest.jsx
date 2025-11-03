@@ -1,69 +1,121 @@
-import React, { useState } from "react";
-import toast from "react-hot-toast";
+import React from "react";
+import "./ReplenishmentRequest.css";
 
-export default function ReplenishmentRequest() {
-  const [note, setNote] = useState("");
-  const [items, setItems] = useState([{ materialName: "", qty: "", unit: "" }]);
+export default function ReplenishmentRequest({
+  items,
+  units,
+  materials,
+  note,
+  onChangeNote,
+  onChangeItem,
+  onAddRow,
+  onDeleteRow,
+  onSubmit
+}) {
 
-  const handleChangeItem = (i, key, value) => {
-    const newItems = [...items];
-    newItems[i][key] = value;
-    setItems(newItems);
-  };
+  const handleSelectMaterial = (index, e) => {
+    const materialId = e.target.value;
+    const material = materials.find(m => m.id === Number(materialId));
 
-  const addRow = () => setItems([...items, { materialName: "", qty: "", unit: "" }]);
-
-  const submit = async () => {
-    const body = {
-      note,
-      details: items.map(i => ({
-        materialName: i.materialName,
-        qtyRequested: parseFloat(i.qty),
-        unit: { id: 1 } // tạm fix, sau này chọn từ dropdown
-      }))
-    };
-
-    const res = await fetch("http://localhost:8080/api/replenishment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    if (res.ok) toast.success("Đã gửi phiếu đề nghị!");
-    else toast.error("Lỗi khi gửi phiếu!");
+    if (material) {
+      onChangeItem(index, { target: { name: "materialId", value: material.id }});
+      onChangeItem(index, { target: { name: "materialName", value: material.materialName }});
+      onChangeItem(index, { target: { name: "specification", value: material.specification }});
+      onChangeItem(index, { target: { name: "unitId", value: material.unitId }});
+      onChangeItem(index, { target: { name: "materialCode", value: material.materialCode }});
+      onChangeItem(index, { target: { name: "manufacturer", value: material.manufacturer }});
+    } else {
+      onChangeItem(index, { target: { name: "materialId", value: "" }});
+    }
   };
 
   return (
-    <div className="card p-6">
-      <h3 className="text-xl font-bold mb-4">Đề nghị bổ sung hàng hoá</h3>
-      <textarea
-        placeholder="Ghi chú..."
-        className="border p-2 w-full mb-4 rounded"
-        value={note}
-        onChange={e => setNote(e.target.value)}
-      />
+    <div className="req-root card">
+      <div className="req-header">
+        <h3>Phiếu Dự Trù Bổ Sung Hàng Hoá</h3>
+      </div>
 
-      <table className="w-full border mb-4">
-        <thead>
-          <tr className="bg-gray-100">
-            <th>Tên vật tư</th>
-            <th>Số lượng</th>
-            <th>Đơn vị</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((i, idx) => (
-            <tr key={idx}>
-              <td><input className="border p-1 w-full" value={i.materialName} onChange={e => handleChangeItem(idx, "materialName", e.target.value)} /></td>
-              <td><input type="number" className="border p-1 w-full" value={i.qty} onChange={e => handleChangeItem(idx, "qty", e.target.value)} /></td>
-              <td><input className="border p-1 w-full" value={i.unit} onChange={e => handleChangeItem(idx, "unit", e.target.value)} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <form className="req-form" onSubmit={onSubmit}>
+        <div className="req-field full">
+          <label>Ghi chú (nếu có)</label>
+          <textarea rows="2" value={note} onChange={(e) => onChangeNote(e.target.value)} />
+        </div>
 
-      <button onClick={addRow} className="bg-blue-500 text-white px-4 py-2 rounded mr-2">+ Thêm dòng</button>
-      <button onClick={submit} className="bg-green-500 text-white px-4 py-2 rounded">Gửi phiếu</button>
+        <div className="req-table-wrap">
+          <table className="req-table">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Tên vật tư</th>
+                <th>Quy cách</th>
+                <th>ĐVT</th>
+                <th>SL hiện có</th>
+                <th>Năm trước</th>
+                <th>Dự trù</th>
+                <th>Mã Code</th>
+                <th>Hãng SX</th>
+                <th>Lý do</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {items.length > 0 ? items.map((item, index) => (
+                <tr key={item.id}>
+                  <td className="text-center">{index + 1}</td>
+
+                  {/* ✅ DROPDOWN TÊN VẬT TƯ */}
+                  <td>
+                    <select
+                      name="materialId"
+                      value={item.materialId || ""}
+                      onChange={(e) => handleSelectMaterial(index, e)}
+                    >
+                      <option value="">Chọn vật tư</option>
+                      {materials?.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.materialName}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+
+                  <td><input name="specification" value={item.specification || ""} readOnly /></td>
+
+                  {/* ✅ ĐVT lấy theo material.unitId */}
+             
+
+                  <td><input type="number" name="qtyAvailable" value={item.qtyAvailable || ""} onChange={(e) => onChangeItem(index, e)} /></td>
+                  <td><input type="number" name="qtyLastYear" value={item.qtyLastYear || ""} onChange={(e) => onChangeItem(index, e)} /></td>
+                  <td><input type="number" name="qtyRequested" value={item.qtyRequested || ""} onChange={(e) => onChangeItem(index, e)} /></td>
+
+                  <td><input name="materialCode" value={item.materialCode || ""} readOnly /></td>
+                  <td><input name="manufacturer" value={item.manufacturer || ""} readOnly /></td>
+
+                  <td><input name="reason" value={item.reason || ""} onChange={(e) => onChangeItem(index, e)} /></td>
+
+                  <td>
+                    <button type="button" className="link danger" onClick={() => onDeleteRow(item.id)}>
+                      Xóa
+                    </button>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="11" style={{ textAlign: "center", padding: 20 }}>
+                    Không có dữ liệu
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="req-actions">
+          <button type="button" className="btn secondary" onClick={onAddRow}>+ Thêm dòng</button>
+          <button type="submit" className="btn primary">Gửi phiếu</button>
+        </div>
+      </form>
     </div>
   );
 }
