@@ -25,6 +25,13 @@ export default function DashboardHeader({ userInfo }) {
   const [avatarError, setAvatarError] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Role mapping để hiển thị tiếng Việt
+  const roleDisplayMapping = {
+    "lanhdao": "Lãnh đạo",
+    "thukho": "Thủ kho", 
+    "canbo": "Cán bộ"
+  };
+
   // Đóng dropdown khi click outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -44,7 +51,7 @@ export default function DashboardHeader({ userInfo }) {
     if (!user || !user.fullName) return "BS. Nguyễn Văn An";
     
     const role = user.role?.toLowerCase();
-    if (role?.includes('bacsi') || role?.includes('truongkhoa') || role?.includes('bác sĩ') || role?.includes('lãnh đạo')) {
+    if (role?.includes('lanhdao') || role?.includes('lãnh đạo')) {
       return `BS. ${user.fullName}`;
     }
     return user.fullName;
@@ -54,18 +61,8 @@ export default function DashboardHeader({ userInfo }) {
   const getDisplayRole = (user) => {
     if (!user || !user.role) return "Trưởng khoa Thiết bị Y tế";
     
-    const roleMap = {
-      'canbo': 'Cán bộ',
-      'truongkhoa': 'Trưởng khoa',
-      'admin': 'Quản trị viên',
-      'bacsi': 'Bác sĩ',
-      'bác sĩ': 'Bác sĩ',
-      'lãnh đạo': 'Lãnh đạo',
-      'thủ kho': 'Thủ kho',
-      'cán bộ khác': 'Cán bộ'
-    };
-    
-    return roleMap[user.role.toLowerCase()] || user.role;
+    // Sử dụng role mapping mới
+    return roleDisplayMapping[user.role] || user.role;
   };
 
   // Lấy avatar image theo role
@@ -74,9 +71,9 @@ export default function DashboardHeader({ userInfo }) {
     
     const role = user.role.toLowerCase();
     
-    if (role.includes('lãnh đạo') || role.includes('truongkhoa') || role.includes('admin')) {
+    if (role.includes('lanhdao') || role.includes('lãnh đạo')) {
       return "/avatar-lanhdao.png";
-    } else if (role.includes('thủ kho') || role.includes('thukho')) {
+    } else if (role.includes('thukho') || role.includes('thủ kho')) {
       return "/avatar-thukho.png";
     } else {
       return "/avatar-canbo.png";
@@ -102,6 +99,18 @@ export default function DashboardHeader({ userInfo }) {
     } catch {
       return "Chưa cập nhật";
     }
+  };
+
+  // Format trạng thái
+  const formatStatus = (status) => {
+    if (!status) return "Chưa xác định";
+    
+    const statusMap = {
+      'approved': 'Đã phê duyệt',
+      'pending': 'Chờ phê duyệt'
+    };
+    
+    return statusMap[status.toLowerCase()] || status;
   };
 
   const handleAvatarError = () => {
@@ -302,15 +311,13 @@ export default function DashboardHeader({ userInfo }) {
 
                 <div className="profile-detail-row">
                   <span className="profile-detail-label">Chức vụ:</span>
-                  <span className="profile-detail-value">{userInfo?.role || "Chưa cập nhật"}</span>
+                  <span className="profile-detail-value">{roleDisplayMapping[userInfo?.role] || userInfo?.role || "Chưa cập nhật"}</span>
                 </div>
 
                 <div className="profile-detail-row">
                   <span className="profile-detail-label">Trạng thái:</span>
                   <span className={`profile-detail-value status-${userInfo?.status?.toLowerCase() || 'pending'}`}>
-                    {userInfo?.status === 'approved' ? 'Đã phê duyệt' : 
-                     userInfo?.status === 'pending' ? 'Chờ phê duyệt' : 
-                     userInfo?.status || 'Chưa xác định'}
+                    {formatStatus(userInfo?.status)}
                   </span>
                 </div>
               </div>

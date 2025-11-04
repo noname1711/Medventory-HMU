@@ -9,7 +9,7 @@ import Swal from "sweetalert2";
 import "./Dashboard.css";
 
 export default function Dashboard() {
-  const [userInfo, setUserInfo] = useState(null); // THÊM DÒNG NÀY
+  const [userInfo, setUserInfo] = useState(null);
 
   const initialData = [
     { id: 1, code: "TB001", name: "Máy X-quang", department: "Khoa Nội", status: "Hoạt động tốt", date: "2023-01-15", value: 500000000 },
@@ -26,11 +26,28 @@ export default function Dashboard() {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
+  // Role mapping để hiển thị tiếng Việt
+  const roleDisplayMapping = {
+    "lanhdao": "Lãnh đạo",
+    "thukho": "Thủ kho", 
+    "canbo": "Cán bộ"
+  };
+
   // LẤY THÔNG TIN USER KHI COMPONENT MOUNT
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
-      setUserInfo(JSON.parse(savedUser));
+      try {
+        const userData = JSON.parse(savedUser);
+        // Chuyển đổi role từ backend enum sang tiếng Việt để hiển thị
+        const formattedUserData = {
+          ...userData,
+          role: roleDisplayMapping[userData.role] || userData.role
+        };
+        setUserInfo(formattedUserData);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
     }
   }, []);
 

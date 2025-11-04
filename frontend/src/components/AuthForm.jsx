@@ -95,6 +95,20 @@ export default function AuthForm() {
     "Khoa bệnh nhiệt đới và can thiệp giảm hại"
   ];
 
+  // Role mapping - chuyển đổi từ tiếng Việt sang backend enum
+  const roleMapping = {
+    "Lãnh đạo": "lanhdao",
+    "Thủ kho": "thukho", 
+    "Cán bộ": "canbo"
+  };
+
+  // Reverse role mapping - chuyển từ backend enum sang tiếng Việt
+  const reverseRoleMapping = {
+    "lanhdao": "Lãnh đạo",
+    "thukho": "Thủ kho",
+    "canbo": "Cán bộ"
+  };
+
   // AUTO LOGIN - CHỈ CHO USER THƯỜNG, KHÔNG CHO ADMIN
   useEffect(() => {
     const attemptAutoLogin = async () => {
@@ -142,7 +156,12 @@ export default function AuthForm() {
             console.log("User auto login successful");
             
             if (data.user) {
-              localStorage.setItem('currentUser', JSON.stringify(data.user));
+              // Chuyển đổi role từ backend enum sang tiếng Việt nếu cần
+              const userData = {
+                ...data.user,
+                role: reverseRoleMapping[data.user.role] || data.user.role
+              };
+              localStorage.setItem('currentUser', JSON.stringify(userData));
             }
             
             // CHỈ chuyển hướng đến dashboard, KHÔNG đến admin
@@ -264,7 +283,12 @@ export default function AuthForm() {
         if (data.success) {
           toast.success(data.message);
           if (data.user) {
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            // Chuyển đổi role từ backend enum sang tiếng Việt để hiển thị
+            const userData = {
+              ...data.user,
+              role: reverseRoleMapping[data.user.role] || data.user.role
+            };
+            localStorage.setItem('currentUser', JSON.stringify(userData));
           }
           
           // CHUYỂN HƯỚNG
@@ -284,6 +308,9 @@ export default function AuthForm() {
         }
       } else {
         // Đăng ký (chỉ cho user thường)
+        // Chuyển đổi role từ tiếng Việt sang backend enum
+        const backendRole = roleMapping[role] || "canbo";
+        
         const registerData = {
           fullName,
           email,
@@ -291,7 +318,7 @@ export default function AuthForm() {
           confirmPassword,
           dateOfBirth,
           department,
-          role,
+          role: backendRole, // Gửi role dạng enum cho backend
         };
 
         const response = await fetch('http://localhost:8080/api/auth/register', {

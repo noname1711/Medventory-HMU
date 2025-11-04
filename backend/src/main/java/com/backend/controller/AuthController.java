@@ -55,7 +55,7 @@ public class AuthController {
 
         } catch (Exception e) {
             return ResponseEntity.badRequest()
-                    .body(new AuthResponse(false, "Lỗi hệ thống: " + e.getMessage()));
+                    .body(new AuthResponse(false, "Lỗi đăng ký: " + e.getMessage()));
         }
     }
 
@@ -64,7 +64,6 @@ public class AuthController {
         try {
             // Xử lý đăng nhập admin đặc biệt
             if ("admin".equals(request.getEmail()) && "12345".equals(request.getPassword())) {
-                // Tạo UserDTO cho admin
                 UserDTO adminUser = new UserDTO();
                 adminUser.setFullName("Admin");
                 adminUser.setRole("admin");
@@ -77,8 +76,7 @@ public class AuthController {
             User user = userService.authenticateUser(request.getEmail(), request.getPassword());
 
             if (user != null) {
-                // Convert User entity to UserDTO
-                UserDTO userDTO = convertToDTO(user);
+                UserDTO userDTO = userService.convertToDTO(user);
                 AuthResponse response = new AuthResponse(true, "Đăng nhập thành công!", "user-token-" + user.getId(), userDTO);
                 return ResponseEntity.ok(response);
             } else {
@@ -88,7 +86,7 @@ public class AuthController {
 
         } catch (Exception e) {
             return ResponseEntity.badRequest()
-                    .body(new AuthResponse(false, "Lỗi hệ thống: " + e.getMessage()));
+                    .body(new AuthResponse(false, "Lỗi đăng nhập: " + e.getMessage()));
         }
     }
 
@@ -160,18 +158,5 @@ public class AuthController {
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
             return ResponseEntity.badRequest().body(response); // 400 Bad Request - Lỗi xử lý
         }
-    }
-
-    private UserDTO convertToDTO(User user) {
-        UserDTO dto = new UserDTO();
-        dto.setId(user.getId());
-        dto.setFullName(user.getFullName());
-        dto.setEmail(user.getEmail());
-        dto.setDateOfBirth(user.getDateOfBirth());
-        dto.setDepartment(user.getDepartment());
-        dto.setRole(user.getRole());
-        dto.setStatus(user.getStatus());
-        dto.setPriority(user.getPriority());
-        return dto;
     }
 }

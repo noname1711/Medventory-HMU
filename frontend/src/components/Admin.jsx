@@ -15,10 +15,17 @@ export default function Admin() {
   const navigate = useNavigate();
 
   const availableRoles = [
-    { value: "Lãnh đạo", label: "Lãnh đạo", priority: 1 },
-    { value: "Thủ kho", label: "Thủ kho", priority: 2 },
-    { value: "Cán bộ", label: "Cán bộ khác", priority: 3 }
+    { value: "lanhdao", label: "Lãnh đạo" },
+    { value: "thukho", label: "Thủ kho" },
+    { value: "canbo", label: "Cán bộ khác" }
   ];
+
+  // Role mapping để hiển thị tiếng Việt
+  const roleDisplayMapping = {
+    "lanhdao": "Lãnh đạo",
+    "thukho": "Thủ kho", 
+    "canbo": "Cán bộ"
+  };
 
   useEffect(() => {
     const checkAdminAccess = () => {
@@ -49,11 +56,6 @@ export default function Admin() {
     const timer = setTimeout(checkAdminAccess, 50);
     return () => clearTimeout(timer);
   }, [navigate]);
-
-  const getPriorityByRole = (role) => {
-    const roleConfig = availableRoles.find(r => r.value === role);
-    return roleConfig ? roleConfig.priority : 3;
-  };
 
   const fetchUsers = async () => {
     try {
@@ -194,7 +196,7 @@ export default function Admin() {
         <p><strong>Họ tên:</strong> ${user.fullName}</p>
         <p><strong>Email:</strong> ${user.email}</p>
         <p><strong>Phòng ban:</strong> ${user.department}</p>
-        <p><strong>Vai trò:</strong> ${user.role}</p>
+        <p><strong>Vai trò:</strong> ${roleDisplayMapping[user.role] || user.role}</p>
       </div><p style="color: #ef4444; margin-top: 15px;">⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!</p>`,
       icon: "warning",
       showCancelButton: true,
@@ -221,21 +223,22 @@ export default function Admin() {
 
   const changeUserRole = async (id, newRole) => {
     try {
-      const newPriority = getPriorityByRole(newRole);
       const response = await fetch(`http://localhost:8080/api/admin/users/${id}/role`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole, priority: newPriority }),
+        body: JSON.stringify({ role: newRole }),
       });
       
       if (response.ok) {
-        setUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: newRole, priority: newPriority } : u));
+        setUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: newRole } : u));
         setEditingUser(null);
         setNewRole("");
         Swal.fire({
           title: "✅ Đã cập nhật!",
-          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${newRole}</p><p><strong>Độ ưu tiên mới:</strong> ${newPriority}</p></div>`,
-          icon: "success", timer: 2000, showConfirmButton: false
+          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${roleDisplayMapping[newRole] || newRole}</p></div>`,
+          icon: "success", 
+          timer: 2000, 
+          showConfirmButton: false
         });
       } else {
         const errorText = await response.text();
@@ -315,7 +318,6 @@ export default function Admin() {
                     <th>Phòng ban</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th>Thứ tự ưu tiên</th>
                     <th>Thao tác</th>
                   </tr>
                 </thead>
@@ -326,7 +328,7 @@ export default function Admin() {
                       <td>{u.email}</td>
                       <td>{u.department}</td>
                       <td>
-                        {u.role}
+                        {roleDisplayMapping[u.role] || u.role}
                         {u.status === "approved" && (
                           <button className="admin-edit-role-btn" onClick={() => openRoleChangeModal(u)} title="Thay đổi quyền">✏️</button>
                         )}
@@ -335,9 +337,6 @@ export default function Admin() {
                         <span className={`admin-status-badge admin-${u.status.toLowerCase()}`}>
                           {u.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
                         </span>
-                      </td>
-                      <td>
-                        <span className={`admin-priority-number admin-priority-${u.priority}`}>{u.priority}</span>
                       </td>
                       <td>
                         {u.status === "pending" ? (
@@ -371,31 +370,25 @@ export default function Admin() {
                 <p><strong>Họ tên:</strong> {editingUser.fullName}</p>
                 <p><strong>Email:</strong> {editingUser.email}</p>
                 <p><strong>Phòng ban:</strong> {editingUser.department}</p>
-                <p><strong>Quyền hiện tại:</strong> {editingUser.role}</p>
-                <p><strong>Độ ưu tiên hiện tại:</strong> 
-                  <span className={`admin-priority-number admin-priority-${editingUser.priority}`}>{editingUser.priority}</span>
-                </p>
+                <p><strong>Quyền hiện tại:</strong> {roleDisplayMapping[editingUser.role] || editingUser.role}</p>
               </div>
               
               <div className="admin-role-selection">
                 <label htmlFor="role-select">Chọn quyền mới:</label>
                 <select id="role-select" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
                   {availableRoles.map((role) => (
-                    <option key={role.value} value={role.value}>{role.label} (Ưu tiên: {role.priority})</option>
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
                   ))}
                 </select>
-                
-                {newRole && (
-                  <div className="admin-priority-preview">
-                    <p><strong>Độ ưu tiên sẽ thay đổi thành:</strong></p>
-                    <span className={`admin-priority-number admin-priority-${getPriorityByRole(newRole)}`}>{getPriorityByRole(newRole)}</span>
-                  </div>
-                )}
               </div>
             </div>
             <div className="admin-modal-footer">
               <button className="admin-btn-secondary" onClick={closeRoleChangeModal}>Hủy</button>
-              <button className="admin-btn-primary" onClick={handleRoleChange} disabled={!newRole || newRole === editingUser.role}>Cập nhật quyền & Ưu tiên</button>
+              <button className="admin-btn-primary" onClick={handleRoleChange} disabled={!newRole || newRole === editingUser.role}>
+                Cập nhật quyền
+              </button>
             </div>
           </div>
         </div>

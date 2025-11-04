@@ -3,7 +3,11 @@ package com.backend.service;
 import com.backend.dto.RegisterRequest;
 import com.backend.dto.UserDTO;
 import com.backend.entity.User;
+import com.backend.entity.Department;
+import com.backend.entity.Role;
+import com.backend.entity.Status;
 import com.backend.repository.UserRepository;
+import com.backend.repository.DepartmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -15,28 +19,57 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    public User registerUser(RegisterRequest request) {
-        User user = new User();
-        user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword()); // Không mã hóa theo yêu cầu
-        user.setDateOfBirth(request.getDateOfBirth());
-        user.setDepartment(request.getDepartment());
-        user.setRole(request.getRole());
-        user.setStatus("pending");
+    @Autowired
+    private DepartmentRepository departmentRepository;
 
-        return userRepository.save(user);
+    public User registerUser(RegisterRequest request) {
+        try {
+            // Tìm hoặc tạo department mới nếu chưa tồn tại
+            Department department = departmentRepository.findByName(request.getDepartment())
+                    .orElseGet(() -> {
+                        // Tạo department mới
+                        Department newDept = new Department();
+                        newDept.setName(request.getDepartment());
+                        return departmentRepository.save(newDept);
+                    });
+
+            User user = new User();
+            user.setFullName(request.getFullName());
+            user.setEmail(request.getEmail());
+            user.setPassword(request.getPassword());
+            user.setDateOfBirth(request.getDateOfBirth());
+            user.setDepartment(department);
+
+            // Xử lý role
+            String roleStr = request.getRole();
+            if (roleStr != null) {
+                try {
+                    user.setRole(Role.valueOf(roleStr));
+                } catch (IllegalArgumentException e) {
+                    // Nếu role không hợp lệ, mặc định là canbo
+                    user.setRole(Role.canbo);
+                }
+            } else {
+                user.setRole(Role.canbo);
+            }
+
+            user.setStatus(Status.pending);
+
+            return userRepository.save(user);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi đăng ký user: " + e.getMessage(), e);
+        }
     }
 
     public User authenticateUser(String email, String password) {
         return userRepository.findByEmail(email)
                 .filter(user -> user.getPassword().equals(password))
-                .filter(user -> "approved".equals(user.getStatus()))
+                .filter(user -> user.getStatus() == Status.approved)
                 .orElse(null);
     }
 
     public List<UserDTO> getPendingUsers() {
-        return userRepository.findByStatusOrderByCreatedAtDesc("pending")
+        return userRepository.findByStatus("pending")
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -52,23 +85,26 @@ public class UserService {
     public boolean updateUserStatus(Long userId, String status) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    user.setStatus(status);
+                    // Dùng trực tiếp enum
+                    user.setStatus(Status.valueOf(status));
                     userRepository.save(user);
                     return true;
                 })
                 .orElse(false);
     }
 
-    private UserDTO convertToDTO(User user) {
+    public UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
         dto.setFullName(user.getFullName());
         dto.setEmail(user.getEmail());
         dto.setDateOfBirth(user.getDateOfBirth());
-        dto.setDepartment(user.getDepartment());
-        dto.setRole(user.getRole());
-        dto.setStatus(user.getStatus());
-        dto.setPriority(user.getPriority());
+        dto.setDepartment(user.getDepartment() != null ? user.getDepartment().getName() : null);
+
+        // Trả về trực tiếp enum name
+        dto.setRole(user.getRole().name());
+        dto.setStatus(user.getStatus().name());
+
         return dto;
     }
 
@@ -76,18 +112,19 @@ public class UserService {
         return userRepository.existsByEmail(email);
     }
 
-    public void deleteUser(Long userId) {
+    public boolean deleteUser(Long userId) {
         if (!userRepository.existsById(userId)) {
-            throw new RuntimeException("Người dùng không tồn tại");
+            return false;
         }
         userRepository.deleteById(userId);
+        return true;
     }
 
-    public boolean updateUserRoleAndPriority(Long userId, String newRole, Integer newPriority) {
+    public boolean updateUserRole(Long userId, String newRole) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    user.setRole(newRole);
-                    user.setPriority(newPriority);
+                    // Dùng trực tiếp enum
+                    user.setRole(Role.valueOf(newRole));
                     userRepository.save(user);
                     return true;
                 })
@@ -97,10 +134,14 @@ public class UserService {
     public boolean updatePassword(String email, String newPassword) {
         return userRepository.findByEmail(email)
                 .map(user -> {
-                    user.setPassword(newPassword); // Lưu password trực tiếp (không encode)
+                    user.setPassword(newPassword);
                     userRepository.save(user);
                     return true;
                 })
                 .orElse(false);
+    }
+
+    public List<Department> getAllDepartments() {
+        return departmentRepository.findAll();
     }
 }
