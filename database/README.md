@@ -1,6 +1,6 @@
 run SQL:
 ```bash
-sudo -u postgres psql -d medventory_hmu -f init_database.sql
+sudo -u postgres psql -d medventory_hmu -f database.sql
 ```
 run be
 ```bash
