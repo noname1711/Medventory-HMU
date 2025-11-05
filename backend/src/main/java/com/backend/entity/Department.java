@@ -1,5 +1,6 @@
 package com.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.List;
@@ -16,8 +17,10 @@ public class Department {
     private String name;
 
     @OneToMany(mappedBy = "department", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<SubDepartment> subDepartments;
 
     @OneToMany(mappedBy = "department")
+    @JsonIgnore
     private List<User> users;
 }

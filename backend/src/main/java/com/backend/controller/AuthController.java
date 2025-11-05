@@ -6,6 +6,7 @@ import com.backend.dto.RegisterRequest;
 import com.backend.dto.UserDTO;
 import com.backend.dto.ForgotPasswordRequest;
 import com.backend.dto.ResetPasswordRequest;
+import com.backend.entity.Department;
 import com.backend.entity.User;
 import com.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,9 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -157,6 +156,17 @@ public class AuthController {
             response.put("success", "false");
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
             return ResponseEntity.badRequest().body(response); // 400 Bad Request - Lỗi xử lý
+        }
+    }
+
+    @GetMapping("/departments")
+    public ResponseEntity<List<Department>> getAvailableDepartments() {
+        try {
+            List<Department> departments = userService.getAllDepartments();
+            return ResponseEntity.ok(departments);
+        } catch (Exception e) {
+            // Trả về list rỗng thay vì lỗi
+            return ResponseEntity.ok(Collections.emptyList());
         }
     }
 }

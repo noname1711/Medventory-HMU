@@ -24,14 +24,9 @@ public class UserService {
 
     public User registerUser(RegisterRequest request) {
         try {
-            // Tìm hoặc tạo department mới nếu chưa tồn tại
+            // CHỈ CHO PHÉP ĐĂNG KÝ VỚI KHOA ĐÃ CÓ TRONG DB
             Department department = departmentRepository.findByName(request.getDepartment())
-                    .orElseGet(() -> {
-                        // Tạo department mới
-                        Department newDept = new Department();
-                        newDept.setName(request.getDepartment());
-                        return departmentRepository.save(newDept);
-                    });
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy khoa: " + request.getDepartment() + ". Vui lòng chọn khoa có sẵn trong hệ thống."));
 
             User user = new User();
             user.setFullName(request.getFullName());
@@ -46,7 +41,6 @@ public class UserService {
                 try {
                     user.setRole(Role.valueOf(roleStr));
                 } catch (IllegalArgumentException e) {
-                    // Nếu role không hợp lệ, mặc định là canbo
                     user.setRole(Role.canbo);
                 }
             } else {
@@ -57,7 +51,7 @@ public class UserService {
 
             return userRepository.save(user);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi đăng ký user: " + e.getMessage(), e);
+            throw new RuntimeException("Lỗi đăng ký: " + e.getMessage(), e);
         }
     }
 
