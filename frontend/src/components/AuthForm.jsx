@@ -46,6 +46,7 @@ export default function AuthForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isAutoLogging, setIsAutoLogging] = useState(false);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
   
   // STATE CHO CÁC TRƯỜNG ĐĂNG KÝ
   const [fullName, setFullName] = useState("");
@@ -53,47 +54,13 @@ export default function AuthForm() {
   const [department, setDepartment] = useState("");
   const [role, setRole] = useState("");
 
+  // DANH SÁCH KHOA LẤY TỪ BACKEND
+  const [departments, setDepartments] = useState([]);
+
   const navigate = useNavigate();
   
   const passwordTimeoutRef = useRef(null);
   const confirmPasswordTimeoutRef = useRef(null);
-
-  // Danh sách phân khoa HMU
-  const departments = [
-    "Khoa xét nghiệm",
-    "Khoa phục hồi chức năng",
-    "Khoa gây mê hồi sức và chống đau",
-    "Khoa cấp cứu",
-    "Khoa mắt",
-    "Khoa ngoại tim mạch và lồng ngực",
-    "Khoa ngoại tiết niệu",
-    "Khoa dược",
-    "Khoa hồi sức tích cực",
-    "Khoa khám chữa bệnh theo yêu cầu",
-    "Khoa giải phẫu bệnh",
-    "Khoa nội thần kinh",
-    "Khoa vi sinh - ký sinh trùng",
-    "Khoa nội tổng hợp",
-    "Khoa dinh dưỡng và tiết chế",
-    "Khoa phẫu thuật tạo hình thẩm mỹ",
-    "Khoa hô hấp",
-    "Khoa kiểm soát nhiễm khuẩn",
-    "Khoa thăm dò chức năng",
-    "Khoa phụ sản",
-    "Khoa nam học và y học giới tính",
-    "Khoa ngoại tổng hợp",
-    "Khoa nhi",
-    "Khoa ngoại thần kinh - cột sống",
-    "Khoa dị ứng - miễn dịch lâm sàng",
-    "Khoa nội tiết",
-    "Khoa huyết học và truyền máu",
-    "Khoa y học cổ truyền",
-    "Khoa răng hàm mặt",
-    "Khoa chấn thương chỉnh hình và y học thể thao",
-    "Khoa khám bệnh",
-    "Khoa nội thận - tiết niệu",
-    "Khoa bệnh nhiệt đới và can thiệp giảm hại"
-  ];
 
   // Role mapping - chuyển đổi từ tiếng Việt sang backend enum
   const roleMapping = {
@@ -108,6 +75,33 @@ export default function AuthForm() {
     "thukho": "Thủ kho",
     "canbo": "Cán bộ"
   };
+
+  // LẤY DANH SÁCH KHOA TỪ BACKEND
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      setIsLoadingDepartments(true);
+      try {
+        const response = await fetch('http://localhost:8080/api/auth/departments');
+        if (response.ok) {
+          const data = await response.json();
+          // API trả về array of objects {id, name} - lấy ra tên khoa
+          const departmentNames = data.map(dept => dept.name);
+          setDepartments(departmentNames);
+        } else {
+          toast.error("Không thể tải danh sách khoa từ hệ thống");
+          setDepartments([]);
+        }
+      } catch (error) {
+        toast.error("Lỗi kết nối đến server");
+        setDepartments([]);
+      } finally {
+        setIsLoadingDepartments(false);
+      }
+    };
+
+    // Chỉ fetch departments khi component mount
+    fetchDepartments();
+  }, []);
 
   // AUTO LOGIN - CHỈ CHO USER THƯỜNG, KHÔNG CHO ADMIN
   useEffect(() => {
@@ -249,6 +243,12 @@ export default function AuthForm() {
     // Kiểm tra các trường bắt buộc khi đăng ký
     if (!isLogin && (!fullName || !dateOfBirth || !department || !role)) {
       toast.error("Vui lòng điền đầy đủ thông tin đăng ký!");
+      return;
+    }
+
+    // Kiểm tra nếu không có khoa nào khi đăng ký
+    if (!isLogin && departments.length === 0) {
+      toast.error("Hệ thống chưa có khoa nào. Vui lòng thử lại sau!");
       return;
     }
 
@@ -450,8 +450,15 @@ export default function AuthForm() {
                     className="department-select"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
+                    disabled={isLoadingDepartments || departments.length === 0}
                   >
-                    <option value="">Phòng ban</option>
+                    <option value="">
+                      {isLoadingDepartments 
+                        ? "Đang tải..." 
+                        : departments.length === 0
+                          ? "Không có khoa nào"
+                          : "Chọn khoa"}
+                    </option>
                     {departments.map((dept, index) => (
                       <option key={index} value={dept} title={dept}>
                         {dept.length > 30 ? dept.substring(0, 30) + "..." : dept}
@@ -569,7 +576,11 @@ export default function AuthForm() {
               <div style={{ height: '20px' }}></div> 
             )}
 
-            <button type="submit" className="submit-btn">
+            <button 
+              type="submit" 
+              className="submit-btn"
+              disabled={!isLogin && (isLoadingDepartments || departments.length === 0)}
+            >
               {isLogin ? "Đăng nhập" : "Đăng ký tài khoản"}
             </button>
           </form>

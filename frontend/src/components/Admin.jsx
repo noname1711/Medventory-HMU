@@ -160,49 +160,28 @@ export default function Admin() {
     }
   };
 
-  const rejectUser = async (id) => {
-    const user = users.find((u) => u.id === id);
-    Swal.fire({
-      title: "⚠️ Xác nhận từ chối?",
-      text: `"${user.fullName}" sẽ bị từ chối và xóa khỏi hệ thống. Hành động này không thể hoàn tác!`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Từ chối & Xóa",
-      cancelButtonText: "Hủy",
-      reverseButtons: true,
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          const response = await fetch(`http://localhost:8080/api/admin/users/${id}`, { method: 'DELETE' });
-          if (response.ok) {
-            setUsers((prev) => prev.filter((u) => u.id !== id));
-            Swal.fire({ title: "❌ Đã từ chối & xóa!", text: `${user.fullName} đã bị từ chối và xóa khỏi hệ thống.`, icon: "error", timer: 2000, showConfirmButton: false });
-          }
-        } catch (error) {
-          console.error("Lỗi khi từ chối người dùng:", error);
-          Swal.fire({ title: "❌ Lỗi!", text: "Không thể từ chối người dùng", icon: "error", timer: 2000 });
-        }
-      }
-    });
-  };
-
   const deleteUser = async (id) => {
     const user = users.find((u) => u.id === id);
+    const isPending = user.status === "pending";
+    
     Swal.fire({
-      title: "Xác nhận xóa tài khoản?",
+      title: isPending ? "⚠️ Xác nhận từ chối & xóa?" : "Xác nhận xóa tài khoản?",
       html: `<div style="text-align: left;">
         <p><strong>Họ tên:</strong> ${user.fullName}</p>
         <p><strong>Email:</strong> ${user.email}</p>
         <p><strong>Phòng ban:</strong> ${user.department}</p>
         <p><strong>Vai trò:</strong> ${roleDisplayMapping[user.role] || user.role}</p>
-      </div><p style="color: #ef4444; margin-top: 15px;">⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!</p>`,
+        <p><strong>Trạng thái:</strong> ${isPending ? 'Chờ duyệt' : 'Đã duyệt'}</p>
+      </div><p style="color: #ef4444; margin-top: 15px;">
+        ${isPending 
+          ? '⚠️ Tài khoản sẽ bị từ chối và xóa khỏi hệ thống. Hành động này không thể hoàn tác!' 
+          : '⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!'}
+      </p>`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
       cancelButtonColor: "#6b7280",
-      confirmButtonText: "Xóa vĩnh viễn",
+      confirmButtonText: isPending ? "Từ chối & Xóa" : "Xóa vĩnh viễn",
       cancelButtonText: "Hủy",
       reverseButtons: true,
     }).then(async (result) => {
@@ -211,7 +190,15 @@ export default function Admin() {
           const response = await fetch(`http://localhost:8080/api/admin/users/${id}`, { method: 'DELETE' });
           if (response.ok) {
             setUsers((prev) => prev.filter((u) => u.id !== id));
-            Swal.fire({ title: "✅ Đã xóa!", text: `Tài khoản "${user.fullName}" đã bị xóa khỏi hệ thống.`, icon: "success", timer: 2000, showConfirmButton: false });
+            Swal.fire({ 
+              title: isPending ? "❌ Đã từ chối & xóa!" : "✅ Đã xóa!", 
+              text: isPending 
+                ? `${user.fullName} đã bị từ chối và xóa khỏi hệ thống.` 
+                : `Tài khoản "${user.fullName}" đã bị xóa khỏi hệ thống.`, 
+              icon: isPending ? "error" : "success", 
+              timer: 2000, 
+              showConfirmButton: false 
+            });
           }
         } catch (error) {
           console.error("Lỗi khi xóa người dùng:", error);
@@ -329,9 +316,13 @@ export default function Admin() {
                       <td>{u.department}</td>
                       <td>
                         {roleDisplayMapping[u.role] || u.role}
-                        {u.status === "approved" && (
-                          <button className="admin-edit-role-btn" onClick={() => openRoleChangeModal(u)} title="Thay đổi quyền">✏️</button>
-                        )}
+                        <button 
+                          className="admin-edit-role-btn" 
+                          onClick={() => openRoleChangeModal(u)} 
+                          title="Thay đổi quyền"
+                        >
+                          ✏️
+                        </button>
                       </td>
                       <td>
                         <span className={`admin-status-badge admin-${u.status.toLowerCase()}`}>
@@ -339,16 +330,14 @@ export default function Admin() {
                         </span>
                       </td>
                       <td>
-                        {u.status === "pending" ? (
-                          <div className="admin-actions">
+                        <div className="admin-actions">
+                          {u.status === "pending" && (
                             <button className="admin-approve-btn" onClick={() => approveUser(u.id)}>Duyệt</button>
-                            <button className="admin-reject-btn" onClick={() => rejectUser(u.id)}>Từ chối</button>
-                          </div>
-                        ) : (
-                          <div className="admin-actions">
-                            <button className="admin-delete-btn" onClick={() => deleteUser(u.id)} title="Xóa tài khoản khỏi hệ thống">Xóa</button>
-                          </div>
-                        )}
+                          )}
+                          <button className="admin-delete-btn" onClick={() => deleteUser(u.id)} title="Xóa tài khoản khỏi hệ thống">
+                            {u.status === "pending" ? "Từ chối" : "Xóa"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -364,6 +353,11 @@ export default function Admin() {
           <div className="admin-modal">
             <div className="admin-modal-header">
               <h3>Thay đổi quyền người dùng</h3>
+              <div className="admin-user-status-info">
+                <span className={`admin-status-badge admin-${editingUser.status.toLowerCase()}`}>
+                  {editingUser.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
+                </span>
+              </div>
             </div>
             <div className="admin-modal-content">
               <div className="admin-user-info">
@@ -371,6 +365,11 @@ export default function Admin() {
                 <p><strong>Email:</strong> {editingUser.email}</p>
                 <p><strong>Phòng ban:</strong> {editingUser.department}</p>
                 <p><strong>Quyền hiện tại:</strong> {roleDisplayMapping[editingUser.role] || editingUser.role}</p>
+                <p><strong>Trạng thái:</strong> 
+                  <span className={`admin-status-badge admin-${editingUser.status.toLowerCase()}`}>
+                    {editingUser.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
+                  </span>
+                </p>
               </div>
               
               <div className="admin-role-selection">
