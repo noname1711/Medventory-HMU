@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import "./ForgotPassword.css";
 
+const API_URL = 'http://localhost:8080/api';
+
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -12,6 +14,11 @@ export default function ForgotPassword() {
   
   // Dùng useRef để track xem component có còn mounted không
   const isMounted = useRef(true);
+
+  // API endpoints - sử dụng biến API_URL
+  const API_ENDPOINTS = {
+    FORGOT_PASSWORD: `${API_URL}/auth/forgot-password`
+  };
 
   useEffect(() => {
     isMounted.current = true;
@@ -62,7 +69,7 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/forgot-password", {
+      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

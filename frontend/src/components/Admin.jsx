@@ -4,6 +4,8 @@ import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import "./Admin.css";
 
+const API_URL = 'http://localhost:8080/api';
+
 export default function Admin() {
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
@@ -25,6 +27,14 @@ export default function Admin() {
     "lanhdao": "Lãnh đạo",
     "thukho": "Thủ kho", 
     "canbo": "Cán bộ"
+  };
+
+  // API endpoints - sử dụng biến API_URL
+  const API_ENDPOINTS = {
+    USERS_ALL: `${API_URL}/admin/users/all`,
+    USER_APPROVE: (id) => `${API_URL}/admin/users/${id}/approve`,
+    USER_DELETE: (id) => `${API_URL}/admin/users/${id}`,
+    USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`
   };
 
   useEffect(() => {
@@ -59,7 +69,7 @@ export default function Admin() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/admin/users/all');
+      const response = await fetch(API_ENDPOINTS.USERS_ALL);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       setUsers(data);
@@ -148,7 +158,7 @@ export default function Admin() {
 
   const approveUser = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${id}/approve`, { method: 'POST' });
+      const response = await fetch(API_ENDPOINTS.USER_APPROVE(id), { method: 'POST' });
       if (response.ok) {
         const user = users.find((u) => u.id === id);
         setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: "approved" } : u)));
@@ -187,7 +197,7 @@ export default function Admin() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const response = await fetch(`http://localhost:8080/api/admin/users/${id}`, { method: 'DELETE' });
+          const response = await fetch(API_ENDPOINTS.USER_DELETE(id), { method: 'DELETE' });
           if (response.ok) {
             setUsers((prev) => prev.filter((u) => u.id !== id));
             Swal.fire({ 
@@ -210,7 +220,7 @@ export default function Admin() {
 
   const changeUserRole = async (id, newRole) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${id}/role`, {
+      const response = await fetch(API_ENDPOINTS.USER_ROLE(id), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),

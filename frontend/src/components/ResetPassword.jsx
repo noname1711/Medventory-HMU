@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import "./ForgotPassword.css";
 
+const API_URL = 'http://localhost:8080/api';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -13,6 +14,11 @@ export default function ResetPassword() {
     newPassword: "",
     confirmPassword: ""
   });
+
+  // API endpoints - sử dụng biến API_URL
+  const API_ENDPOINTS = {
+    RESET_PASSWORD: `${API_URL}/auth/reset-password`
+  };
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
@@ -58,7 +64,7 @@ export default function ResetPassword() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/reset-password", {
+      const response = await fetch(API_ENDPOINTS.RESET_PASSWORD, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
