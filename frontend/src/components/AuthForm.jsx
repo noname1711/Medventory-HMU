@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "./AuthForm.css";
 
+const API_URL = 'http://localhost:8080/api';
+
 // COOKIE MANAGER UTILITIES
 const cookieManager = {
   setCookie: (name, value, days = 30) => {
@@ -76,12 +78,19 @@ export default function AuthForm() {
     "canbo": "Cán bộ"
   };
 
+  // API endpoints - sử dụng biến API_URL
+  const API_ENDPOINTS = {
+    LOGIN: `${API_URL}/auth/login`,
+    REGISTER: `${API_URL}/auth/register`,
+    DEPARTMENTS: `${API_URL}/auth/departments`
+  };
+
   // LẤY DANH SÁCH KHOA TỪ BACKEND
   useEffect(() => {
     const fetchDepartments = async () => {
       setIsLoadingDepartments(true);
       try {
-        const response = await fetch('http://localhost:8080/api/auth/departments');
+        const response = await fetch(API_ENDPOINTS.DEPARTMENTS);
         if (response.ok) {
           const data = await response.json();
           // API trả về array of objects {id, name} - lấy ra tên khoa
@@ -133,7 +142,7 @@ export default function AuthForm() {
         setIsAutoLogging(true);
         
         try {
-          const response = await fetch('http://localhost:8080/api/auth/login', {
+          const response = await fetch(API_ENDPOINTS.LOGIN, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -270,7 +279,7 @@ export default function AuthForm() {
         }
 
         // Đăng nhập
-        const response = await fetch('http://localhost:8080/api/auth/login', {
+        const response = await fetch(API_ENDPOINTS.LOGIN, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -321,7 +330,7 @@ export default function AuthForm() {
           role: backendRole, // Gửi role dạng enum cho backend
         };
 
-        const response = await fetch('http://localhost:8080/api/auth/register', {
+        const response = await fetch(API_ENDPOINTS.REGISTER, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

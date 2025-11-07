@@ -234,33 +234,61 @@ CREATE INDEX idx_materials_code                   ON materials(code);
 -- SEED DATA
 -- ============================================
 
--- Departments
+-- Departments (Updated with new names)
 INSERT INTO departments(name) VALUES
-('Khoa Dược'),
-('Khoa Hóa học'),
-('Khoa Điều dưỡng'),
-('Khoa Sinh học'),
-('Khoa Vật tư');
+('Khoa xét nghiệm'),
+('Khoa phục hồi chức năng'),
+('Khoa gây mê hồi sức và chống đau'),
+('Khoa cấp cứu'),
+('Khoa mắt'),
+('Khoa ngoại tim mạch và lồng ngực'),
+('Khoa ngoại tiết niệu'),
+('Khoa dược'),
+('Khoa hồi sức tích cực'),
+('Khoa khám chữa bệnh theo yêu cầu'),
+('Khoa giải phẫu bệnh'),
+('Khoa nội thần kinh'),
+('Khoa vi sinh - ký sinh trùng'),
+('Khoa nội tổng hợp'),
+('Khoa dinh dưỡng và tiết chế'),
+('Khoa phẫu thuật tạo hình thẩm mỹ'),
+('Khoa hô hấp'),
+('Khoa kiểm soát nhiễm khuẩn'),
+('Khoa thăm dò chức năng'),
+('Khoa phụ sản'),
+('Khoa nam học và y học giới tính'),
+('Khoa ngoại tổng hợp'),
+('Khoa nhi'),
+('Khoa ngoại thần kinh - cột sống'),
+('Khoa dị ứng - miễn dịch lâm sàng'),
+('Khoa nội tiết'),
+('Khoa huyết học và truyền máu'),
+('Khoa y học cổ truyền'),
+('Khoa răng hàm mặt'),
+('Khoa chấn thương chỉnh hình và y học thể thao'),
+('Khoa khám bệnh'),
+('Khoa nội thận - tiết niệu'),
+('Khoa bệnh nhiệt đới và can thiệp giảm hại');
 
--- Sub-departments
+-- Sub-departments (Updated to reference new departments)
 INSERT INTO sub_departments(name, department_id) VALUES
-('Dược lý',   (SELECT id FROM departments WHERE name='Khoa Dược')),
-('Hóa sinh',  (SELECT id FROM departments WHERE name='Khoa Hóa học')),
-('BHPT',      (SELECT id FROM departments WHERE name='Khoa Hóa học')),
-('Vi sinh',   (SELECT id FROM departments WHERE name='Khoa Sinh học')),
-('Vật tư 1',  (SELECT id FROM departments WHERE name='Khoa Vật tư'));
+('Dược lý',   (SELECT id FROM departments WHERE name='Khoa dược')),
+('Hóa sinh',  (SELECT id FROM departments WHERE name='Khoa xét nghiệm')),
+('BHPT',      (SELECT id FROM departments WHERE name='Khoa xét nghiệm')),
+('Vi sinh',   (SELECT id FROM departments WHERE name='Khoa vi sinh - ký sinh trùng')),
+('Vật tư 1',  (SELECT id FROM departments WHERE name='Khoa dược'));
 
 -- Units
 INSERT INTO units(name) VALUES
 ('chai'),('lọ'),('hộp'),('cái'),('ml'),('g'),('viên'),('kg'),('bộ');
 
--- Users (3+ tài khoản)
+-- Users (3+ tài khoản) - Updated to reference new departments
 INSERT INTO users(full_name, email, password, department_id, role, status) VALUES
 ('Admin System',        'admin',               '12345', NULL,                                                'lanhdao',   'approved'),
-('Lãnh Đạo Khoa Dược',  'lanhdao@gmail.com',    '12345', (SELECT id FROM departments WHERE name='Khoa Dược'), 'lanhdao', 'approved'),
-('Thủ Kho Hóa học',     'thukho@gmail.com',   '12345', (SELECT id FROM departments WHERE name='Khoa Hóa học'),'thukho',  'approved'),
-('CB Bộ môn BHPT',      'canbo.bhpt@gmail.com',      '12345', (SELECT id FROM departments WHERE name='Khoa Hóa học'),'canbo',   'pending'),
-('CB Hóa sinh',         'canbo.hoasinh@gmail.com',   '12345', (SELECT id FROM departments WHERE name='Khoa Hóa học'),'canbo',   'pending');
+('Lãnh Đạo Khoa Dược',  'lanhdao@gmail.com',    '12345', (SELECT id FROM departments WHERE name='Khoa dược'), 'lanhdao', 'approved'),
+('Thủ Kho Xét nghiệm',  'thukho@gmail.com',   '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),'thukho',  'approved'),
+('CB Bộ môn BHPT',      'canbo.bhpt@gmail.com',      '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),'canbo',   'pending'),
+('CB Hóa sinh',         'canbo.hoasinh@gmail.com',   '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),'canbo',   'pending');
 
 -- Materials
 INSERT INTO materials(name, spec, unit_id, code, manufacturer, category) VALUES
@@ -273,14 +301,14 @@ INSERT INTO materials(name, spec, unit_id, code, manufacturer, category) VALUES
 ('Glucoza 5%',             'Chai 500 ml',           (SELECT id FROM units WHERE name='chai'), 'GLUC-500',    'IVCo',        'B'),
 ('Ống pipet 1ml',          'Bộ 100 cái',            (SELECT id FROM units WHERE name='bộ'),   'PIP1-100',    'LabMate',     'D');
 
--- Supplement forecast (2 headers, nhiều dòng)
+-- Supplement forecast (2 headers, nhiều dòng) - Updated department references
 INSERT INTO supp_forecast_header(created_by, academic_year, department_id, status, approval_by, approval_at, approval_note)
 VALUES
-((SELECT id FROM users WHERE email='thukho.hoahoc@hmu'), '2025-2026',
- (SELECT id FROM departments WHERE name='Khoa Hóa học'),
- 'approved', (SELECT id FROM users WHERE email='lanhdao.duoc@hmu'), NOW(), 'Đồng ý theo đề xuất'),
-((SELECT id FROM users WHERE email='thukho.hoahoc@hmu'), '2025-2026',
- (SELECT id FROM departments WHERE name='Khoa Hóa học'),
+((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026',
+ (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),
+ 'approved', (SELECT id FROM users WHERE email='lanhdao@gmail.com'), NOW(), 'Đồng ý theo đề xuất'),
+((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026',
+ (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),
  'pending',  NULL, NULL, NULL);
 
 INSERT INTO supp_forecast_detail(header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification)
@@ -291,16 +319,16 @@ FROM (
   UNION ALL SELECT 50,200,250,'Thay thế hao hụt/vỡ',        'TUBE-10'
 ) x
 JOIN materials m ON m.code = x.code
-JOIN supp_forecast_header h1 ON h1.status = 'approved' AND h1.department_id = (SELECT id FROM departments WHERE name='Khoa Hóa học');
+JOIN supp_forecast_header h1 ON h1.status = 'approved' AND h1.department_id = (SELECT id FROM departments WHERE name='Khoa xét nghiệm');
 
--- Issue request (approved) + details
+-- Issue request (approved) + details - Updated department references
 INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, approval_by, approval_at, approval_note, note)
 VALUES
-((SELECT id FROM users WHERE email='canbo.bhpt@hmu'),
+((SELECT id FROM users WHERE email='canbo.bhpt@gmail.com'),
  (SELECT id FROM sub_departments WHERE name='BHPT'),
- (SELECT id FROM departments WHERE name='Khoa Hóa học'),
+ (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),
  NOW(), 'approved',
- (SELECT id FROM users WHERE email='lanhdao.duoc@hmu'),
+ (SELECT id FROM users WHERE email='lanhdao@gmail.com'),
  NOW(), 'Phê duyệt cấp phát', 'Xin lĩnh vật tư thí nghiệm');
 
 INSERT INTO issue_req_detail(header_id, material_id, qty_requested)
@@ -313,7 +341,7 @@ ORDER BY m.id;
 -- Receipt (1 header, nhiều dòng)
 INSERT INTO receipt_header(created_by, received_from, reason, receipt_date, total_amount)
 VALUES
-((SELECT id FROM users WHERE email='thukho.hoahoc@hmu'),
+((SELECT id FROM users WHERE email='thukho@gmail.com'),
  'Công ty Vật tư Khoa học ABC', 'Nhập theo hợp đồng 01/2025', CURRENT_DATE, 0);
 
 INSERT INTO receipt_detail(header_id, material_id, name, spec, code, unit_id, price, qty_doc, qty_actual, lot_number, mfg_date, exp_date, total)
@@ -334,11 +362,11 @@ SET total_amount = COALESCE((
 ),0)
 WHERE rh.id IN (SELECT id FROM receipt_header);
 
--- Issue (1 header, nhiều dòng)
+-- Issue (1 header, nhiều dòng) - Updated department reference
 INSERT INTO issue_header(created_by, receiver_name, department_id, issue_date, total_amount)
 VALUES
-((SELECT id FROM users WHERE email='thukho.hoahoc@hmu'),
- 'Bộ môn BHPT', (SELECT id FROM departments WHERE name='Khoa Hóa học'),
+((SELECT id FROM users WHERE email='thukho@gmail.com'),
+ 'Bộ môn BHPT', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'),
  CURRENT_DATE, 0);
 
 INSERT INTO issue_detail(header_id, material_id, name, spec, code, unit_id, unit_price, qty_requested, qty_issued, total)
@@ -359,7 +387,7 @@ SET total_amount = COALESCE((
 ),0)
 WHERE ih.id IN (SELECT id FROM issue_header);
 
--- Inventory cards (ví dụ)
+-- Inventory cards (ví dụ) - Updated sub-department reference
 INSERT INTO inventory_card(material_id, unit_id, warehouse_name, record_date, opening_stock, qty_in, qty_out, supplier, lot_number, mfg_date, exp_date, sub_department_id)
 SELECT m.id, m.unit_id, 'Kho Hóa chất', CURRENT_DATE, 0, 100, 10, 'Cty ABC', 'ETH-0125-A', '2025-01-10', '2027-01-10',
        (SELECT id FROM sub_departments WHERE name='BHPT')
@@ -369,4 +397,4 @@ COMMIT;
 
 -- Done.
 
-select * from departments
+select * from departments;
