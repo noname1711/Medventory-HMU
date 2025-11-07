@@ -454,27 +454,42 @@ export default function AuthForm() {
                     onChange={(e) => setDateOfBirth(e.target.value)}
                     required 
                   />
+                  
+                  {/* ĐÃ CHUYỂN VỊ TRÍ: PHÂN QUYỀN LÊN TRƯỚC, CHỌN KHOA XUỐNG SAU */}
                   <select 
-                    required 
-                    className="department-select"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    disabled={isLoadingDepartments || departments.length === 0}
+                    required
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="role-select"
                   >
-                    <option value="">
-                      {isLoadingDepartments 
-                        ? "Đang tải..." 
-                        : departments.length === 0
-                          ? "Không có khoa nào"
-                          : "Chọn khoa"}
-                    </option>
-                    {departments.map((dept, index) => (
-                      <option key={index} value={dept} title={dept}>
-                        {dept.length > 30 ? dept.substring(0, 30) + "..." : dept}
-                      </option>
-                    ))}
+                    <option value="">Phân quyền</option>
+                    <option value="Lãnh đạo">Lãnh đạo</option>
+                    <option value="Thủ kho">Thủ kho</option>
+                    <option value="Cán bộ">Cán bộ khác</option>
                   </select>
                 </div>
+
+                {/* CHUYỂN SELECT KHOA XUỐNG DƯỚI CÙNG TRONG PHẦN ĐĂNG KÝ */}
+                <select 
+                  required 
+                  className="department-select"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  disabled={isLoadingDepartments || departments.length === 0}
+                >
+                  <option value="">
+                    {isLoadingDepartments 
+                      ? "Đang tải..." 
+                      : departments.length === 0
+                        ? "Không có khoa nào"
+                        : "Chọn khoa"}
+                  </option>
+                  {departments.map((dept, index) => (
+                    <option key={index} value={dept} title={dept}>
+                      {dept.length > 30 ? dept.substring(0, 30) + "..." : dept}
+                    </option>
+                  ))}
+                </select>
               </>
             )}
 
@@ -548,19 +563,6 @@ export default function AuthForm() {
                     </div>
                   )}
                 </div>
-                
-                {/* Role select */}
-                <select 
-                  required
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="role-select"
-                >
-                  <option value="">Phân quyền</option>
-                  <option value="Lãnh đạo">Lãnh đạo</option>
-                  <option value="Thủ kho">Thủ kho</option>
-                  <option value="Cán bộ">Cán bộ khác</option>
-                </select>
               </>
             )}
 
