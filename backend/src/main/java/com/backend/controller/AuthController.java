@@ -42,10 +42,13 @@ public class AuthController {
                         .body(new AuthResponse(false, "Mật khẩu xác nhận không khớp!"));
             }
 
-            // Kiểm tra email hợp lệ (trừ admin)
-            if (!request.getEmail().endsWith("@gmail.com") && !"admin".equals(request.getEmail())) {
-                return ResponseEntity.badRequest()
-                        .body(new AuthResponse(false, "Vui lòng dùng email @gmail.com để đăng ký!"));
+            // Kiểm tra role hợp lệ (không cho phép đăng ký Ban Giám Hiệu)
+            if (request.getRole() != null) {
+                String role = request.getRole();
+                if (role.equals("Ban Giám Hiệu") || role.equals("0")) {
+                    return ResponseEntity.badRequest()
+                            .body(new AuthResponse(false, "Không thể đăng ký tài khoản Ban Giám Hiệu!"));
+                }
             }
 
             User user = userService.registerUser(request);
@@ -61,22 +64,14 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         try {
-            // Xử lý đăng nhập admin đặc biệt
-            if ("admin".equals(request.getEmail()) && "12345".equals(request.getPassword())) {
-                UserDTO adminUser = new UserDTO();
-                adminUser.setFullName("Admin");
-                adminUser.setRole("admin");
-                adminUser.setDepartment("Quản trị hệ thống");
-
-                AuthResponse response = new AuthResponse(true, "Xin chào Admin", "admin-token", adminUser);
-                return ResponseEntity.ok(response);
-            }
-
             User user = userService.authenticateUser(request.getEmail(), request.getPassword());
 
             if (user != null) {
                 UserDTO userDTO = userService.convertToDTO(user);
-                AuthResponse response = new AuthResponse(true, "Đăng nhập thành công!", "user-token-" + user.getId(), userDTO);
+                String message = user.isBanGiamHieu() ?
+                        "Xin chào Ban Giám Hiệu!" : "Đăng nhập thành công!";
+
+                AuthResponse response = new AuthResponse(true, message, "user-token-" + user.getId(), userDTO);
                 return ResponseEntity.ok(response);
             } else {
                 return ResponseEntity.badRequest()
@@ -98,7 +93,7 @@ public class AuthController {
             if (!userService.emailExists(email)) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
-                return ResponseEntity.status(404).body(response); // 404 Not Found - Không tìm thấy email
+                return ResponseEntity.status(404).body(response);
             }
 
             // Tạo token reset
@@ -109,13 +104,13 @@ public class AuthController {
             response.put("success", true);
             response.put("resetToken", resetToken);
 
-            return ResponseEntity.ok(response);  // 200 OK - Yêu cầu thành công
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response); // 500 Internal Server Error - Lỗi server
+            return ResponseEntity.internalServerError().body(response);
         }
     }
 
@@ -129,7 +124,7 @@ public class AuthController {
             if (!resetTokens.containsKey(token)) {
                 Map<String, String> response = new HashMap<>();
                 response.put("success", "false");
-                return ResponseEntity.badRequest().body(response); // 400 Bad Request - Client gửi token sai
+                return ResponseEntity.badRequest().body(response);
             }
 
             // Lấy email từ token
@@ -144,18 +139,18 @@ public class AuthController {
 
                 Map<String, String> response = new HashMap<>();
                 response.put("success", "true");
-                return ResponseEntity.ok(response);  // 200 OK - Reset mật khẩu thành công
+                return ResponseEntity.ok(response);
             } else {
                 Map<String, String> response = new HashMap<>();
                 response.put("success", "false");
-                return ResponseEntity.badRequest().body(response); // 400 Bad Request - Lỗi cập nhật
+                return ResponseEntity.badRequest().body(response);
             }
 
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("success", "false");
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response); // 400 Bad Request - Lỗi xử lý
+            return ResponseEntity.badRequest().body(response);
         }
     }
 
@@ -165,7 +160,6 @@ public class AuthController {
             List<Department> departments = userService.getAllDepartments();
             return ResponseEntity.ok(departments);
         } catch (Exception e) {
-            // Trả về list rỗng thay vì lỗi
             return ResponseEntity.ok(Collections.emptyList());
         }
     }

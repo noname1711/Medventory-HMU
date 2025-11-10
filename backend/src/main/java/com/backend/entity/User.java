@@ -28,11 +28,57 @@ public class User {
     @JoinColumn(name = "department_id")
     private Department department;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private Role role = Role.canbo;
+    @Column(name = "role_check", nullable = false)
+    private Integer roleCheck = 3; // 0 = Ban Giám Hiệu, 1 = Lãnh đạo, 2 = Thủ kho, 3 = Cán bộ
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private Status status = Status.pending;
+    @Column(name = "role", length = 100)
+    private String role; // Tên chức vụ thực tế
+
+    @Column(name = "status", nullable = false)
+    private Integer status = 0; // 0 = pending, 1 = approved
+
+    // Helper methods
+    public boolean isBanGiamHieu() {
+        return roleCheck != null && roleCheck == 0;
+    }
+
+    public boolean isLanhDao() {
+        return roleCheck != null && roleCheck == 1;
+    }
+
+    public boolean isThuKho() {
+        return roleCheck != null && roleCheck == 2;
+    }
+
+    public boolean isCanBo() {
+        return roleCheck != null && roleCheck == 3;
+    }
+
+    public boolean isApproved() {
+        return status != null && status == 1;
+    }
+
+    public boolean isPending() {
+        return status != null && status == 0;
+    }
+
+    public String getRoleName() {
+        if (roleCheck == null) return "Không xác định";
+        switch (roleCheck) {
+            case 0: return "Ban Giám Hiệu";
+            case 1: return "Lãnh đạo";
+            case 2: return "Thủ kho";
+            case 3: return "Cán bộ";
+            default: return "Không xác định";
+        }
+    }
+
+    public String getStatusName() {
+        if (status == null) return "Không xác định";
+        switch (status) {
+            case 0: return "Chờ duyệt";
+            case 1: return "Đã duyệt";
+            default: return "Không xác định";
+        }
+    }
 }

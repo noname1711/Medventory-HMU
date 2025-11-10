@@ -80,6 +80,11 @@ public class AdminController {
                 return ResponseEntity.badRequest().body("Role không được để trống");
             }
 
+            // Không cho phép chuyển thành Ban Giám Hiệu qua API
+            if (newRole.equals("Ban Giám Hiệu") || newRole.equals("0")) {
+                return ResponseEntity.badRequest().body("Không thể cập nhật thành Ban Giám Hiệu!");
+            }
+
             boolean success = userService.updateUserRole(userId, newRole);
             if (success) {
                 return ResponseEntity.ok().body("Cập nhật quyền thành công");

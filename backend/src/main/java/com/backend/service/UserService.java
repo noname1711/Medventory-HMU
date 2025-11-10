@@ -4,13 +4,12 @@ import com.backend.dto.RegisterRequest;
 import com.backend.dto.UserDTO;
 import com.backend.entity.User;
 import com.backend.entity.Department;
-import com.backend.entity.Role;
-import com.backend.entity.Status;
 import com.backend.repository.UserRepository;
 import com.backend.repository.DepartmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,6 +20,16 @@ public class UserService {
 
     @Autowired
     private DepartmentRepository departmentRepository;
+
+    // Map role từ tiếng Việt sang roleCheck
+    private Integer mapRoleToRoleCheck(String role) {
+        switch (role) {
+            case "Lãnh đạo": return 1;
+            case "Thủ kho": return 2;
+            case "Cán bộ": return 3;
+            default: return 3; // Mặc định là Cán bộ
+        }
+    }
 
     public User registerUser(RegisterRequest request) {
         try {
@@ -35,19 +44,13 @@ public class UserService {
             user.setDateOfBirth(request.getDateOfBirth());
             user.setDepartment(department);
 
-            // Xử lý role
+            // Xử lý role theo database schema mới
             String roleStr = request.getRole();
-            if (roleStr != null) {
-                try {
-                    user.setRole(Role.valueOf(roleStr));
-                } catch (IllegalArgumentException e) {
-                    user.setRole(Role.canbo);
-                }
-            } else {
-                user.setRole(Role.canbo);
-            }
+            Integer roleCheck = mapRoleToRoleCheck(roleStr);
+            user.setRoleCheck(roleCheck);
+            user.setRole(roleStr); // Lưu tên role thực tế
 
-            user.setStatus(Status.pending);
+            user.setStatus(0); // 0 = pending
 
             return userRepository.save(user);
         } catch (Exception e) {
@@ -56,14 +59,21 @@ public class UserService {
     }
 
     public User authenticateUser(String email, String password) {
-        return userRepository.findByEmail(email)
-                .filter(user -> user.getPassword().equals(password))
-                .filter(user -> user.getStatus() == Status.approved)
-                .orElse(null);
+        Optional<User> userOpt = userRepository.findByEmailAndPassword(email, password);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            // Cho phép đăng nhập nếu:
+            // - Là Ban Giám Hiệu (roleCheck = 0) - LUÔN được đăng nhập
+            // - Hoặc là user thường VÀ đã được approved (status = 1)
+            if (user.isBanGiamHieu() || user.getStatus() == 1) {
+                return user;
+            }
+        }
+        return null;
     }
 
     public List<UserDTO> getPendingUsers() {
-        return userRepository.findByStatus("pending")
+        return userRepository.findByStatus(0) // 0 = pending
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -79,8 +89,9 @@ public class UserService {
     public boolean updateUserStatus(Long userId, String status) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    // Dùng trực tiếp enum
-                    user.setStatus(Status.valueOf(status));
+                    // Chuyển đổi status từ string sang integer
+                    int statusValue = "approved".equals(status) ? 1 : 0;
+                    user.setStatus(statusValue);
                     userRepository.save(user);
                     return true;
                 })
@@ -95,9 +106,24 @@ public class UserService {
         dto.setDateOfBirth(user.getDateOfBirth());
         dto.setDepartment(user.getDepartment() != null ? user.getDepartment().getName() : null);
 
-        // Trả về trực tiếp enum name
-        dto.setRole(user.getRole().name());
-        dto.setStatus(user.getStatus().name());
+        // Sử dụng helper methods từ User entity
+        dto.setRole(user.getRoleName());
+
+        // QUAN TRỌNG: Nếu là Ban Giám Hiệu, sử dụng role thực tế từ database
+        if (user.isBanGiamHieu() && user.getRole() != null && !user.getRole().isEmpty()) {
+            dto.setRole(user.getRole()); // Hiển thị "Hiệu trưởng", "Phó Hiệu trưởng"
+        } else {
+            dto.setRole(user.getRoleName()); // Hiển thị "Ban Giám Hiệu", "Lãnh đạo", etc.
+        }
+
+        dto.setStatus(user.getStatusName());
+        dto.setRoleCheck(user.getRoleCheck());
+        dto.setStatusValue(user.getStatus());
+        dto.setIsApproved(user.isApproved());
+        dto.setIsBanGiamHieu(user.isBanGiamHieu());
+        dto.setIsLanhDao(user.isLanhDao());
+        dto.setIsThuKho(user.isThuKho());
+        dto.setIsCanBo(user.isCanBo());
 
         return dto;
     }
@@ -117,8 +143,9 @@ public class UserService {
     public boolean updateUserRole(Long userId, String newRole) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    // Dùng trực tiếp enum
-                    user.setRole(Role.valueOf(newRole));
+                    Integer roleCheck = mapRoleToRoleCheck(newRole);
+                    user.setRoleCheck(roleCheck);
+                    user.setRole(newRole);
                     userRepository.save(user);
                     return true;
                 })
