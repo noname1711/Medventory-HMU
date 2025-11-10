@@ -8,26 +8,22 @@ const API_URL = 'http://localhost:8080/api';
 
 export default function Admin() {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [newRole, setNewRole] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [activeTab, setActiveTab] = useState("pending"); // "pending" or "approved"
+  const [adminInfo, setAdminInfo] = useState(null);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const navigate = useNavigate();
 
   const availableRoles = [
-    { value: "lanhdao", label: "Lãnh đạo" },
-    { value: "thukho", label: "Thủ kho" },
-    { value: "canbo", label: "Cán bộ khác" }
+    { value: "Lãnh đạo", label: "Lãnh đạo" },
+    { value: "Thủ kho", label: "Thủ kho" },
+    { value: "Cán bộ", label: "Cán bộ khác" }
   ];
-
-  // Role mapping để hiển thị tiếng Việt
-  const roleDisplayMapping = {
-    "lanhdao": "Lãnh đạo",
-    "thukho": "Thủ kho", 
-    "canbo": "Cán bộ"
-  };
 
   // API endpoints - sử dụng biến API_URL
   const API_ENDPOINTS = {
@@ -51,11 +47,13 @@ export default function Admin() {
         }
       }
 
-      if (adminJustLoggedIn || (userData && userData.email === "admin")) {
+      // Kiểm tra nếu là Ban Giám Hiệu
+      if (adminJustLoggedIn || (userData && userData.isBanGiamHieu)) {
         if (adminJustLoggedIn) {
           sessionStorage.removeItem('adminJustLoggedIn');
         }
         setIsAuthenticated(true);
+        setAdminInfo(userData);
         fetchUsers();
       } else {
         navigate("/");
@@ -72,7 +70,11 @@ export default function Admin() {
       const response = await fetch(API_ENDPOINTS.USERS_ALL);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      setUsers(data);
+      
+      // Lọc bỏ các tài khoản Ban Giám Hiệu (roleCheck = 0)
+      const filteredData = data.filter(user => !user.isBanGiamHieu);
+      setUsers(filteredData);
+      filterUsersByStatus(filteredData, activeTab);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách người dùng:", error);
       Swal.fire({
@@ -84,6 +86,18 @@ export default function Admin() {
     }
   };
 
+  const filterUsersByStatus = (userList, status) => {
+    if (status === "pending") {
+      setFilteredUsers(userList.filter(user => user.statusValue === 0));
+    } else {
+      setFilteredUsers(userList.filter(user => user.statusValue === 1));
+    }
+  };
+
+  useEffect(() => {
+    filterUsersByStatus(users, activeTab);
+  }, [users, activeTab]);
+
   useEffect(() => {
     if (isAuthenticated && users.length > 0) updateChart();
   }, [users, isAuthenticated]);
@@ -92,8 +106,8 @@ export default function Admin() {
     const ctx = chartRef.current?.getContext("2d");
     if (!ctx) return;
 
-    const approved = users.filter((u) => u.status === "approved").length;
-    const pending = users.filter((u) => u.status === "pending").length;
+    const approved = users.filter((u) => u.statusValue === 1).length;
+    const pending = users.filter((u) => u.statusValue === 0).length;
 
     if (chartInstance.current) chartInstance.current.destroy();
 
@@ -147,7 +161,7 @@ export default function Admin() {
       if (result.isConfirmed) {
         localStorage.removeItem('currentUser');
         sessionStorage.removeItem('adminJustLoggedIn');
-        const cookiesToDelete = ["rememberedEmail", "rememberedPassword", "rememberMe", "rememberedAdmin", "rememberedAdminPassword", "rememberAdmin"];
+        const cookiesToDelete = ["rememberedEmail", "rememberedPassword", "rememberMe"];
         cookiesToDelete.forEach(cookieName => {
           document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
         });
@@ -161,7 +175,8 @@ export default function Admin() {
       const response = await fetch(API_ENDPOINTS.USER_APPROVE(id), { method: 'POST' });
       if (response.ok) {
         const user = users.find((u) => u.id === id);
-        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: "approved" } : u)));
+        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u)));
+        filterUsersByStatus(users.map(u => u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u), activeTab);
         Swal.fire({ title: "✅ Đã duyệt!", text: `${user.fullName} đã được cấp quyền truy cập.`, icon: "success", timer: 2000, showConfirmButton: false });
       }
     } catch (error) {
@@ -172,7 +187,7 @@ export default function Admin() {
 
   const deleteUser = async (id) => {
     const user = users.find((u) => u.id === id);
-    const isPending = user.status === "pending";
+    const isPending = user.statusValue === 0;
     
     Swal.fire({
       title: isPending ? "⚠️ Xác nhận từ chối & xóa?" : "Xác nhận xóa tài khoản?",
@@ -180,7 +195,7 @@ export default function Admin() {
         <p><strong>Họ tên:</strong> ${user.fullName}</p>
         <p><strong>Email:</strong> ${user.email}</p>
         <p><strong>Phòng ban:</strong> ${user.department}</p>
-        <p><strong>Vai trò:</strong> ${roleDisplayMapping[user.role] || user.role}</p>
+        <p><strong>Vai trò:</strong> ${user.role}</p>
         <p><strong>Trạng thái:</strong> ${isPending ? 'Chờ duyệt' : 'Đã duyệt'}</p>
       </div><p style="color: #ef4444; margin-top: 15px;">
         ${isPending 
@@ -200,6 +215,7 @@ export default function Admin() {
           const response = await fetch(API_ENDPOINTS.USER_DELETE(id), { method: 'DELETE' });
           if (response.ok) {
             setUsers((prev) => prev.filter((u) => u.id !== id));
+            filterUsersByStatus(users.filter(u => u.id !== id), activeTab);
             Swal.fire({ 
               title: isPending ? "❌ Đã từ chối & xóa!" : "✅ Đã xóa!", 
               text: isPending 
@@ -228,11 +244,12 @@ export default function Admin() {
       
       if (response.ok) {
         setUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: newRole } : u));
+        filterUsersByStatus(users.map(u => u.id === id ? { ...u, role: newRole } : u), activeTab);
         setEditingUser(null);
         setNewRole("");
         Swal.fire({
           title: "✅ Đã cập nhật!",
-          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${roleDisplayMapping[newRole] || newRole}</p></div>`,
+          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${newRole}</p></div>`,
           icon: "success", 
           timer: 2000, 
           showConfirmButton: false
@@ -280,8 +297,16 @@ export default function Admin() {
     <div className="admin-page">
       <header className="admin-header">
         <div className="admin-title">
-          <h1>Bảng điều khiển Admin</h1>
-          <p>Duyệt & quản lý tài khoản đăng ký hệ thống</p>
+          <h1>Bảng điều khiển cho Ban giám hiệu</h1>
+          <p>
+            {adminInfo ? (
+              <>
+                Xin chào <strong>{adminInfo.fullName}</strong> - {adminInfo.role}
+              </>
+            ) : (
+              "Duyệt & quản lý tài khoản đăng ký hệ thống"
+            )}
+          </p>
         </div>
         <div className="admin-header-actions">
           <button className="admin-logout-btn" onClick={handleLogout} title="Đăng xuất khỏi trang admin">
@@ -302,12 +327,29 @@ export default function Admin() {
             <div className="admin-card-header">
               <h3>Danh sách tài khoản hệ thống</h3>
               <div className="admin-user-count-badge">
-                <span className="admin-count-number">{users.length}</span>
+                <span className="admin-count-number">{filteredUsers.length}</span>
                 <span className="admin-count-text">tài khoản</span>
               </div>
             </div>
+
+            {/* Tabs phân loại */}
+            <div className="admin-tabs">
+              <button 
+                className={`admin-tab ${activeTab === "pending" ? "admin-tab-active" : ""}`}
+                onClick={() => setActiveTab("pending")}
+              >
+                Tài khoản chờ duyệt ({users.filter(u => u.statusValue === 0).length})
+              </button>
+              <button 
+                className={`admin-tab ${activeTab === "approved" ? "admin-tab-active" : ""}`}
+                onClick={() => setActiveTab("approved")}
+              >
+                Tài khoản đã duyệt ({users.filter(u => u.statusValue === 1).length})
+              </button>
+            </div>
+
             <div className="admin-table-container">
-              <table>
+              <table className="admin-table">
                 <thead>
                   <tr>
                     <th>Họ tên</th>
@@ -319,38 +361,49 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className={u.status === "approved" ? "admin-approved" : ""}>
+                  {filteredUsers.map((u, index) => (
+                    <tr key={u.id} className={`${u.statusValue === 1 ? "admin-approved" : ""} ${index === filteredUsers.length - 1 ? "admin-last-row" : ""}`}>
                       <td>{u.fullName}</td>
                       <td>{u.email}</td>
                       <td>{u.department}</td>
                       <td>
-                        {roleDisplayMapping[u.role] || u.role}
-                        <button 
-                          className="admin-edit-role-btn" 
-                          onClick={() => openRoleChangeModal(u)} 
-                          title="Thay đổi quyền"
-                        >
-                          ✏️
-                        </button>
+                        <div className="admin-role-cell">
+                          <span>{u.role}</span>
+                          <button 
+                            className="admin-edit-role-btn" 
+                            onClick={() => openRoleChangeModal(u)} 
+                            title="Thay đổi quyền"
+                          >
+                            ✏️
+                          </button>
+                        </div>
                       </td>
                       <td>
-                        <span className={`admin-status-badge admin-${u.status.toLowerCase()}`}>
-                          {u.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
+                        <span className={`admin-status-badge admin-${u.statusValue === 1 ? 'approved' : 'pending'}`}>
+                          {u.statusValue === 1 ? 'Đã duyệt' : 'Chờ duyệt'}
                         </span>
                       </td>
                       <td>
                         <div className="admin-actions">
-                          {u.status === "pending" && (
+                          {u.statusValue === 0 && (
                             <button className="admin-approve-btn" onClick={() => approveUser(u.id)}>Duyệt</button>
                           )}
                           <button className="admin-delete-btn" onClick={() => deleteUser(u.id)} title="Xóa tài khoản khỏi hệ thống">
-                            {u.status === "pending" ? "Từ chối" : "Xóa"}
+                            {u.statusValue === 0 ? "Từ chối" : "Xóa"}
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {filteredUsers.length === 0 && (
+                    <tr className="admin-last-row">
+                      <td colSpan="6" className="admin-no-data">
+                        {activeTab === "pending" 
+                          ? "Không có tài khoản nào đang chờ duyệt" 
+                          : "Không có tài khoản nào đã được duyệt"}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -364,8 +417,8 @@ export default function Admin() {
             <div className="admin-modal-header">
               <h3>Thay đổi quyền người dùng</h3>
               <div className="admin-user-status-info">
-                <span className={`admin-status-badge admin-${editingUser.status.toLowerCase()}`}>
-                  {editingUser.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
+                <span className={`admin-status-badge admin-${editingUser.statusValue === 1 ? 'approved' : 'pending'}`}>
+                  {editingUser.statusValue === 1 ? 'Đã duyệt' : 'Chờ duyệt'}
                 </span>
               </div>
             </div>
@@ -374,10 +427,10 @@ export default function Admin() {
                 <p><strong>Họ tên:</strong> {editingUser.fullName}</p>
                 <p><strong>Email:</strong> {editingUser.email}</p>
                 <p><strong>Phòng ban:</strong> {editingUser.department}</p>
-                <p><strong>Quyền hiện tại:</strong> {roleDisplayMapping[editingUser.role] || editingUser.role}</p>
+                <p><strong>Quyền hiện tại:</strong> {editingUser.role}</p>
                 <p><strong>Trạng thái:</strong> 
-                  <span className={`admin-status-badge admin-${editingUser.status.toLowerCase()}`}>
-                    {editingUser.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
+                  <span className={`admin-status-badge admin-${editingUser.statusValue === 1 ? 'approved' : 'pending'}`}>
+                    {editingUser.statusValue === 1 ? 'Đã duyệt' : 'Chờ duyệt'}
                   </span>
                 </p>
               </div>

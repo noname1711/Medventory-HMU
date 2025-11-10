@@ -11,5 +11,5 @@ public class RegisterRequest {
     private String confirmPassword;
     private LocalDate dateOfBirth;
     private String department;
-    private String role;
+    private String role; // "Lãnh đạo", "Thủ kho", "Cán bộ"
 }

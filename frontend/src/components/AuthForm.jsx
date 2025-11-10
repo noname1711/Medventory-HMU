@@ -30,8 +30,7 @@ const cookieManager = {
 
   clearAllAuthCookies: () => {
     const cookiesToDelete = [
-      "rememberedEmail", "rememberedPassword", "rememberMe",
-      "rememberedAdmin", "rememberedAdminPassword", "rememberAdmin"
+      "rememberedEmail", "rememberedPassword", "rememberMe"
     ];
     cookiesToDelete.forEach(cookieName => {
       cookieManager.deleteCookie(cookieName);
@@ -64,20 +63,6 @@ export default function AuthForm() {
   const passwordTimeoutRef = useRef(null);
   const confirmPasswordTimeoutRef = useRef(null);
 
-  // Role mapping - chuyển đổi từ tiếng Việt sang backend enum
-  const roleMapping = {
-    "Lãnh đạo": "lanhdao",
-    "Thủ kho": "thukho", 
-    "Cán bộ": "canbo"
-  };
-
-  // Reverse role mapping - chuyển từ backend enum sang tiếng Việt
-  const reverseRoleMapping = {
-    "lanhdao": "Lãnh đạo",
-    "thukho": "Thủ kho",
-    "canbo": "Cán bộ"
-  };
-
   // API endpoints - sử dụng biến API_URL
   const API_ENDPOINTS = {
     LOGIN: `${API_URL}/auth/login`,
@@ -93,7 +78,6 @@ export default function AuthForm() {
         const response = await fetch(API_ENDPOINTS.DEPARTMENTS);
         if (response.ok) {
           const data = await response.json();
-          // API trả về array of objects {id, name} - lấy ra tên khoa
           const departmentNames = data.map(dept => dept.name);
           setDepartments(departmentNames);
         } else {
@@ -108,37 +92,18 @@ export default function AuthForm() {
       }
     };
 
-    // Chỉ fetch departments khi component mount
     fetchDepartments();
   }, []);
 
-  // AUTO LOGIN - CHỈ CHO USER THƯỜNG, KHÔNG CHO ADMIN
+  // AUTO LOGIN - CHỈ CHO USER THƯỜNG (BAN GIÁM HIỆU CŨNG DÙNG EMAIL NÊN KHÔNG CẦN RIÊNG)
   useEffect(() => {
     const attemptAutoLogin = async () => {
-      // CHỈ KIỂM TRA COOKIES USER THƯỜNG
       const savedEmail = cookieManager.getCookie("rememberedEmail");
       const savedPassword = cookieManager.getCookie("rememberedPassword");
       const savedRememberMe = cookieManager.getCookie("rememberMe") === "true";
       
-      console.log("Auto Login Check - User only:", {
-        savedEmail, 
-        savedRememberMe,
-        isAdmin: savedEmail === "admin"
-      });
-      
-      // QUAN TRỌNG: KHÔNG auto login cho admin
-      if (savedEmail === "admin") {
-        console.log("Admin detected - Skipping auto login");
-        // Xóa cookies admin cũ nếu có
-        cookieManager.deleteCookie("rememberedEmail");
-        cookieManager.deleteCookie("rememberedPassword");
-        cookieManager.deleteCookie("rememberMe");
-        return;
-      }
-      
-      // CHỈ AUTO LOGIN CHO USER THƯỜNG
+      // THỬ AUTO LOGIN CHO TẤT CẢ USER (CẢ BAN GIÁM HIỆU VÀ USER THƯỜNG)
       if (savedRememberMe && savedEmail && savedPassword) {
-        console.log("Attempting user auto login");
         setIsAutoLogging(true);
         
         try {
@@ -156,38 +121,33 @@ export default function AuthForm() {
           const data = await response.json();
 
           if (data.success) {
-            console.log("User auto login successful");
-            
             if (data.user) {
-              // Chuyển đổi role từ backend enum sang tiếng Việt nếu cần
-              const userData = {
-                ...data.user,
-                role: reverseRoleMapping[data.user.role] || data.user.role
-              };
-              localStorage.setItem('currentUser', JSON.stringify(userData));
+              localStorage.setItem('currentUser', JSON.stringify(data.user));
             }
             
-            // CHỈ chuyển hướng đến dashboard, KHÔNG đến admin
-            setTimeout(() => navigate("/dashboard"), 500);
+            // Kiểm tra nếu là Ban Giám Hiệu thì chuyển hướng đến admin
+            if (data.user && data.user.isBanGiamHieu) {
+              sessionStorage.setItem('adminJustLoggedIn', 'true');
+              setTimeout(() => navigate("/admin"), 500);
+            } else {
+              setTimeout(() => navigate("/dashboard"), 500);
+            }
           } else {
-            // Nếu auto login thất bại, chỉ điền email
             setEmail(savedEmail);
             setRememberMe(true);
           }
         } catch (error) {
-          console.error("User auto login error:", error);
-          // Nếu có lỗi, chỉ điền email
           setEmail(savedEmail);
           setRememberMe(true);
         } finally {
           setIsAutoLogging(false);
         }
-      } else if (savedRememberMe && savedEmail) {
-        // Chỉ có email, không có password -> chỉ điền email
+      } 
+      // CHỈ CÓ EMAIL, KHÔNG CÓ PASSWORD
+      else if (savedRememberMe && savedEmail) {
         setEmail(savedEmail);
         setRememberMe(true);
         
-        // Auto-focus password field
         setTimeout(() => {
           const passwordInput = document.querySelector('input[type="password"]');
           if (passwordInput) {
@@ -219,15 +179,16 @@ export default function AuthForm() {
     setDepartment("");
     setRole("");
     setConfirmPassword("");
+    setEmail("");
+    setPassword("");
   };
 
-  // HANDLE REMEMBER ME CHANGE - CHỈ CHO USER THƯỜNG
+  // HANDLE REMEMBER ME CHANGE - CHO TẤT CẢ USER (CẢ BAN GIÁM HIỆU)
   const handleRememberMeChange = (e) => {
     const isChecked = e.target.checked;
     setRememberMe(isChecked);
     
     if (!isChecked) {
-      // Xóa cookies user thường
       cookieManager.deleteCookie("rememberedEmail");
       cookieManager.deleteCookie("rememberedPassword");
       cookieManager.deleteCookie("rememberMe");
@@ -237,48 +198,23 @@ export default function AuthForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Kiểm tra email hợp lệ
-    if (!email.endsWith("@gmail.com") && email !== "admin") {
-      toast.error("Vui lòng dùng email @gmail.com để đăng nhập/đăng ký!");
-      return;
-    }
+    if (isLogin) {
+      // ĐĂNG NHẬP CHO TẤT CẢ USER (CẢ BAN GIÁM HIỆU VÀ USER THƯỜNG)
+      if (!email || !password) {
+        toast.error("Vui lòng điền đầy đủ thông tin đăng nhập!");
+        return;
+      }
 
-    // Kiểm tra xác nhận mật khẩu khi đăng ký
-    if (!isLogin && password !== confirmPassword) {
-      toast.error("Mật khẩu xác nhận không khớp!");
-      return;
-    }
+      // XỬ LÝ GHI NHỚ ĐĂNG NHẬP - CHO TẤT CẢ USER
+      if (rememberMe) {
+        cookieManager.setCookie("rememberedEmail", email, 30);
+        cookieManager.setCookie("rememberedPassword", password, 30);
+        cookieManager.setCookie("rememberMe", "true", 30);
+      } else {
+        cookieManager.clearAllAuthCookies();
+      }
 
-    // Kiểm tra các trường bắt buộc khi đăng ký
-    if (!isLogin && (!fullName || !dateOfBirth || !department || !role)) {
-      toast.error("Vui lòng điền đầy đủ thông tin đăng ký!");
-      return;
-    }
-
-    // Kiểm tra nếu không có khoa nào khi đăng ký
-    if (!isLogin && departments.length === 0) {
-      toast.error("Hệ thống chưa có khoa nào. Vui lòng thử lại sau!");
-      return;
-    }
-
-    try {
-      if (isLogin) {
-        // XỬ LÝ GHI NHỚ ĐĂNG NHẬP - CHỈ CHO USER THƯỜNG
-        if (rememberMe && email !== "admin") {
-          // CHỈ lưu cookies cho user thường
-          cookieManager.setCookie("rememberedEmail", email, 30);
-          cookieManager.setCookie("rememberedPassword", password, 30);
-          cookieManager.setCookie("rememberMe", "true", 30);
-          // Xóa cookies admin nếu có
-          cookieManager.deleteCookie("rememberedAdmin");
-          cookieManager.deleteCookie("rememberedAdminPassword");
-          cookieManager.deleteCookie("rememberAdmin");
-        } else {
-          // Xóa tất cả cookies khi không chọn remember me hoặc là admin
-          cookieManager.clearAllAuthCookies();
-        }
-
-        // Đăng nhập
+      try {
         const response = await fetch(API_ENDPOINTS.LOGIN, {
           method: 'POST',
           headers: {
@@ -292,17 +228,11 @@ export default function AuthForm() {
         if (data.success) {
           toast.success(data.message);
           if (data.user) {
-            // Chuyển đổi role từ backend enum sang tiếng Việt để hiển thị
-            const userData = {
-              ...data.user,
-              role: reverseRoleMapping[data.user.role] || data.user.role
-            };
-            localStorage.setItem('currentUser', JSON.stringify(userData));
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
           }
           
-          // CHUYỂN HƯỚNG
-          if (email === "admin") {
-            // THÊM SESSION FLAG CHO ADMIN
+          // KIỂM TRA VÀ CHUYỂN HƯỚNG THEO ROLE
+          if (data.user && data.user.isBanGiamHieu) {
             sessionStorage.setItem('adminJustLoggedIn', 'true');
             setTimeout(() => navigate("/admin"), 800);
           } else {
@@ -311,15 +241,31 @@ export default function AuthForm() {
         } else {
           toast.error(data.message);
           // Nếu đăng nhập thất bại, xóa password khỏi cookies
-          if (rememberMe && email !== "admin") {
+          if (rememberMe) {
             cookieManager.deleteCookie("rememberedPassword");
           }
         }
-      } else {
-        // Đăng ký (chỉ cho user thường)
-        // Chuyển đổi role từ tiếng Việt sang backend enum
-        const backendRole = roleMapping[role] || "canbo";
-        
+      } catch (error) {
+        toast.error("Lỗi kết nối đến server!");
+      }
+    } else {
+      // ĐĂNG KÝ USER THƯỜNG (KHÔNG CHO ĐĂNG KÝ BAN GIÁM HIỆU)
+      if (password !== confirmPassword) {
+        toast.error("Mật khẩu xác nhận không khớp!");
+        return;
+      }
+
+      if (!fullName || !dateOfBirth || !department || !role) {
+        toast.error("Vui lòng điền đầy đủ thông tin đăng ký!");
+        return;
+      }
+
+      if (departments.length === 0) {
+        toast.error("Hệ thống chưa có khoa nào. Vui lòng thử lại sau!");
+        return;
+      }
+
+      try {
         const registerData = {
           fullName,
           email,
@@ -327,7 +273,7 @@ export default function AuthForm() {
           confirmPassword,
           dateOfBirth,
           department,
-          role: backendRole, // Gửi role dạng enum cho backend
+          role, // Gửi role dạng tiếng Việt
         };
 
         const response = await fetch(API_ENDPOINTS.REGISTER, {
@@ -343,15 +289,13 @@ export default function AuthForm() {
         if (data.success) {
           toast.success(data.message);
           setIsLogin(true);
-          setEmail("");
-          setPassword("");
           resetForm();
         } else {
           toast.error(data.message);
         }
+      } catch (error) {
+        toast.error("Lỗi kết nối đến server!");
       }
-    } catch (error) {
-      toast.error("Lỗi kết nối đến server!");
     }
   };
 
@@ -455,7 +399,6 @@ export default function AuthForm() {
                     required 
                   />
                   
-                  {/* ĐÃ CHUYỂN VỊ TRÍ: PHÂN QUYỀN LÊN TRƯỚC, CHỌN KHOA XUỐNG SAU */}
                   <select 
                     required
                     value={role}
@@ -469,7 +412,6 @@ export default function AuthForm() {
                   </select>
                 </div>
 
-                {/* CHUYỂN SELECT KHOA XUỐNG DƯỚI CÙNG TRONG PHẦN ĐĂNG KÝ */}
                 <select 
                   required 
                   className="department-select"
@@ -493,12 +435,10 @@ export default function AuthForm() {
               </>
             )}
 
-            {/* Email input */}
+            {/* INPUT EMAIL CHO CẢ ĐĂNG NHẬP VÀ ĐĂNG KÝ */}
             <input
-              type={email === "admin" ? "text" : "email"}
-              placeholder={
-                email === "admin" ? "Tài khoản admin" : "Email @gmail.com"
-              }
+              type="email"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -566,8 +506,8 @@ export default function AuthForm() {
               </>
             )}
 
-            {/* CHỈ HIỂN THỊ REMEMBER ROW CHO USER THƯỜNG */}
-            {isLogin && email !== "admin" && (
+            {/* REMEMBER ME - HIỂN THỊ CHO CẢ ĐĂNG NHẬP */}
+            {isLogin && (
               <div className="remember-row">
                 <label>
                   <input 
@@ -581,10 +521,6 @@ export default function AuthForm() {
                   Quên mật khẩu?
                 </a>
               </div>
-            )}
-
-            {isLogin && email === "admin" && (
-              <div style={{ height: '20px' }}></div> 
             )}
 
             <button 

@@ -60,12 +60,6 @@ export default function ForgotPassword() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const email = formData.get("email");
-
-    if (!email.endsWith("@gmail.com")) {
-      toast.error("Email phải có đuôi @gmail.com!");
-      return;
-    }
-
     setIsLoading(true);
 
     try {
