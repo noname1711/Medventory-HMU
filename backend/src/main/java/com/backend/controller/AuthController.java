@@ -8,6 +8,7 @@ import com.backend.dto.ForgotPasswordRequest;
 import com.backend.dto.ResetPasswordRequest;
 import com.backend.entity.Department;
 import com.backend.entity.User;
+import com.backend.service.DepartmentService;
 import com.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,8 @@ public class AuthController {
 
     // Map để lưu trữ token tạm thời
     private Map<String, String> resetTokens = new HashMap<>();
+
+    private DepartmentService departmentService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -158,6 +161,17 @@ public class AuthController {
     public ResponseEntity<List<Department>> getAvailableDepartments() {
         try {
             List<Department> departments = userService.getAllDepartments();
+            return ResponseEntity.ok(departments);
+        } catch (Exception e) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
+    @GetMapping("/departments/search")
+    public ResponseEntity<List<Department>> searchDepartmentsForRegistration(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        try {
+            List<Department> departments = departmentService.searchDepartments(keyword);
             return ResponseEntity.ok(departments);
         } catch (Exception e) {
             return ResponseEntity.ok(Collections.emptyList());
