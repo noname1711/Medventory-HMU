@@ -313,20 +313,33 @@ INSERT INTO sub_departments(name, department_id) VALUES
 ('Hóa sinh', (SELECT id FROM departments WHERE name='Khoa xét nghiệm')),
 ('BHPT',     (SELECT id FROM departments WHERE name='Khoa xét nghiệm')),
 ('Vi sinh',  (SELECT id FROM departments WHERE name='Khoa vi sinh - ký sinh trùng')),
-('Vật tư 1', (SELECT id FROM departments WHERE name='Khoa dược'));
+('Kho chính', (SELECT id FROM departments WHERE name='Quản trị vật tư'));
 
 -- Units
 INSERT INTO units(name) VALUES
 ('chai'),('lọ'),('hộp'),('cái'),('ml'),('g'),('viên'),('kg'),('bộ');
 
--- Users (normal + khoa)
-INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
-('Lãnh Đạo', 'lanhdao@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 1, 'Lãnh đạo P.QTVT', 1),
-('Thủ Kho', 'thukho@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 2, 'Thủ kho', 1),
-('CB Bộ môn BHPT', 'canbo.bhpt@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Bộ môn BHPT', 0),
-('CB Hóa sinh', 'canbo.hoasinh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Hóa sinh', 0);
+-- ============================================
+-- USERS - ĐÃ ĐIỀU CHỈNH THEO YÊU CẦU
+-- ============================================
 
--- Tài khoản BGH
+-- LÃNH ĐẠO & THỦ KHO: Thuộc Quản trị vật tư
+INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
+('Trưởng phòng QTVT', 'lanhdao@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 1, 'Trưởng phòng Quản trị vật tư', 1),
+('Phó phòng QTVT', 'pholanhdao@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 1, 'Phó phòng Quản trị vật tư', 1),
+('Thủ Kho Chính', 'thukho@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 2, 'Thủ kho chính', 1),
+('Thủ Kho Phụ', 'thukho2@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 2, 'Thủ kho phụ', 1);
+
+-- CÁN BỘ: Thuộc các khoa khác (KHÔNG thuộc Quản trị vật tư)
+INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
+('CB Bộ môn BHPT', 'canbo.bhpt@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Bộ môn BHPT', 1),
+('CB Hóa sinh', 'canbo.hoasinh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Hóa sinh', 1),
+('CB Vi sinh', 'canbo.visinh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa vi sinh - ký sinh trùng'), 3, 'Cán bộ Vi sinh', 1),
+('CB Dược lý', 'canbo.duocly@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa dược'), 3, 'Cán bộ Dược lý', 1),
+('CB Khám bệnh', 'canbo.khambenh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa khám bệnh'), 3, 'Cán bộ Khám bệnh', 1),
+('CB Cấp cứu', 'canbo.capcuu@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa cấp cứu'), 3, 'Cán bộ Cấp cứu', 1);
+
+-- BAN GIÁM HIỆU: Không thuộc department nào
 INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
 ('GS. TS. BS. Nguyễn Hữu Tú', 'hieutruong@gmail.com', '12345', NULL, 0, 'Hiệu trưởng', 1),
 ('PGS. TS. BS. Kim Bảo Giang', 'phohieutruong1@gmail.com', '12345', NULL, 0, 'Phó Hiệu trưởng', 1),
@@ -343,14 +356,26 @@ INSERT INTO materials(name, spec, unit_id, code, manufacturer, category) VALUES
 ('NaCl 0.9%',             'Chai 1000 ml',        (SELECT id FROM units WHERE name='chai'), 'NACL-1000',   'IVCo',        'B'),
 ('Khẩu trang y tế',       'Hộp 50 cái',          (SELECT id FROM units WHERE name='hộp'),  'MASK-50',     'ProtectMed',  'C'),
 ('Glucoza 5%',            'Chai 500 ml',         (SELECT id FROM units WHERE name='chai'), 'GLUC-500',    'IVCo',        'B'),
-('Ống pipet 1ml',         'Bộ 100 cái',          (SELECT id FROM units WHERE name='bộ'),   'PIP1-100',    'LabMate',     'D');
+('Ống pipet 1ml',         'Bộ 100 cái',          (SELECT id FROM units WHERE name='bộ'),   'PIP1-100',    'LabMate',     'D'),
+('Bông y tế vô trùng', 'Hộp 500g', (SELECT id FROM units WHERE name='hộp'), 'COTTON-500', 'MediCotton', 'C'),
+('Băng gạc cá nhân', 'Hộp 100 cái', (SELECT id FROM units WHERE name='hộp'), 'BANDAGE-100', 'FirstAid Co', 'C'),
+('Cồn 70 độ', 'Chai 500 ml', (SELECT id FROM units WHERE name='chai'), 'ALCOHOL-70', 'ABC Pharma', 'B'),
+('Kim tiêm vô trùng', 'Hộp 100 cái', (SELECT id FROM units WHERE name='hộp'), 'SYRINGE-100', 'MediNeedle', 'A'),
+('Gạc vô trùng', 'Hộp 50 miếng', (SELECT id FROM units WHERE name='hộp'), 'GAUZE-50', 'MediGauze', 'C'),
+('Bơm kim tiêm 5ml', 'Hộp 50 cái', (SELECT id FROM units WHERE name='hộp'), 'SYRINGE-5ML', 'MediNeedle', 'A'),
+('Hóa chất xét nghiệm', 'Lọ 100ml', (SELECT id FROM units WHERE name='lọ'), 'CHEM-TEST', 'LabChem', 'B'),
+('Ống nghiệm plastic', 'Hộp 200 cái', (SELECT id FROM units WHERE name='hộp'), 'TUBE-PLASTIC', 'LabPlastic', 'D');
 
--- Supplement forecast headers (status INT)
+-- ============================================
+-- DỮ LIỆU MẪU CHO ĐƠN XIN LĨNH
+-- ============================================
+
+-- Supplement forecast headers
 INSERT INTO supp_forecast_header(created_by, academic_year, department_id, status, approval_by, approval_at, approval_note) VALUES
 ((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 1, (SELECT id FROM users WHERE email='lanhdao@gmail.com'), NOW(), 'Đồng ý theo đề xuất'),
 ((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 0, NULL, NULL, NULL);
 
--- Supplement forecast details (join header status = 1)
+-- Supplement forecast details
 INSERT INTO supp_forecast_detail(header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification)
 SELECT h1.id, m.id, cs, py, ty, m.code, m.manufacturer, j
 FROM (
@@ -361,17 +386,112 @@ FROM (
 JOIN materials m ON m.code = x.code
 JOIN supp_forecast_header h1 ON h1.status = 1 AND h1.department_id = (SELECT id FROM departments WHERE name='Khoa xét nghiệm');
 
--- Issue request header (status INT, 1 = approved)
-INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, approval_by, approval_at, approval_note, note) VALUES
-((SELECT id FROM users WHERE email='canbo.bhpt@gmail.com'), (SELECT id FROM sub_departments WHERE name='BHPT'), (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), NOW(), 1, (SELECT id FROM users WHERE email='lanhdao@gmail.com'), NOW(), 'Phê duyệt cấp phát', 'Xin lĩnh vật tư thí nghiệm');
+-- ============================================
+-- PHIẾU XIN LĨNH MẪU
+-- ============================================
 
--- Issue request details (join header status = 1)
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested)
-SELECT h.id, m.id, q
-FROM (VALUES ('ETH96-500',15), ('GLOVE-100',10), ('MASK-50',5)) v(code,q)
-JOIN materials m ON m.code=v.code
-JOIN issue_req_header h ON h.status=1
-ORDER BY m.id;
+-- Phiếu 1: Đã phê duyệt
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, approval_by, approval_at, approval_note, note) VALUES
+((SELECT id FROM users WHERE email='canbo.bhpt@gmail.com'), 
+ (SELECT id FROM sub_departments WHERE name='BHPT'), 
+ (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 
+ NOW() - INTERVAL '3 days', 1, 
+ (SELECT id FROM users WHERE email='lanhdao@gmail.com'), 
+ NOW() - INTERVAL '2 days', 
+ 'Phê duyệt cấp phát đầy đủ', 
+ 'Xin lĩnh vật tư thí nghiệm cho sinh viên');
+
+-- Phiếu 2: Chờ phê duyệt - CB Hóa sinh
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, note) VALUES
+((SELECT id FROM users WHERE email='canbo.hoasinh@gmail.com'), 
+ (SELECT id FROM sub_departments WHERE name='Hóa sinh'), 
+ (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 
+ NOW() - INTERVAL '2 days', 0, 
+ 'Xin lĩnh vật tư cho thí nghiệm Hóa sinh thực hành cho sinh viên năm 2');
+
+-- Phiếu 3: Chờ phê duyệt - CB Vi sinh
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, note) VALUES
+((SELECT id FROM users WHERE email='canbo.visinh@gmail.com'), 
+ (SELECT id FROM sub_departments WHERE name='Vi sinh'), 
+ (SELECT id FROM departments WHERE name='Khoa vi sinh - ký sinh trùng'), 
+ NOW() - INTERVAL '1 day', 0, 
+ 'Xin lĩnh vật tư cho phòng thí nghiệm vi sinh');
+
+-- Phiếu 4: Chờ phê duyệt - CB Khám bệnh
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, note) VALUES
+((SELECT id FROM users WHERE email='canbo.khambenh@gmail.com'), 
+ NULL, 
+ (SELECT id FROM departments WHERE name='Khoa khám bệnh'), 
+ NOW() - INTERVAL '12 hours', 0, 
+ 'Xin lĩnh vật tư cho công tác khám chữa bệnh định kỳ');
+
+-- Phiếu 5: Chờ phê duyệt - CB Cấp cứu
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, note) VALUES
+((SELECT id FROM users WHERE email='canbo.capcuu@gmail.com'), 
+ NULL, 
+ (SELECT id FROM departments WHERE name='Khoa cấp cứu'), 
+ NOW() - INTERVAL '6 hours', 0, 
+ 'Xin lĩnh vật tư khẩn cấp cho khoa cấp cứu');
+
+-- Phiếu 6: Đã từ chối
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, approval_by, approval_at, approval_note, note) VALUES
+((SELECT id FROM users WHERE email='canbo.duocly@gmail.com'), 
+ (SELECT id FROM sub_departments WHERE name='Dược lý'), 
+ (SELECT id FROM departments WHERE name='Khoa dược'), 
+ NOW() - INTERVAL '5 days', 2, 
+ (SELECT id FROM users WHERE email='lanhdao@gmail.com'), 
+ NOW() - INTERVAL '4 days', 
+ 'Số lượng yêu cầu vượt quá định mức cho phép', 
+ 'Xin lĩnh vật tư cho nghiên cứu dược lý - số lượng lớn');
+
+-- ============================================
+-- CHI TIẾT PHIẾU XIN LĨNH
+-- ============================================
+
+-- Chi tiết Phiếu 1 (approved)
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
+(1, (SELECT id FROM materials WHERE code='ETH96-500'), 15),
+(1, (SELECT id FROM materials WHERE code='GLOVE-100'), 10),
+(1, (SELECT id FROM materials WHERE code='MASK-50'), 5);
+
+-- Chi tiết Phiếu 2 (pending)
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
+(2, (SELECT id FROM materials WHERE code='ETH96-500'), 15),
+(2, (SELECT id FROM materials WHERE code='GLOVE-100'), 20),
+(2, (SELECT id FROM materials WHERE code='TUBE-10'), 25),
+(2, (SELECT id FROM materials WHERE code='PIP1-100'), 8);
+
+-- Chi tiết Phiếu 3 (pending)  
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
+(3, (SELECT id FROM materials WHERE code='NACL-1000'), 12),
+(3, (SELECT id FROM materials WHERE code='MASK-50'), 15),
+(3, (SELECT id FROM materials WHERE code='GLUC-500'), 10),
+(3, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 8);
+
+-- Chi tiết Phiếu 4 (pending)
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
+(4, (SELECT id FROM materials WHERE code='GLOVE-100'), 30),
+(4, (SELECT id FROM materials WHERE code='MASK-50'), 25),
+(4, (SELECT id FROM materials WHERE code='COTTON-500'), 5),
+(4, (SELECT id FROM materials WHERE code='BANDAGE-100'), 4),
+(4, (SELECT id FROM materials WHERE code='GAUZE-50'), 6);
+
+-- Chi tiết Phiếu 5 (pending)
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
+(5, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 18),
+(5, (SELECT id FROM materials WHERE code='GLOVE-100'), 25),
+(5, (SELECT id FROM materials WHERE code='SYRINGE-100'), 12),
+(5, (SELECT id FROM materials WHERE code='TUBE-PLASTIC'), 15);
+
+-- Chi tiết Phiếu 6 (rejected) - số lượng lớn bị từ chối
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
+(6, (SELECT id FROM materials WHERE code='ETH96-500'), 50),
+(6, (SELECT id FROM materials WHERE code='GLOVE-100'), 100),
+(6, (SELECT id FROM materials WHERE code='PARA500-100'), 30);
+
+-- ============================================
+-- DỮ LIỆU NHẬP/XUẤT KHO
+-- ============================================
 
 -- Receipt
 INSERT INTO receipt_header(created_by, received_from, reason, receipt_date, total_amount) VALUES
@@ -416,6 +536,22 @@ INSERT INTO inventory_card(material_id, unit_id, warehouse_name, record_date, op
 SELECT m.id, m.unit_id, 'Kho Hóa chất', CURRENT_DATE, 0, 100, 10, 'Cty ABC', 'ETH-0125-A', '2025-01-10', '2027-01-10',
        (SELECT id FROM sub_departments WHERE name='BHPT')
 FROM materials m WHERE m.code='ETH96-500';
+
+-- ============================================
+-- THÔNG BÁO HỆ THỐNG
+-- ============================================
+
+-- Thông báo cho lãnh đạo về phiếu mới
+INSERT INTO notifications(user_id, entity_type, entity_id, event_type, title, content, is_read, created_at) VALUES
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 2, 0, 'Phiếu xin lĩnh mới #2 cần phê duyệt', 'Có phiếu xin lĩnh #2 từ CB Hóa sinh cần phê duyệt', false, NOW() - INTERVAL '2 days'),
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 3, 0, 'Phiếu xin lĩnh mới #3 cần phê duyệt', 'Có phiếu xin lĩnh #3 từ CB Vi sinh cần phê duyệt', false, NOW() - INTERVAL '1 day'),
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 4, 0, 'Phiếu xin lĩnh mới #4 cần phê duyệt', 'Có phiếu xin lĩnh #4 từ CB Khám bệnh cần phê duyệt', false, NOW() - INTERVAL '12 hours'),
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 5, 0, 'Phiếu xin lĩnh mới #5 cần phê duyệt', 'Có phiếu xin lĩnh #5 từ CB Cấp cứu cần phê duyệt', false, NOW() - INTERVAL '6 hours');
+
+-- Thông báo đã đọc (lịch sử)
+INSERT INTO notifications(user_id, entity_type, entity_id, event_type, title, content, is_read, created_at, read_at) VALUES
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 1, 1, 'Phiếu xin lĩnh #1 đã được phê duyệt', 'Phiếu xin lĩnh #1 đã được phê duyệt và xuất kho', true, NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 6, 2, 'Phiếu xin lĩnh #6 đã bị từ chối', 'Phiếu xin lĩnh #6 đã bị từ chối do vượt quá định mức', true, NOW() - INTERVAL '4 days', NOW() - INTERVAL '3 days');
 
 COMMIT;
 
