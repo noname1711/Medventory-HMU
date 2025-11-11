@@ -27,7 +27,7 @@ public class MaterialService {
         dto.setId(material.getId());
         dto.setMaterialName(material.getName());       // ✅ đúng field DB
         dto.setSpecification(material.getSpec());      // ✅ đúng field DB
-        dto.setUnit(material.getName()); // ✅ về FE hiển thị tên unit
+        dto.setUnitId(material.getUnitId()); // ✅ về FE hiển thị tên unit
         dto.setManufacturer(material.getManufacturer());
         dto.setMaterialCode(material.getCode());       // ✅ đúng theo DB
         return dto;

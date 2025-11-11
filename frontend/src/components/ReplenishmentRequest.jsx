@@ -12,13 +12,20 @@ export default function ReplenishmentRequest({
   onDeleteRow,
   onSubmit
 }) {
+  const UNIT_MAP = {
+  1: "Hộp",
+  2: "Chai",
+  3: "Cái",
+  4: "Túi",
+  5: "Bộ"
+};
 
   const handleSelectMaterial = (index, e) => {
-    const materialId = e.target.value;
-    const material = materials.find(m => m.id === Number(materialId));
+    const id = e.target.value;
+    const material = materials.find(m => m.id === Number(id));
 
     if (material) {
-      onChangeItem(index, { target: { name: "materialId", value: material.id }});
+      onChangeItem(index, { target: { name: "id", value: material.id }});
       onChangeItem(index, { target: { name: "materialName", value: material.materialName }});
       onChangeItem(index, { target: { name: "specification", value: material.specification }});
       onChangeItem(index, { target: { name: "unitId", value: material.unitId }});
@@ -43,71 +50,100 @@ export default function ReplenishmentRequest({
 
         <div className="req-table-wrap">
           <table className="req-table">
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Tên vật tư</th>
-                <th>Quy cách</th>
-                <th>ĐVT</th>
-                <th>SL hiện có</th>
-                <th>Năm trước</th>
-                <th>Dự trù</th>
-                <th>Mã Code</th>
-                <th>Hãng SX</th>
-                <th>Lý do</th>
-                <th></th>
-              </tr>
-            </thead>
+           <thead>
+  <tr>
+    <th>STT</th>
+    <th>Tên vật tư</th>
+    <th>Quy cách</th>
+    <th>ĐVT</th>
+    <th>SL hiện có</th>
+    <th>Năm trước</th>
+    <th>Dự trù</th>     {/* qtyRequested */}
+    <th>Mã Code</th>
+    <th>Hãng SX</th>
+    <th>Lý do</th>
+    <th></th>          {/* Cột Xóa riêng */}
+  </tr>
+</thead>
 
-            <tbody>
-              {items.length > 0 ? items.map((item, index) => (
-                <tr key={item.id}>
-                  <td className="text-center">{index + 1}</td>
 
-                  {/* ✅ DROPDOWN TÊN VẬT TƯ */}
-                  <td>
-                    <select
-                      name="materialId"
-                      value={item.materialId || ""}
-                      onChange={(e) => handleSelectMaterial(index, e)}
-                    >
-                      <option value="">Chọn vật tư</option>
-                      {materials?.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.materialName}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+<tbody>
+  {items.length > 0 ? items.map((item, index) => (
+    <tr key={item.id}>
+      <td className="text-center">{index + 1}</td>  {/* STT */}
 
-                  <td><input name="specification" value={item.specification || ""} readOnly /></td>
+      {/* Tên vật tư */}
+      <td>
+        <select
+          name="id"
+          value={item.id || ""}
+          onChange={(e) => handleSelectMaterial(index, e)}
+        >
+          <option value="">Chọn vật tư</option>
+          {materials?.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.materialName}
+            </option>
+          ))}
+        </select>
+      </td>
 
-                  {/* ✅ ĐVT lấy theo material.unitId */}
-             
+      {/* Quy cách */}
+      <td>
+        <input name="specification" value={item.specification || ""} readOnly />
+      </td>
 
-                  <td><input type="number" name="qtyAvailable" value={item.qtyAvailable || ""} onChange={(e) => onChangeItem(index, e)} /></td>
-                  <td><input type="number" name="qtyLastYear" value={item.qtyLastYear || ""} onChange={(e) => onChangeItem(index, e)} /></td>
-                  <td><input type="number" name="qtyRequested" value={item.qtyRequested || ""} onChange={(e) => onChangeItem(index, e)} /></td>
+      {/* Đơn vị tính */}
+      <td>
+        <input name="unitId" value={UNIT_MAP[item.unitId] || ""} readOnly />  
+      </td>
 
-                  <td><input name="materialCode" value={item.materialCode || ""} readOnly /></td>
-                  <td><input name="manufacturer" value={item.manufacturer || ""} readOnly /></td>
+      {/* Số lượng hiện có */}
+      <td>
+        <input type="number" name="qtyAvailable" value={item.qtyAvailable || ""} onChange={(e) => onChangeItem(index, e)} />
+      </td>
 
-                  <td><input name="reason" value={item.reason || ""} onChange={(e) => onChangeItem(index, e)} /></td>
+      {/* Năm trước */}
+      <td>
+        <input type="number" name="qtyLastYear" value={item.qtyLastYear || ""} onChange={(e) => onChangeItem(index, e)} />
+      </td>
 
-                  <td>
-                    <button type="button" className="link danger" onClick={() => onDeleteRow(item.id)}>
-                      Xóa
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="11" style={{ textAlign: "center", padding: 20 }}>
-                    Không có dữ liệu
-                  </td>
-                </tr>
-              )}
-            </tbody>
+      {/* Dự trù */}
+      <td>
+        <input type="number" name="qtyRequested" value={item.qtyRequested || ""} onChange={(e) => onChangeItem(index, e)} />
+      </td>
+
+      {/* Mã Code */}
+      <td>
+        <input name="materialCode" value={item.materialCode || ""} readOnly />
+      </td>
+
+      {/* Hãng sản xuất */}
+      <td>
+        <input name="manufacturer" value={item.manufacturer || ""} readOnly />
+      </td>
+
+      {/* Lý do dự trù */}
+      <td>
+        <input name="reason" value={item.reason || ""} onChange={(e) => onChangeItem(index, e)} />
+      </td>
+
+      {/* Nút Xóa - nằm ở cột riêng */}
+      <td>
+        <button type="button" className="link danger" onClick={() => onDeleteRow(item.id)}>
+          Xóa
+        </button>
+      </td>
+    </tr>
+  )) : (
+    <tr>
+      <td colSpan="11" style={{ textAlign: "center", padding: 20 }}>
+        Không có dữ liệu
+      </td>
+    </tr>
+  )}
+</tbody>
+
           </table>
         </div>
 

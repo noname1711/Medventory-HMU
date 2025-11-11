@@ -175,7 +175,7 @@ async function submit(e) {
     departmentId: null,         // optional, set nếu bạn có id phòng ban
     createdByEmail: currentUser?.email || null,
     items: items.map(it => ({
-      materialId: it.materialId ? Number(it.materialId) : null,  // nếu UI có materialId
+      materialId: it.id ? Number(it.id) : null,  // nếu UI có materialId
       currentStock: it.qtyAvailable ? Number(it.qtyAvailable) : 0,
       prevYearQty: it.qtyLastYear ? Number(it.qtyLastYear) : 0,
       thisYearQty: it.qtyRequested ? Number(it.qtyRequested) : 0,
