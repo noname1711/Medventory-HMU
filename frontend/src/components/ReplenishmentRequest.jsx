@@ -3,14 +3,15 @@ import "./ReplenishmentRequest.css";
 
 export default function ReplenishmentRequest({
   items,
-  units,
   materials,
-  note,
-  onChangeNote,
+  departments,
+  selectedDept,
+  setSelectedDept,
   onChangeItem,
   onAddRow,
   onDeleteRow,
-  onSubmit
+  onSubmit,
+  onLoadPrevious
 }) {
   const UNIT_MAP = {
   1: "Hộp",
@@ -22,10 +23,10 @@ export default function ReplenishmentRequest({
 
   const handleSelectMaterial = (index, e) => {
     const id = e.target.value;
-    const material = materials.find(m => m.id === Number(id));
+    const material = materials.find(m => m.materialId === Number(id));
 
     if (material) {
-      onChangeItem(index, { target: { name: "id", value: material.id }});
+      onChangeItem(index, { target: { name: "materialId", value: material.materialId }});
       onChangeItem(index, { target: { name: "materialName", value: material.materialName }});
       onChangeItem(index, { target: { name: "specification", value: material.specification }});
       onChangeItem(index, { target: { name: "unitId", value: material.unitId }});
@@ -43,10 +44,33 @@ export default function ReplenishmentRequest({
       </div>
 
       <form className="req-form" onSubmit={onSubmit}>
-        <div className="req-field full">
-          <label>Ghi chú (nếu có)</label>
-          <textarea rows="2" value={note} onChange={(e) => onChangeNote(e.target.value)} />
+
+        <div className="req-field half">
+          <label>Chọn bộ môn lập dự trù</label>
+          <select
+            value={selectedDept}
+            onChange={(e) => setSelectedDept(e.target.value)}
+            required
+          >
+            <option value="">-- Chọn bộ môn --</option>
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <div className="req-actions" style={{ marginBottom: "12px" }}>
+  <button 
+    type="button"
+    className="btn secondary"
+    onClick={onLoadPrevious}
+  >
+    🔄 Load dự trù năm trước
+  </button>
+</div>
+
 
         <div className="req-table-wrap">
           <table className="req-table">
@@ -69,19 +93,19 @@ export default function ReplenishmentRequest({
 
 <tbody>
   {items.length > 0 ? items.map((item, index) => (
-    <tr key={item.id}>
+    <tr key={item.materialId}>
       <td className="text-center">{index + 1}</td>  {/* STT */}
 
       {/* Tên vật tư */}
       <td>
         <select
-          name="id"
-          value={item.id || ""}
+          name="materialId"
+          value={item.materialId || ""}
           onChange={(e) => handleSelectMaterial(index, e)}
         >
           <option value="">Chọn vật tư</option>
-          {materials?.map((m) => (
-            <option key={m.id} value={m.id}>
+          {materials.map((m) => (
+            <option key={m.materialId} value={m.materialId}>
               {m.materialName}
             </option>
           ))}
@@ -130,7 +154,7 @@ export default function ReplenishmentRequest({
 
       {/* Nút Xóa - nằm ở cột riêng */}
       <td>
-        <button type="button" className="link danger" onClick={() => onDeleteRow(item.id)}>
+        <button type="button" className="link danger" onClick={() => onDeleteRow(item.materialId)}>
           Xóa
         </button>
       </td>

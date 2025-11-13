@@ -86,7 +86,7 @@ export default function Dashboard() {
 
 
   const emptyRow = {
-  id: crypto.randomUUID(),       // tạo id unique
+  materialId: "",       
   materialName: "",
   specification: "",
   unitId: "",
@@ -98,9 +98,21 @@ export default function Dashboard() {
   reason: "",
 };
 
-const [items, setItems] = useState(initialReplenishmentItems);
-const [units, setUnits] = useState([]);
+const [items, setItems] = useState([]);
 const [materials, setMaterials] = useState([]);
+const [departments, setDepartments] = useState([]);
+const [selectedDept, setSelectedDept] = useState("");
+
+const fetchDepartments = async () => {
+  try {
+    const res = await fetch("http://localhost:8080/api/departments");
+    const data = await res.json();
+    console.log("Departments từ BE:", data);
+    setDepartments(data);
+  } catch (err) {
+    console.error("Lỗi khi lấy departments:", err);
+  }
+};
 const fetchMaterials = async () => {
   try {
     const response = await fetch("http://localhost:8080/api/materials");
@@ -111,9 +123,6 @@ const fetchMaterials = async () => {
     console.error("Lỗi khi lấy materials:", error);
   }
 };
-
-
-const [note, setNote] = useState("");
 
   const [equipmentData, setEquipmentData] = useState(initialData);
   const [nextId, setNextId] = useState(6);
@@ -136,23 +145,19 @@ const [note, setNote] = useState("");
     if (activeTab === "dashboard") updateStatusChart();
   }, [equipmentData, activeTab]);
 
-  useEffect(() => {
-  fetch("http://localhost:8080/api/units")
-    .then((res) => res.json())
-    .then((data) => setUnits(data));
-}, []);
 
-useEffect(() => {
+  useEffect(() => {
   fetchMaterials();
-}, []);
+  fetchDepartments();
+  }, []);
 
 
 function addRow() {
-  setItems((prev) => [...prev, { ...emptyRow, id: crypto.randomUUID() }]);
+  setItems((prev) => [...prev, { ...emptyRow, materialId: crypto.randomUUID() }]);
 }
 
 function deleteRow(id) {
-  setItems((prev) => prev.filter((i) => i.id !== id));
+  setItems((prev) => prev.filter((i) => i.materialId !== id));
 }
 
 function changeItem(index, e) {
@@ -172,10 +177,10 @@ async function submit(e) {
 
   const payload = {
     academicYear: "2025-2026", // hoặc bạn có thể tạo input cho người dùng chọn
-    departmentId: null,         // optional, set nếu bạn có id phòng ban
+    departmentId: selectedDept ? Number(selectedDept) : null,         // optional, set nếu bạn có id phòng ban
     createdByEmail: currentUser?.email || null,
     items: items.map(it => ({
-      materialId: it.id ? Number(it.id) : null,  // nếu UI có materialId
+      materialId: it.materialId ? Number(it.materialId) : null,  // nếu UI có materialId
       currentStock: it.qtyAvailable ? Number(it.qtyAvailable) : 0,
       prevYearQty: it.qtyLastYear ? Number(it.qtyLastYear) : 0,
       thisYearQty: it.qtyRequested ? Number(it.qtyRequested) : 0,
@@ -208,7 +213,7 @@ async function submit(e) {
 
       // reset lại form
       setItems([ { ...emptyRow, id: crypto.randomUUID() } ]);
-      setNote("");
+      
       // có thể chuyển tab hay reload danh sách
     } else {
       Swal.fire({
@@ -224,6 +229,52 @@ async function submit(e) {
       title: "Lỗi kết nối",
       text: err.message || "Không thể kết nối tới server"
     });
+  }
+}
+
+  async function loadPreviousForecast() {
+  try {
+    const url = selectedDept
+      ? `http://localhost:8080/api/supp-forecasts/previous?departmentId=${selectedDept}`
+      : `http://localhost:8080/api/supp-forecasts/previous`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "Không có dữ liệu dự trù năm trước",
+        timer: 1500,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    const mapped = data.map(item => ({
+      materialId: item.materialId,
+      materialName: item.materialName,
+      specification: item.specification,
+      unitId: item.unitId,
+      qtyAvailable: Number(item.currentStock || 0),
+      qtyLastYear: Number(item.prevYearQty || 0),
+      qtyRequested: Number(item.thisYearQty || 0),
+      materialCode: item.materialCode,
+      manufacturer: item.manufacturer,
+      reason: "Tự động tạo dự trù"   // 🔥 Auto fill
+    }));
+
+    setItems(mapped);
+
+    Swal.fire({
+      icon: "success",
+      title: "Đã load dự trù năm trước",
+      timer: 1200,
+      showConfirmButton: false,
+    });
+
+  } catch (err) {
+    Swal.fire("Lỗi", err.message, "error");
   }
 }
 
@@ -330,38 +381,6 @@ async function submit(e) {
     });
   }
 
-  function deleteItem(id) {
-  const item = items.find((i) => i.id === id);
-
-  Swal.fire({
-    title: "🗑️ Xác nhận xóa?",
-    text: `Bạn có chắc chắn muốn xóa vật tư “${item.materialName}”?`,
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-    confirmButtonText: "Xóa",
-    cancelButtonText: "Hủy",
-    reverseButtons: true,
-    backdrop: true,
-  }).then((result) => {
-    if (result.isConfirmed) {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-
-      Swal.fire({
-        title: "✅ Đã xóa!",
-        text: `Vật tư “${item.materialName}” đã bị xóa khỏi danh sách.`,
-        icon: "success",
-        position: "center",
-        timer: 2000,
-        showConfirmButton: false,
-        backdrop: true,
-      });
-    }
-  });
-}
-
-
 
   function handleExport(content, filename, contentType) {
     if (contentType === "empty") {
@@ -446,14 +465,15 @@ async function submit(e) {
           {activeTab === "replenish" && (
   <ReplenishmentRequest
     items={items}
-    units={units}
-    materials={materials}   // ✅ Thêm dòng này
-    note={note}
-    onChangeNote={setNote}
+    materials={materials}
+    departments={departments}
+    selectedDept={selectedDept}
+    setSelectedDept={setSelectedDept}   
     onChangeItem={changeItem}
     onAddRow={addRow}
     onDeleteRow={deleteRow}
     onSubmit={submit}
+    onLoadPrevious={loadPreviousForecast}
   />
 )}
 

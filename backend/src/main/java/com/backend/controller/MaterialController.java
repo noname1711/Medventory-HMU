@@ -10,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/materials")
-@CrossOrigin(origins = "*")   // Cho phép FE gọi API
+@CrossOrigin(origins = "http://localhost:5173")
 public class MaterialController {
 
     @Autowired

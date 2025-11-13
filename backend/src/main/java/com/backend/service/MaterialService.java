@@ -24,12 +24,12 @@ public class MaterialService {
 
     private MaterialDTO convertToDTO(Material material) {
         MaterialDTO dto = new MaterialDTO();
-        dto.setId(material.getId());
-        dto.setMaterialName(material.getName());       // ✅ đúng field DB
-        dto.setSpecification(material.getSpec());      // ✅ đúng field DB
-        dto.setUnitId(material.getUnitId()); // ✅ về FE hiển thị tên unit
+        dto.setMaterialId(material.getId());
+        dto.setMaterialName(material.getName());
+        dto.setSpecification(material.getSpec());
+        dto.setUnitId(material.getUnitId());
         dto.setManufacturer(material.getManufacturer());
-        dto.setMaterialCode(material.getCode());       // ✅ đúng theo DB
+        dto.setMaterialCode(material.getCode());
         return dto;
     }
 }

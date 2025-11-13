@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class MaterialDTO {
-    private Long id;
+    private Long materialId;
     private String materialName;
     private String specification;
     private Integer unitId;

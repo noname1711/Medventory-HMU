@@ -29,4 +29,21 @@ public class SuppForecastController {
             );
         }
     }
+
+    @GetMapping("/previous")
+    public ResponseEntity<?> loadPrevious(
+            @RequestParam(required = false) Integer departmentId
+    ) {
+        try {
+            var data = forecastService.loadPreviousForecast(departmentId);
+
+            return ResponseEntity.ok(data);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.badRequest().body(
+                    java.util.Map.of("error", ex.getMessage())
+            );
+        }
+    }
 }

@@ -190,3 +190,17 @@ select {
   background: #f2f2f2;
   cursor: not-allowed;
 }
+
+.req-field.half {
+  display: inline-block;
+  width: 48%;
+  margin-right: 2%;
+}
+
+.req-field.half select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+}
