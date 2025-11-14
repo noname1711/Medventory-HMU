@@ -807,3 +807,483 @@
 .admin-delete-btn:hover {
   background-color: #dc2626;
 }
+
+/* ===== ADMIN FORECAST STYLES ===== */
+
+/* Forecast list card */
+.admin-forecast-list {
+  grid-column: 1 / -1;
+  margin-top: 2rem;
+}
+
+.admin-forecast-list .admin-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.admin-forecast-list .admin-card-header h3 {
+  color: #1f2937;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Forecast status badges */
+.admin-status-badge.admin-rejected {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-status-badge.admin-unknown {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Forecast action buttons */
+.admin-actions .admin-view-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 0.5rem;
+}
+
+.admin-actions .admin-view-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.admin-actions .admin-reject-btn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 0.5rem;
+}
+
+.admin-actions .admin-reject-btn:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Forecast modal */
+.admin-forecast-modal {
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.admin-forecast-info {
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-info-row {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.admin-info-item {
+  flex: 1;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-info-item.full-width {
+  flex: 0 0 100%;
+}
+
+.admin-info-item strong {
+  color: #374151;
+  margin-right: 0.5rem;
+}
+
+/* Forecast details table */
+.admin-forecast-details {
+  margin-top: 1.5rem;
+}
+
+.admin-forecast-details h4 {
+  color: #1f2937;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.admin-details-table {
+  background: white;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.admin-details-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* ĐỔI MÀU ĐEN THÀNH TRẮNG */
+.admin-details-table thead {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.admin-details-table th {
+  color: #374151;
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-right: 1px solid #e5e7eb;
+}
+
+.admin-details-table th:last-child {
+  border-right: none;
+}
+
+.admin-details-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #4b5563;
+  border-right: 1px solid #f3f4f6;
+}
+
+.admin-details-table td:last-child {
+  border-right: none;
+}
+
+.admin-details-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-details-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.admin-details-table td strong {
+  color: #059669;
+  font-weight: 600;
+}
+
+/* Responsive design for forecast modal */
+@media (max-width: 768px) {
+  .admin-forecast-modal {
+    margin: 1rem;
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .admin-info-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .admin-details-table {
+    overflow-x: auto;
+  }
+  
+  .admin-details-table table {
+    min-width: 600px;
+  }
+}
+
+/* Enhanced table styles for forecast list */
+.admin-forecast-list .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* ĐỔI MÀU ĐEN THÀNH TRẮNG */
+.admin-forecast-list .admin-table thead {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.admin-forecast-list .admin-table th {
+  color: #374151;
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-right: 1px solid #e5e7eb;
+}
+
+.admin-forecast-list .admin-table th:last-child {
+  border-right: none;
+}
+
+.admin-forecast-list .admin-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #4b5563;
+  border-right: 1px solid #f3f4f6;
+}
+
+.admin-forecast-list .admin-table td:last-child {
+  border-right: none;
+}
+
+.admin-forecast-list .admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-forecast-list .admin-table tbody tr:hover {
+  background-color: #f8fafc;
+  transition: background-color 0.2s ease;
+}
+
+/* Loading states */
+.admin-forecast-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  color: #6b7280;
+}
+
+.admin-forecast-loading::after {
+  content: "";
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 1rem;
+}
+
+/* Empty state for forecast list */
+.admin-forecast-list .admin-no-data {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  font-style: italic;
+  background: #f9fafb;
+}
+
+/* Animation for new forecast items */
+@keyframes slideInForecast {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-forecast-list .admin-table tbody tr {
+  animation: slideInForecast 0.3s ease-out;
+}
+
+/* Enhanced button styles for forecast actions */
+.admin-actions .admin-approve-btn,
+.admin-actions .admin-reject-btn,
+.admin-actions .admin-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-actions .admin-approve-btn:active,
+.admin-actions .admin-reject-btn:active,
+.admin-actions .admin-view-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Status indicator dots */
+.admin-status-indicator {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}
+
+.admin-status-indicator.pending {
+  background-color: #facc15;
+}
+
+.admin-status-indicator.approved {
+  background-color: #10b981;
+}
+
+.admin-status-indicator.rejected {
+  background-color: #ef4444;
+}
+
+/* Forecast summary cards */
+.admin-forecast-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.admin-summary-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.admin-summary-card h4 {
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.admin-summary-card .number {
+  color: #1f2937;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-summary-card.pending .number {
+  color: #f59e0b;
+}
+
+.admin-summary-card.approved .number {
+  color: #10b981;
+}
+
+.admin-summary-card.rejected .number {
+  color: #ef4444;
+}
+
+/* Print styles for forecast details */
+@media print {
+  .admin-forecast-modal {
+    position: static;
+    box-shadow: none;
+    max-width: none;
+    max-height: none;
+  }
+  
+  .admin-modal-overlay {
+    position: static;
+    background: white;
+  }
+  
+  .admin-modal-footer {
+    display: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .admin-forecast-info {
+    border: 2px solid currentColor;
+  }
+  
+  .admin-details-table {
+    border: 2px solid currentColor;
+  }
+  
+  .admin-summary-card {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .admin-actions .admin-approve-btn,
+  .admin-actions .admin-reject-btn,
+  .admin-actions .admin-view-btn {
+    transition: none;
+  }
+  
+  .admin-forecast-list .admin-table tbody tr {
+    animation: none;
+  }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .admin-forecast-info {
+    background: #f8fafc;
+    border-color: #e5e7eb;
+  }
+  
+  .admin-info-item {
+    background: white;
+    border-color: #e5e7eb;
+    color: #374151;
+  }
+  
+  .admin-details-table {
+    background: white;
+    border-color: #e5e7eb;
+  }
+  
+  .admin-details-table td {
+    color: #4b5563;
+    border-color: #e5e7eb;
+  }
+  
+  .admin-details-table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+}

@@ -13,8 +13,11 @@ export default function Admin() {
   const [newRole, setNewRole] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" or "approved"
+  const [activeTab, setActiveTab] = useState("pending");
   const [adminInfo, setAdminInfo] = useState(null);
+  const [forecasts, setForecasts] = useState([]);
+  const [activeForecastTab, setActiveForecastTab] = useState("pending");
+  const [selectedForecast, setSelectedForecast] = useState(null);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const navigate = useNavigate();
@@ -25,12 +28,15 @@ export default function Admin() {
     { value: "Cán bộ", label: "Cán bộ khác" }
   ];
 
-  // API endpoints - sử dụng biến API_URL
   const API_ENDPOINTS = {
     USERS_ALL: `${API_URL}/admin/users/all`,
     USER_APPROVE: (id) => `${API_URL}/admin/users/${id}/approve`,
     USER_DELETE: (id) => `${API_URL}/admin/users/${id}`,
-    USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`
+    USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`,
+    FORECASTS_PENDING: (bghId) => `${API_URL}/supp-forecast/bgh/pending?bghId=${bghId}`,
+    FORECASTS_PROCESSED: (bghId) => `${API_URL}/supp-forecast/bgh/processed?bghId=${bghId}`,
+    FORECAST_APPROVE: `${API_URL}/supp-forecast/approve`,
+    FORECAST_STATS: (bghId) => `${API_URL}/supp-forecast/bgh/stats?bghId=${bghId}`
   };
 
   useEffect(() => {
@@ -43,11 +49,10 @@ export default function Admin() {
         try {
           userData = JSON.parse(currentUser);
         } catch (error) {
-          console.error("Error parsing user data:", error);
+          // Đã bỏ console.error
         }
       }
 
-      // Kiểm tra nếu là Ban Giám Hiệu
       if (adminJustLoggedIn || (userData && userData.isBanGiamHieu)) {
         if (adminJustLoggedIn) {
           sessionStorage.removeItem('adminJustLoggedIn');
@@ -55,6 +60,7 @@ export default function Admin() {
         setIsAuthenticated(true);
         setAdminInfo(userData);
         fetchUsers();
+        fetchForecasts();
       } else {
         navigate("/");
       }
@@ -71,15 +77,35 @@ export default function Admin() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       
-      // Lọc bỏ các tài khoản Ban Giám Hiệu (roleCheck = 0)
       const filteredData = data.filter(user => !user.isBanGiamHieu);
       setUsers(filteredData);
       filterUsersByStatus(filteredData, activeTab);
     } catch (error) {
-      console.error("Lỗi khi lấy danh sách người dùng:", error);
       Swal.fire({
         title: "Lỗi!",
         text: "Không thể tải danh sách người dùng",
+        icon: "error",
+        timer: 3000,
+      });
+    }
+  };
+
+  const fetchForecasts = async () => {
+    if (!adminInfo?.id) return;
+    
+    try {
+      const endpoint = activeForecastTab === "pending" 
+        ? API_ENDPOINTS.FORECASTS_PENDING(adminInfo.id)
+        : API_ENDPOINTS.FORECASTS_PROCESSED(adminInfo.id);
+      
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setForecasts(data);
+    } catch (error) {
+      Swal.fire({
+        title: "Lỗi!",
+        text: "Không thể tải danh sách dự trù",
         icon: "error",
         timer: 3000,
       });
@@ -97,6 +123,12 @@ export default function Admin() {
   useEffect(() => {
     filterUsersByStatus(users, activeTab);
   }, [users, activeTab]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchForecasts();
+    }
+  }, [activeForecastTab, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated && users.length > 0) updateChart();
@@ -180,7 +212,6 @@ export default function Admin() {
         Swal.fire({ title: "✅ Đã duyệt!", text: `${user.fullName} đã được cấp quyền truy cập.`, icon: "success", timer: 2000, showConfirmButton: false });
       }
     } catch (error) {
-      console.error("Lỗi khi duyệt người dùng:", error);
       Swal.fire({ title: "❌ Lỗi!", text: "Không thể duyệt người dùng", icon: "error", timer: 2000 });
     }
   };
@@ -227,7 +258,6 @@ export default function Admin() {
             });
           }
         } catch (error) {
-          console.error("Lỗi khi xóa người dùng:", error);
           Swal.fire({ title: "❌ Lỗi!", text: "Không thể xóa người dùng", icon: "error", timer: 2000 });
         }
       }
@@ -259,7 +289,6 @@ export default function Admin() {
         Swal.fire({ title: "❌ Lỗi!", text: `Không thể thay đổi quyền: ${errorText}`, icon: "error", timer: 3000 });
       }
     } catch (error) {
-      console.error("Lỗi khi thay đổi quyền:", error);
       Swal.fire({ title: "❌ Lỗi kết nối!", text: "Không thể kết nối đến server", icon: "error", timer: 3000 });
     }
   };
@@ -276,6 +305,134 @@ export default function Admin() {
 
   const handleRoleChange = () => {
     if (editingUser && newRole) changeUserRole(editingUser.id, newRole);
+  };
+
+  // ==================== DỰ TRÙ BỔ SUNG ====================
+
+  const approveForecast = async (forecastId) => {
+    const { value: note } = await Swal.fire({
+      title: "Phê duyệt dự trù?",
+      input: "textarea",
+      inputLabel: "Lý do phê duyệt (không bắt buộc):",
+      inputPlaceholder: "Nhập lý do phê duyệt (nếu có)...",
+      inputAttributes: { maxLength: "500" },
+      showCancelButton: true,
+      confirmButtonText: "Phê duyệt",
+      confirmButtonColor: "#10B981",
+      cancelButtonText: "Hủy",
+    });
+
+    if (note !== undefined) {
+      try {
+        const requestBody = {
+          forecastId: forecastId,
+          action: 1,
+          note: note || "Đã phê duyệt",
+          approverId: adminInfo.id
+        };
+
+        const response = await fetch(API_ENDPOINTS.FORECAST_APPROVE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (response.ok) {
+          Swal.fire({
+            title: "✅ Đã phê duyệt!",
+            text: "Dự trù đã được phê duyệt thành công.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false
+          });
+          fetchForecasts();
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      } catch (error) {
+        Swal.fire({
+          title: "❌ Lỗi!",
+          text: "Không thể phê duyệt dự trù",
+          icon: "error",
+          timer: 2000
+        });
+      }
+    }
+  };
+
+  const rejectForecast = async (forecastId) => {
+    const { value: note } = await Swal.fire({
+      title: "Từ chối dự trù?",
+      input: "textarea",
+      inputLabel: "Lý do từ chối:",
+      inputPlaceholder: "Nhập lý do từ chối dự trù...",
+      inputAttributes: { maxLength: "500" },
+      showCancelButton: true,
+      confirmButtonText: "Từ chối",
+      confirmButtonColor: "#EF4444",
+      cancelButtonText: "Hủy",
+      preConfirm: (note) => {
+        if (!note || note.trim().length === 0) {
+          Swal.showValidationMessage("Vui lòng nhập lý do từ chối!");
+          return false;
+        }
+        return note;
+      }
+    });
+
+    if (note) {
+      try {
+        const requestBody = {
+          forecastId: forecastId,
+          action: 2,
+          note: note,
+          approverId: adminInfo.id
+        };
+
+        const response = await fetch(API_ENDPOINTS.FORECAST_APPROVE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (response.ok) {
+          Swal.fire({
+            title: "✅ Đã từ chối!",
+            text: "Dự trù đã được từ chối thành công.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false
+          });
+          fetchForecasts();
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      } catch (error) {
+        Swal.fire({
+          title: "❌ Lỗi!",
+          text: "Không thể từ chối dự trù",
+          icon: "error",
+          timer: 2000
+        });
+      }
+    }
+  };
+
+  const viewForecastDetails = (forecast) => {
+    setSelectedForecast(forecast);
+  };
+
+  const closeForecastDetails = () => {
+    setSelectedForecast(null);
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 0: return { text: "Chờ duyệt", class: "pending" };
+      case 1: return { text: "Đã duyệt", class: "approved" };
+      case 2: return { text: "Đã từ chối", class: "rejected" };
+      default: return { text: "Không xác định", class: "unknown" };
+    }
   };
 
   if (isCheckingAuth) {
@@ -304,7 +461,7 @@ export default function Admin() {
                 Xin chào <strong>{adminInfo.fullName}</strong> - {adminInfo.role}
               </>
             ) : (
-              "Duyệt & quản lý tài khoản đăng ký hệ thống"
+              "Duyệt & quản lý tài khoản và dự trù bổ sung"
             )}
           </p>
         </div>
@@ -314,6 +471,7 @@ export default function Admin() {
           </button>
         </div>
       </header>
+
       <div className="admin-container">
         <div className="admin-grid-layout">
           <div className="admin-chart-card admin-card">
@@ -332,7 +490,6 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Tabs phân loại */}
             <div className="admin-tabs">
               <button 
                 className={`admin-tab ${activeTab === "pending" ? "admin-tab-active" : ""}`}
@@ -408,6 +565,102 @@ export default function Admin() {
               </table>
             </div>
           </div>
+
+          <div className="admin-forecast-list admin-card">
+            <div className="admin-card-header">
+              <h3>Duyệt dự trù bổ sung</h3>
+              <div className="admin-user-count-badge">
+                <span className="admin-count-number">{forecasts.length}</span>
+                <span className="admin-count-text">dự trù</span>
+              </div>
+            </div>
+
+            <div className="admin-tabs">
+              <button 
+                className={`admin-tab ${activeForecastTab === "pending" ? "admin-tab-active" : ""}`}
+                onClick={() => setActiveForecastTab("pending")}
+              >
+                Chờ duyệt
+              </button>
+              <button 
+                className={`admin-tab ${activeForecastTab === "processed" ? "admin-tab-active" : ""}`}
+                onClick={() => setActiveForecastTab("processed")}
+              >
+                Đã xử lý
+              </button>
+            </div>
+
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Khoa/Phòng</th>
+                    <th>Năm học</th>
+                    <th>Người tạo</th>
+                    <th>Ngày tạo</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecasts.map((forecast, index) => {
+                    const status = getStatusBadge(forecast.status);
+                    return (
+                      <tr key={forecast.id} className={index === forecasts.length - 1 ? "admin-last-row" : ""}>
+                        <td>{forecast.department?.name || "Không xác định"}</td>
+                        <td>{forecast.academicYear}</td>
+                        <td>{forecast.createdBy?.fullName || "Không xác định"}</td>
+                        <td>{new Date(forecast.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td>
+                          <span className={`admin-status-badge admin-${status.class}`}>
+                            {status.text}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-actions">
+                            <button 
+                              className="admin-view-btn" 
+                              onClick={() => viewForecastDetails(forecast)}
+                              title="Xem chi tiết"
+                            >
+                              👁️
+                            </button>
+                            {forecast.status === 0 && (
+                              <>
+                                <button 
+                                  className="admin-approve-btn" 
+                                  onClick={() => approveForecast(forecast.id)} 
+                                  title="Phê duyệt"
+                                >
+                                  ✓
+                                </button>
+                                <button 
+                                  className="admin-reject-btn" 
+                                  onClick={() => rejectForecast(forecast.id)} 
+                                  title="Từ chối"
+                                >
+                                  ✗
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {forecasts.length === 0 && (
+                    <tr className="admin-last-row">
+                      <td colSpan="6" className="admin-no-data">
+                        {activeForecastTab === "pending" 
+                          ? "Không có dự trù nào chờ duyệt" 
+                          : "Không có dự trù nào đã xử lý"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -450,6 +703,109 @@ export default function Admin() {
               <button className="admin-btn-secondary" onClick={closeRoleChangeModal}>Hủy</button>
               <button className="admin-btn-primary" onClick={handleRoleChange} disabled={!newRole || newRole === editingUser.role}>
                 Cập nhật quyền
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedForecast && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal admin-forecast-modal">
+            <div className="admin-modal-header">
+              <h3>Chi tiết dự trù #{selectedForecast.id}</h3>
+              <div className="admin-user-status-info">
+                <span className={`admin-status-badge admin-${getStatusBadge(selectedForecast.status).class}`}>
+                  {getStatusBadge(selectedForecast.status).text}
+                </span>
+              </div>
+            </div>
+            <div className="admin-modal-content">
+              <div className="admin-forecast-info">
+                <div className="admin-info-row">
+                  <div className="admin-info-item">
+                    <strong>Khoa/Phòng:</strong> {selectedForecast.department?.name || "Không xác định"}
+                  </div>
+                  <div className="admin-info-item">
+                    <strong>Năm học:</strong> {selectedForecast.academicYear}
+                  </div>
+                </div>
+                <div className="admin-info-row">
+                  <div className="admin-info-item">
+                    <strong>Người tạo:</strong> {selectedForecast.createdBy?.fullName || "Không xác định"}
+                  </div>
+                  <div className="admin-info-item">
+                    <strong>Ngày tạo:</strong> {new Date(selectedForecast.createdAt).toLocaleDateString('vi-VN')}
+                  </div>
+                </div>
+                {selectedForecast.approvalBy && (
+                  <div className="admin-info-row">
+                    <div className="admin-info-item">
+                      <strong>Người duyệt:</strong> {selectedForecast.approvalBy?.fullName}
+                    </div>
+                    <div className="admin-info-item">
+                      <strong>Ngày duyệt:</strong> {new Date(selectedForecast.approvalAt).toLocaleDateString('vi-VN')}
+                    </div>
+                  </div>
+                )}
+                {selectedForecast.approvalNote && (
+                  <div className="admin-info-row">
+                    <div className="admin-info-item full-width">
+                      <strong>Ghi chú:</strong> {selectedForecast.approvalNote}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selectedForecast.details && selectedForecast.details.length > 0 && (
+                <div className="admin-forecast-details">
+                  <h4>Danh sách vật tư</h4>
+                  <div className="admin-details-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Tên vật tư</th>
+                          <th>Tồn hiện tại</th>
+                          <th>Năm trước</th>
+                          <th>Dự trù năm nay</th>
+                          <th>Lý do</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedForecast.details.map((detail, index) => (
+                          <tr key={index}>
+                            <td>{detail.material?.name || "Vật tư mới"}</td>
+                            <td>{detail.currentStock}</td>
+                            <td>{detail.prevYearQty}</td>
+                            <td><strong>{detail.thisYearQty}</strong></td>
+                            <td>{detail.justification}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="admin-modal-footer">
+              {selectedForecast.status === 0 && (
+                <>
+                  <button 
+                    className="admin-reject-btn" 
+                    onClick={() => rejectForecast(selectedForecast.id)} 
+                  >
+                    Từ chối
+                  </button>
+                  <button 
+                    className="admin-approve-btn" 
+                    onClick={() => approveForecast(selectedForecast.id)} 
+                  >
+                    Phê duyệt
+                  </button>
+                </>
+              )}
+              <button className="admin-btn-secondary" onClick={closeForecastDetails}>
+                Đóng
               </button>
             </div>
           </div>
