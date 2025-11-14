@@ -320,24 +320,24 @@ INSERT INTO units(name) VALUES
 ('chai'),('lọ'),('hộp'),('cái'),('ml'),('g'),('viên'),('kg'),('bộ');
 
 -- ============================================
--- USERS - ĐÃ ĐIỀU CHỈNH THEO YÊU CẦU
+-- USERS 
 -- ============================================
 
 -- LÃNH ĐẠO & THỦ KHO: Thuộc Quản trị vật tư
 INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
-('Trưởng phòng QTVT', 'lanhdao@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 1, 'Trưởng phòng Quản trị vật tư', 1),
+('Trưởng phòng QTVT', 'lanhdao@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 1, 'Trưởng phòng Quản trị vật tư', 0),
 ('Phó phòng QTVT', 'pholanhdao@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 1, 'Phó phòng Quản trị vật tư', 1),
-('Thủ Kho Chính', 'thukho@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 2, 'Thủ kho chính', 1),
+('Thủ Kho Chính', 'thukho@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 2, 'Thủ kho chính', 0),
 ('Thủ Kho Phụ', 'thukho2@gmail.com', '12345', (SELECT id FROM departments WHERE name='Quản trị vật tư'), 2, 'Thủ kho phụ', 1);
 
 -- CÁN BỘ: Thuộc các khoa khác (KHÔNG thuộc Quản trị vật tư)
 INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
-('CB Bộ môn BHPT', 'canbo.bhpt@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Bộ môn BHPT', 1),
+('CB Bộ môn BHPT', 'canbo.bhpt@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Bộ môn BHPT', 0),
 ('CB Hóa sinh', 'canbo.hoasinh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 3, 'Cán bộ Hóa sinh', 1),
-('CB Vi sinh', 'canbo.visinh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa vi sinh - ký sinh trùng'), 3, 'Cán bộ Vi sinh', 1),
+('CB Vi sinh', 'canbo.visinh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa vi sinh - ký sinh trùng'), 3, 'Cán bộ Vi sinh', 0),
 ('CB Dược lý', 'canbo.duocly@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa dược'), 3, 'Cán bộ Dược lý', 1),
 ('CB Khám bệnh', 'canbo.khambenh@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa khám bệnh'), 3, 'Cán bộ Khám bệnh', 1),
-('CB Cấp cứu', 'canbo.capcuu@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa cấp cứu'), 3, 'Cán bộ Cấp cứu', 1);
+('CB Cấp cứu', 'canbo.capcuu@gmail.com', '12345', (SELECT id FROM departments WHERE name='Khoa cấp cứu'), 3, 'Cán bộ Cấp cứu', 0);
 
 -- BAN GIÁM HIỆU: Không thuộc department nào
 INSERT INTO users(full_name, email, password, department_id, role_check, role, status) VALUES
@@ -367,24 +367,48 @@ INSERT INTO materials(name, spec, unit_id, code, manufacturer, category) VALUES
 ('Ống nghiệm plastic', 'Hộp 200 cái', (SELECT id FROM units WHERE name='hộp'), 'TUBE-PLASTIC', 'LabPlastic', 'D');
 
 -- ============================================
--- DỮ LIỆU MẪU CHO ĐƠN XIN LĨNH
+-- DỮ LIỆU MẪU CHO ĐƠN DỰ TRÙ
 -- ============================================
 
 -- Supplement forecast headers
-INSERT INTO supp_forecast_header(created_by, academic_year, department_id, status, approval_by, approval_at, approval_note) VALUES
-((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 1, (SELECT id FROM users WHERE email='lanhdao@gmail.com'), NOW(), 'Đồng ý theo đề xuất'),
-((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 0, NULL, NULL, NULL);
+INSERT INTO supp_forecast_header (created_by, academic_year, department_id, status, approval_by, approval_at, approval_note) VALUES
+((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 1, (SELECT id FROM users WHERE email='hieutruong@gmail.com'), NOW(), 'Đồng ý theo đề xuất'),
+((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 0, NULL, NULL, NULL),
+((SELECT id FROM users WHERE email='thukho2@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa dược'), 1, (SELECT id FROM users WHERE email='phohieutruong1@gmail.com'), NOW(), 'Phê duyệt đủ số lượng'),
+((SELECT id FROM users WHERE email='thukho@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa cấp cứu'), 2, (SELECT id FROM users WHERE email='phohieutruong2@gmail.com'), NOW(), 'Cần điều chỉnh giảm số lượng'),
+((SELECT id FROM users WHERE email='thukho2@gmail.com'), '2025-2026', (SELECT id FROM departments WHERE name='Khoa khám bệnh'), 0, NULL, NULL, NULL);
 
--- Supplement forecast details
-INSERT INTO supp_forecast_detail(header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification)
-SELECT h1.id, m.id, cs, py, ty, m.code, m.manufacturer, j
-FROM (
-  SELECT 10 cs, 50 py, 80 ty, 'Bổ sung phục vụ thực hành' j, 'ETH96-500' code
-  UNION ALL SELECT 20,120,150,'Tăng nhu cầu thực hành',     'GLOVE-100'
-  UNION ALL SELECT 50,200,250,'Thay thế hao hụt/vỡ',        'TUBE-10'
-) x
-JOIN materials m ON m.code = x.code
-JOIN supp_forecast_header h1 ON h1.status = 1 AND h1.department_id = (SELECT id FROM departments WHERE name='Khoa xét nghiệm');
+-- Supplement forecast details cho Khoa xét nghiệm (approved)
+INSERT INTO supp_forecast_detail (header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification) VALUES
+(1, (SELECT id FROM materials WHERE code='ETH96-500'), 10, 50, 80, 'ETH96-500', 'ABC Pharma', 'Bổ sung phục vụ thực hành'),
+(1, (SELECT id FROM materials WHERE code='GLOVE-100'), 20, 120, 150, 'GLOVE-100', 'GloveCo', 'Tăng nhu cầu thực hành'),
+(1, (SELECT id FROM materials WHERE code='TUBE-10'), 50, 200, 250, 'TUBE-10', 'LabGlass', 'Thay thế hao hụt/vỡ');
+
+-- Supplement forecast details cho Khoa xét nghiệm (pending)
+INSERT INTO supp_forecast_detail (header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification) VALUES
+(2, (SELECT id FROM materials WHERE code='PIP1-100'), 30, 100, 150, 'PIP1-100', 'LabMate', 'Bổ sung dụng cụ thí nghiệm'),
+(2, (SELECT id FROM materials WHERE code='CHEM-TEST'), 5, 20, 40, 'CHEM-TEST', 'LabChem', 'Tăng cường hóa chất xét nghiệm');
+
+-- Supplement forecast details cho Khoa dược (approved)
+INSERT INTO supp_forecast_detail (header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification) VALUES
+(3, (SELECT id FROM materials WHERE code='PARA500-100'), 15, 60, 90, 'PARA500-100', 'MediPharm', 'Dự trù cho nghiên cứu dược lý'),
+(3, (SELECT id FROM materials WHERE code='NACL-1000'), 25, 80, 120, 'NACL-1000', 'IVCo', 'Dung dịch truyền nghiên cứu'),
+(3, (SELECT id FROM materials WHERE code='SYRINGE-100'), 40, 150, 200, 'SYRINGE-100', 'MediNeedle', 'Kim tiêm thí nghiệm');
+
+-- Supplement forecast details cho Khoa cấp cứu (rejected)
+INSERT INTO supp_forecast_detail (header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification) VALUES
+(4, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 5, 40, 60, 'ALCOHOL-70', 'ABC Pharma', 'Dự phòng cho trường hợp khẩn cấp'),
+(4, (SELECT id FROM materials WHERE code='GLOVE-100'), 15, 80, 120, 'GLOVE-100', 'GloveCo', 'Tăng cường phòng hộ'),
+(4, (SELECT id FROM materials WHERE code='MASK-50'), 20, 60, 100, 'MASK-50', 'ProtectMed', 'Khẩu trang y tế'),
+(4, (SELECT id FROM materials WHERE code='BANDAGE-100'), 10, 30, 50, 'BANDAGE-100', 'FirstAid Co', 'Băng gạc sơ cứu');
+
+-- Supplement forecast details cho Khoa khám bệnh (pending)
+INSERT INTO supp_forecast_detail (header_id, material_id, current_stock, prev_year_qty, this_year_qty, proposed_code, proposed_manufacturer, justification) VALUES
+(5, (SELECT id FROM materials WHERE code='COTTON-500'), 25, 80, 120, 'COTTON-500', 'MediCotton', 'Tăng cường vật tư khám bệnh'),
+(5, (SELECT id FROM materials WHERE code='GAUZE-50'), 30, 100, 150, 'GAUZE-50', 'MediGauze', 'Gạc vô trùng khám bệnh'),
+(5, (SELECT id FROM materials WHERE code='SYRINGE-5ML'), 20, 60, 90, 'SYRINGE-5ML', 'MediNeedle', 'Bơm kim tiêm khám bệnh'),
+(5, (SELECT id FROM materials WHERE code='GLOVE-100'), 35, 120, 180, 'GLOVE-100', 'GloveCo', 'Găng tay khám bệnh');
+
 
 -- ============================================
 -- PHIẾU XIN LĨNH MẪU
