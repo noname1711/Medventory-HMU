@@ -272,9 +272,9 @@
 
 .category-badge {
   padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
+  border-radius: 2px;
+  font-size: 15px;
+  font-weight: 450;
 }
 
 .category-badge.danger { background: #fee2e2; color: #dc2626; }
@@ -682,26 +682,6 @@
   background-color: #5a6268;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
-
-/* Small close button for approval modal */
-.btn-close-small {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #6c757d;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.btn-close-small:hover {
-  background-color: #f8f9fa;
-  color: #dc3545;
 }
 
 /* Detail Modal */

@@ -19,4 +19,7 @@ public class UserDTO {
     private Boolean isLanhDao;
     private Boolean isThuKho;
     private Boolean isCanBo;
+
+    private Long departmentId;
+    private String departmentName;
 }

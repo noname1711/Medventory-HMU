@@ -21,6 +21,11 @@ public class UserService {
     @Autowired
     private DepartmentRepository departmentRepository;
 
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElse(null);
+    }
+
     // Map role từ tiếng Việt sang roleCheck
     private Integer mapRoleToRoleCheck(String role) {
         switch (role) {
@@ -104,16 +109,27 @@ public class UserService {
         dto.setFullName(user.getFullName());
         dto.setEmail(user.getEmail());
         dto.setDateOfBirth(user.getDateOfBirth());
-        dto.setDepartment(user.getDepartment() != null ? user.getDepartment().getName() : null);
+
+        // DEPARTMENT INFO
+        if (user.getDepartment() != null) {
+            dto.setDepartment(user.getDepartment().getName());
+            dto.setDepartmentId(user.getDepartment().getId());
+            dto.setDepartmentName(user.getDepartment().getName());
+        } else {
+            // Nếu user không có department
+            dto.setDepartment(null);
+            dto.setDepartmentId(null);
+            dto.setDepartmentName(null);
+        }
 
         // Sử dụng helper methods từ User entity
         dto.setRole(user.getRoleName());
 
-        // QUAN TRỌNG: Nếu là Ban Giám Hiệu, sử dụng role thực tế từ database
+        // Nếu là Ban Giám Hiệu, sử dụng role thực tế từ database
         if (user.isBanGiamHieu() && user.getRole() != null && !user.getRole().isEmpty()) {
             dto.setRole(user.getRole()); // Hiển thị "Hiệu trưởng", "Phó Hiệu trưởng"
         } else {
-            dto.setRole(user.getRoleName()); // Hiển thị "Ban Giám Hiệu", "Lãnh đạo", etc.
+            dto.setRole(user.getRoleName()); // Hiển thị "Ban Giám Hiệu", "Lãnh đạo"
         }
 
         dto.setStatus(user.getStatusName());
@@ -126,6 +142,22 @@ public class UserService {
         dto.setIsCanBo(user.isCanBo());
 
         return dto;
+    }
+
+    // Lấy thông tin user đầy đủ theo email
+    public UserDTO getUserInfoByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+        return convertToDTO(user);
+    }
+
+    // Lấy thông tin user đầy đủ theo ID
+    public UserDTO getUserInfoById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
+
+        return convertToDTO(user);
     }
 
     public boolean emailExists(String email) {

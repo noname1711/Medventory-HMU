@@ -25,9 +25,24 @@ public class AuthController {
     @Autowired
     private UserService userService;
 
-    // Map để lưu trữ token tạm thời
-    private Map<String, String> resetTokens = new HashMap<>();
+    // Map để lưu trữ token tạm thời với expiry time
+    private Map<String, ResetTokenInfo> resetTokens = new HashMap<>();
 
+    // Inner class để lưu thông tin token
+    private static class ResetTokenInfo {
+        private String email;
+        private long createdAt;
+
+        public ResetTokenInfo(String email, long createdAt) {
+            this.email = email;
+            this.createdAt = createdAt;
+        }
+
+        public String getEmail() { return email; }
+        public long getCreatedAt() { return createdAt; }
+    }
+
+    @Autowired
     private DepartmentService departmentService;
 
     @PostMapping("/register")
@@ -92,16 +107,30 @@ public class AuthController {
         try {
             String email = request.getEmail();
 
-            // Kiểm tra email có tồn tại không
-            if (!userService.emailExists(email)) {
+            // Check user tồn tại và trạng thái
+            User user = userService.findByEmail(email);
+            if (user == null) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
+                response.put("message", "Email không tồn tại trong hệ thống!");
                 return ResponseEntity.status(404).body(response);
             }
 
-            // Tạo token reset
+            // Check tài khoản đã được phê duyệt chưa
+            if (!user.isApproved()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Tài khoản chưa được phê duyệt. Vui lòng liên hệ quản trị viên!");
+                return ResponseEntity.status(403).body(response);
+            }
+
+            // Tạo token reset với expiry time (1 giờ)
             String resetToken = UUID.randomUUID().toString();
-            resetTokens.put(resetToken, email);
+            ResetTokenInfo tokenInfo = new ResetTokenInfo(email, System.currentTimeMillis());
+            resetTokens.put(resetToken, tokenInfo);
+
+            // Clear token cũ (quá 2 giờ)
+            cleanExpiredTokens();
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -123,15 +152,37 @@ public class AuthController {
             String token = request.getToken();
             String newPassword = request.getNewPassword();
 
-            // Kiểm tra token có hợp lệ không
+            // Check token có hợp lệ và chưa hết hạn không
             if (!resetTokens.containsKey(token)) {
-                Map<String, String> response = new HashMap<>();
-                response.put("success", "false");
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Token không hợp lệ hoặc đã hết hạn!");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            ResetTokenInfo tokenInfo = resetTokens.get(token);
+
+            // Check TOKEN HẾT HẠN (1 giờ)
+            long tokenAge = System.currentTimeMillis() - tokenInfo.getCreatedAt();
+            if (tokenAge > 3600000) { // 1 giờ = 3600000 milliseconds
+                resetTokens.remove(token);
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Token đã hết hạn. Vui lòng yêu cầu mã mới!");
                 return ResponseEntity.badRequest().body(response);
             }
 
             // Lấy email từ token
-            String email = resetTokens.get(token);
+            String email = tokenInfo.getEmail();
+
+            // Check trạng thái tài khoản trước khi reset
+            User user = userService.findByEmail(email);
+            if (user != null && !user.isApproved()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Không thể đặt lại mật khẩu cho tài khoản chưa được phê duyệt!");
+                return ResponseEntity.badRequest().body(response);
+            }
 
             // Cập nhật mật khẩu mới
             boolean isUpdated = userService.updatePassword(email, newPassword);
@@ -140,18 +191,20 @@ public class AuthController {
                 // Xóa token đã sử dụng
                 resetTokens.remove(token);
 
-                Map<String, String> response = new HashMap<>();
-                response.put("success", "true");
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Đặt lại mật khẩu thành công!");
                 return ResponseEntity.ok(response);
             } else {
-                Map<String, String> response = new HashMap<>();
-                response.put("success", "false");
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Không thể cập nhật mật khẩu!");
                 return ResponseEntity.badRequest().body(response);
             }
 
         } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("success", "false");
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
             response.put("message", "Có lỗi xảy ra: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
@@ -176,5 +229,24 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.ok(Collections.emptyList());
         }
+    }
+
+    @GetMapping("/user-info")
+    public ResponseEntity<UserDTO> getUserInfo(@RequestParam String email) {
+        try {
+            UserDTO userDTO = userService.getUserInfoByEmail(email);
+            return ResponseEntity.ok(userDTO);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Dọn dẹp token hết hạn
+    private void cleanExpiredTokens() {
+        long currentTime = System.currentTimeMillis();
+        resetTokens.entrySet().removeIf(entry -> {
+            long tokenAge = currentTime - entry.getValue().getCreatedAt();
+            return tokenAge > 7200000; // Dọn token quá 2 giờ
+        });
     }
 }

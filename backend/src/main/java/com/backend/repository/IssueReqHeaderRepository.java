@@ -38,8 +38,9 @@ public interface IssueReqHeaderRepository extends JpaRepository<IssueReqHeader, 
     // Đếm phiếu của user theo trạng thái
     long countByCreatedByIdAndStatus(Long userId, Integer status);
 
-    // Thêm các method này
     List<IssueReqHeader> findByStatusOrderByRequestedAtDesc(Integer status);
     List<IssueReqHeader> findByStatusInOrderByRequestedAtDesc(List<Integer> statuses);
     Long countByStatus(Integer status);
+
+    List<IssueReqHeader> findByCreatedByIdOrderByRequestedAtDesc(Long createdById);
 }
