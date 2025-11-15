@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class IssueReqService {
 
     private final IssueReqHeaderRepository headerRepository;
@@ -34,13 +35,11 @@ public class IssueReqService {
         try {
             User leader = getUserWithRoleCheck(leaderId, 1, "Chỉ lãnh đạo được xem phiếu chờ phê duyệt");
 
-            // SỬA: Lấy tất cả phiếu pending từ mọi department
             List<IssueReqHeader> pendingRequests = headerRepository.findByStatusOrderByRequestedAtDesc(0);
             List<IssueReqHeaderDTO> requestDTOs = pendingRequests.stream()
                     .map(this::convertToDTO)
                     .collect(Collectors.toList());
 
-            // SỬA: Count tất cả phiếu từ mọi department
             long totalCount = headerRepository.countByStatus(0);
             long approvedCount = headerRepository.countByStatus(1);
             long rejectedCount = headerRepository.countByStatus(2);
@@ -55,7 +54,6 @@ public class IssueReqService {
             );
 
         } catch (Exception e) {
-            // KHÔNG throw exception, return response với empty array
             System.out.println("Error in getPendingRequestsForLeader: " + e.getMessage());
             return IssueReqListResponseDTO.success(
                     "Không có phiếu nào chờ phê duyệt",
@@ -69,13 +67,11 @@ public class IssueReqService {
         try {
             User leader = getUserWithRoleCheck(leaderId, 1, "Chỉ lãnh đạo được xem lịch sử phê duyệt");
 
-            // SỬA: Lấy tất cả phiếu processed từ mọi department (status 1 hoặc 2)
             List<IssueReqHeader> processedRequests = headerRepository.findByStatusInOrderByRequestedAtDesc(List.of(1, 2));
             List<IssueReqHeaderDTO> requestDTOs = processedRequests.stream()
                     .map(this::convertToDTO)
                     .collect(Collectors.toList());
 
-            // SỬA: Count tất cả phiếu từ mọi department
             long totalCount = requestDTOs.size();
             long pendingCount = headerRepository.countByStatus(0);
 
@@ -142,12 +138,6 @@ public class IssueReqService {
                 throw new RuntimeException("Phiếu này đã được xử lý");
             }
 
-            // SỬA: Bỏ check department - lãnh đạo có thể phê duyệt phiếu từ mọi department
-            // if (!header.getDepartment().getId().equals(approver.getDepartment().getId())) {
-            //     throw new RuntimeException("Bạn không có quyền phê duyệt phiếu của department này");
-            // }
-
-            // Cập nhật thông tin phê duyệt
             header.setApprovalBy(approver);
             header.setApprovalAt(LocalDateTime.now());
             header.setApprovalNote(request.getNote());
@@ -164,7 +154,6 @@ public class IssueReqService {
                     break;
 
                 case ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT:
-                    // Giữ status = 0, chỉ gửi thông báo yêu cầu điều chỉnh
                     notificationService.notifyAdjustmentRequest(header, request.getNote());
                     break;
 
@@ -190,44 +179,225 @@ public class IssueReqService {
         }
     }
 
-    // ==================== HELPER METHODS ====================
+    // ==================== TẠO PHIẾU XIN LĨNH CHO CÁN BỘ ====================
 
-    private User getUserWithRoleCheck(Long userId, Integer requiredRole, String errorMessage) {
+    public IssueReqDetailResponseDTO createIssueRequest(CreateIssueReqDTO request, Long creatorId) {
         try {
-            User user = userRepository.findById(userId)
+            User creator = userRepository.findById(creatorId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-            if (!user.getRoleCheck().equals(requiredRole)) {
-                throw new RuntimeException(errorMessage);
-            }
-
-            if (!user.isApproved()) {
+            if (!creator.isApproved()) {
                 throw new RuntimeException("Tài khoản chưa được kích hoạt");
             }
 
-            return user;
+            if (!creator.isCanBo()) {
+                throw new RuntimeException("Chỉ cán bộ được tạo phiếu xin lĩnh");
+            }
+
+            validateCreateRequest(request);
+
+            // Tạo header
+            IssueReqHeader header = new IssueReqHeader();
+            header.setCreatedBy(creator);
+            header.setRequestedAt(LocalDateTime.now());
+            header.setStatus(0);
+            header.setNote(request.getNote());
+
+            if (creator.getDepartment() != null) {
+                header.setDepartment(creator.getDepartment());
+            } else {
+                throw new RuntimeException("Cán bộ phải thuộc một khoa/phòng");
+            }
+
+            // Set sub-department
+            if (request.getSubDepartmentId() != null) {
+                SubDepartment subDepartment = subDepartmentRepository.findById(request.getSubDepartmentId())
+                        .orElseThrow(() -> new RuntimeException("Sub-department không tồn tại"));
+
+                if (!subDepartment.getDepartment().getId().equals(creator.getDepartment().getId())) {
+                    throw new RuntimeException("Bộ môn không thuộc khoa/phòng của bạn");
+                }
+
+                header.setSubDepartment(subDepartment);
+            }
+
+            header = headerRepository.save(header);
+
+            // Tạo details - VẬT TƯ MỚI SẼ ĐƯỢC TẠO MATERIAL MỚI
+            List<IssueReqDetail> details = createDetails(header, request.getDetails());
+            header.setDetails(details);
+
+            IssueReqHeaderDTO headerDTO = convertToDTO(header);
+            Map<String, Object> summary = createSummary(header);
+
+            return IssueReqDetailResponseDTO.success(
+                    "Tạo phiếu xin lĩnh thành công và đã gửi cho lãnh đạo phê duyệt",
+                    headerDTO,
+                    headerDTO.getDetails(),
+                    summary
+            );
+
         } catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
+            return IssueReqDetailResponseDTO.error("Lỗi khi tạo phiếu xin lĩnh: " + e.getMessage());
         }
     }
 
+    public IssueReqListResponseDTO getRequestsForCanBo(Long canBoId) {
+        try {
+            User canBo = userRepository.findById(canBoId)
+                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+            if (!canBo.isApproved()) {
+                throw new RuntimeException("Tài khoản chưa được kích hoạt");
+            }
+
+            List<IssueReqHeader> requests = headerRepository.findByCreatedByIdOrderByRequestedAtDesc(canBoId);
+            List<IssueReqHeaderDTO> requestDTOs = requests.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+
+            long totalCount = requests.size();
+            long pendingCount = requests.stream().filter(r -> r.getStatus() == 0).count();
+            long approvedCount = requests.stream().filter(r -> r.getStatus() == 1).count();
+            long rejectedCount = requests.stream().filter(r -> r.getStatus() == 2).count();
+
+            return IssueReqListResponseDTO.success(
+                    requestDTOs.isEmpty() ? "Chưa có phiếu xin lĩnh nào" : "Lấy danh sách phiếu thành công",
+                    requestDTOs,
+                    totalCount,
+                    (int) pendingCount,
+                    (int) approvedCount,
+                    (int) rejectedCount
+            );
+
+        } catch (Exception e) {
+            System.out.println("Error in getRequestsForCanBo: " + e.getMessage());
+            return IssueReqListResponseDTO.success(
+                    "Chưa có phiếu xin lĩnh nào",
+                    new ArrayList<>(),
+                    0L, 0, 0, 0
+            );
+        }
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    private User getUserWithRoleCheck(Long userId, Integer requiredRole, String errorMessage) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        if (!user.getRoleCheck().equals(requiredRole)) {
+            throw new RuntimeException(errorMessage);
+        }
+
+        if (!user.isApproved()) {
+            throw new RuntimeException("Tài khoản chưa được kích hoạt");
+        }
+
+        return user;
+    }
+
     private boolean hasPermissionToView(IssueReqHeader header, User user) {
-        // Người tạo phiếu được xem
         if (header.getCreatedBy().getId().equals(user.getId())) {
             return true;
         }
-
-        // SỬA: Lãnh đạo được xem tất cả phiếu từ mọi department
         if (user.isLanhDao()) {
             return true;
         }
-
-        // Ban giám hiệu được xem tất cả
         if (user.isBanGiamHieu()) {
             return true;
         }
-
         return false;
+    }
+
+    private void validateCreateRequest(CreateIssueReqDTO request) {
+        if (request.getDetails() == null || request.getDetails().isEmpty()) {
+            throw new RuntimeException("Phiếu xin lĩnh phải có ít nhất 1 vật tư");
+        }
+
+        for (CreateIssueReqDetailDTO detail : request.getDetails()) {
+            if (detail.getQtyRequested() == null || detail.getQtyRequested().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RuntimeException("Số lượng vật tư phải lớn hơn 0");
+            }
+
+            boolean hasMaterialId = detail.getMaterialId() != null;
+            boolean hasNewMaterialInfo = detail.getMaterialName() != null &&
+                    !detail.getMaterialName().trim().isEmpty() &&
+                    detail.getUnitId() != null;
+
+            if (!hasMaterialId && !hasNewMaterialInfo) {
+                throw new RuntimeException("Vật tư phải có mã (đã có trong danh mục) hoặc tên + đơn vị tính (vật tư mới)");
+            }
+
+            // VALIDATE CATEGORY CHO VẬT TƯ MỚI
+            if (detail.getMaterialId() == null) {
+                if (detail.getCategory() == null || detail.getCategory().trim().isEmpty()) {
+                    throw new RuntimeException("Vật tư mới phải có loại (A, B, C, D)");
+                }
+
+                String category = detail.getCategory().trim().toUpperCase();
+                if (!category.matches("[ABCD]")) {
+                    throw new RuntimeException("Loại vật tư phải là A, B, C hoặc D");
+                }
+            }
+
+            if (detail.getMaterialId() != null) {
+                materialRepository.findById(detail.getMaterialId())
+                        .orElseThrow(() -> new RuntimeException("Vật tư không tồn tại với ID: " + detail.getMaterialId()));
+            }
+
+            if (detail.getUnitId() != null && detail.getMaterialId() == null) {
+                unitRepository.findById(detail.getUnitId())
+                        .orElseThrow(() -> new RuntimeException("Đơn vị tính không tồn tại với ID: " + detail.getUnitId()));
+            }
+        }
+    }
+
+    private List<IssueReqDetail> createDetails(IssueReqHeader header, List<CreateIssueReqDetailDTO> detailDTOs) {
+        List<IssueReqDetail> details = new ArrayList<>();
+
+        for (CreateIssueReqDetailDTO detailDTO : detailDTOs) {
+            IssueReqDetail detail = new IssueReqDetail();
+            detail.setHeader(header);
+            detail.setQtyRequested(detailDTO.getQtyRequested());
+            detail.setProposedCode(detailDTO.getProposedCode());
+            detail.setProposedManufacturer(detailDTO.getProposedManufacturer());
+
+            if (detailDTO.getMaterialId() != null) {
+                // Vật tư có trong danh mục
+                Material material = materialRepository.findById(detailDTO.getMaterialId())
+                        .orElseThrow(() -> new RuntimeException("Vật tư không tồn tại"));
+                detail.setMaterial(material);
+            } else {
+                // VẬT TƯ MỚI - TẠO MATERIAL MỚI VỚI CATEGORY TỪ FRONTEND
+                Material newMaterial = new Material();
+                newMaterial.setName(detailDTO.getMaterialName());
+                newMaterial.setSpec(detailDTO.getSpec());
+                newMaterial.setCode(detailDTO.getProposedCode());
+                newMaterial.setManufacturer(detailDTO.getProposedManufacturer());
+
+                // SET CATEGORY TỪ FRONTEND
+                if (detailDTO.getCategory() != null && !detailDTO.getCategory().isEmpty()) {
+                    newMaterial.setCategory(detailDTO.getCategory().charAt(0));
+                } else {
+                    newMaterial.setCategory('D'); // Mặc định
+                }
+
+                if (detailDTO.getUnitId() != null) {
+                    Unit unit = unitRepository.findById(detailDTO.getUnitId())
+                            .orElseThrow(() -> new RuntimeException("Đơn vị tính không tồn tại"));
+                    newMaterial.setUnit(unit);
+                }
+
+                // Lưu material mới
+                newMaterial = materialRepository.save(newMaterial);
+                detail.setMaterial(newMaterial);
+            }
+
+            details.add(detail);
+        }
+
+        return detailRepository.saveAll(details);
     }
 
     private Map<String, Object> createSummary(IssueReqHeader header) {
@@ -238,18 +408,19 @@ public class IssueReqService {
                 .map(IssueReqDetail::getQtyRequested)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Phân loại theo category
+        // Phân loại theo category - VẬT TƯ MỚI ĐÃ CÓ MATERIAL NÊN LẤY ĐÚNG CATEGORY
         Map<String, Long> categoryCount = header.getDetails().stream()
                 .collect(Collectors.groupingBy(
-                        detail -> {
-                            Character category = detail.getMaterialCategory();
-                            return category != null ? category.toString() : "D";
-                        },
+                        detail -> detail.getMaterialCategory().toString(),
                         Collectors.counting()
                 ));
 
         long newMaterials = header.getDetails().stream()
-                .filter(detail -> detail.getMaterial() == null)
+                .filter(detail -> {
+                    // Vật tư mới là những vật tư được tạo trong phiếu này
+                    Material material = detail.getMaterial();
+                    return material != null && material.getCode().equals(detail.getProposedCode());
+                })
                 .count();
 
         summary.put("totalMaterials", totalMaterials);
@@ -265,14 +436,12 @@ public class IssueReqService {
         IssueReqHeaderDTO dto = new IssueReqHeaderDTO();
         dto.setId(header.getId());
 
-        // Created by info
         if (header.getCreatedBy() != null) {
             dto.setCreatedById(header.getCreatedBy().getId());
             dto.setCreatedByName(header.getCreatedBy().getFullName());
             dto.setCreatedByEmail(header.getCreatedBy().getEmail());
         }
 
-        // Department info
         if (header.getSubDepartment() != null) {
             dto.setSubDepartmentId(header.getSubDepartment().getId());
             dto.setSubDepartmentName(header.getSubDepartment().getName());
@@ -283,7 +452,6 @@ public class IssueReqService {
             dto.setDepartmentName(header.getDepartment().getName());
         }
 
-        // Approval info
         dto.setRequestedAt(header.getRequestedAt());
         dto.setStatus(header.getStatus());
         dto.setStatusName(header.getStatusName());
@@ -298,7 +466,6 @@ public class IssueReqService {
         dto.setApprovalNote(header.getApprovalNote());
         dto.setNote(header.getNote());
 
-        // Convert details
         List<IssueReqDetailDTO> detailDTOs = header.getDetails().stream()
                 .map(this::convertDetailToDTO)
                 .collect(Collectors.toList());
@@ -313,8 +480,9 @@ public class IssueReqService {
         dto.setQtyRequested(detail.getQtyRequested());
         dto.setProposedCode(detail.getProposedCode());
         dto.setProposedManufacturer(detail.getProposedManufacturer());
-        dto.setCategory(detail.getMaterialCategory());
-        dto.setIsNewMaterial(detail.getMaterial() == null);
+        dto.setCategory(detail.getMaterialCategory()); // LẤY CATEGORY TỪ MATERIAL
+        dto.setIsNewMaterial(detail.getMaterial() != null &&
+                detail.getMaterial().getCode().equals(detail.getProposedCode()));
 
         if (detail.getMaterial() != null) {
             dto.setMaterialId(detail.getMaterial().getId());

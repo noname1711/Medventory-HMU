@@ -22,16 +22,9 @@ public class IssueReqController {
     public ResponseEntity<IssueReqListResponseDTO> getPendingRequestsForLeader(
             @RequestHeader("X-User-Id") Long leaderId) {
         try {
-            System.out.println("=== GET /leader/pending called ===");
-            System.out.println("Leader ID: " + leaderId);
-
             IssueReqListResponseDTO response = issueReqService.getPendingRequestsForLeader(leaderId);
-            System.out.println("Response success: " + response.isSuccess());
-            System.out.println("Requests count: " + (response.getRequests() != null ? response.getRequests().size() : 0));
-
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("ERROR in /leader/pending: " + e.getMessage());
             e.printStackTrace();
             // Fallback response nếu có lỗi
             return ResponseEntity.ok(IssueReqListResponseDTO.success(
@@ -46,16 +39,9 @@ public class IssueReqController {
     public ResponseEntity<IssueReqListResponseDTO> getProcessedRequestsForLeader(
             @RequestHeader("X-User-Id") Long leaderId) {
         try {
-            System.out.println("=== GET /leader/processed called ===");
-            System.out.println("Leader ID: " + leaderId);
-
             IssueReqListResponseDTO response = issueReqService.getProcessedRequestsForLeader(leaderId);
-            System.out.println("Response success: " + response.isSuccess());
-            System.out.println("Requests count: " + (response.getRequests() != null ? response.getRequests().size() : 0));
-
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("ERROR in /leader/processed: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.ok(IssueReqListResponseDTO.success(
                     "Chưa có lịch sử phê duyệt",
@@ -72,16 +58,9 @@ public class IssueReqController {
             @PathVariable Long id,
             @RequestHeader("X-User-Id") Long userId) {
         try {
-            System.out.println("=== GET /{id}/detail called ===");
-            System.out.println("Request ID: " + id);
-            System.out.println("User ID: " + userId);
-
             IssueReqDetailResponseDTO response = issueReqService.getRequestDetailWithSummary(id, userId);
-            System.out.println("Detail response success: " + response.isSuccess());
-
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("ERROR in /{id}/detail: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Không thể tải chi tiết phiếu"));
         }
@@ -95,10 +74,6 @@ public class IssueReqController {
             @RequestBody ApprovalActionDTO request,
             @RequestHeader("X-User-Id") Long approverId) {
         try {
-            System.out.println("=== POST /{id}/approve called ===");
-            System.out.println("Request ID: " + id);
-            System.out.println("Approver ID: " + approverId);
-
             request.setIssueReqId(id);
             request.setApproverId(approverId);
             request.setAction(ApprovalActionDTO.ACTION_APPROVE);
@@ -106,7 +81,6 @@ public class IssueReqController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("ERROR in /{id}/approve: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi phê duyệt phiếu"));
         }
@@ -118,10 +92,6 @@ public class IssueReqController {
             @RequestBody ApprovalActionDTO request,
             @RequestHeader("X-User-Id") Long approverId) {
         try {
-            System.out.println("=== POST /{id}/reject called ===");
-            System.out.println("Request ID: " + id);
-            System.out.println("Approver ID: " + approverId);
-
             request.setIssueReqId(id);
             request.setApproverId(approverId);
             request.setAction(ApprovalActionDTO.ACTION_REJECT);
@@ -129,7 +99,6 @@ public class IssueReqController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("ERROR in /{id}/reject: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi từ chối phiếu"));
         }
@@ -141,10 +110,6 @@ public class IssueReqController {
             @RequestBody ApprovalActionDTO request,
             @RequestHeader("X-User-Id") Long approverId) {
         try {
-            System.out.println("=== POST /{id}/request-adjustment called ===");
-            System.out.println("Request ID: " + id);
-            System.out.println("Approver ID: " + approverId);
-
             request.setIssueReqId(id);
             request.setApproverId(approverId);
             request.setAction(ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT);
@@ -152,9 +117,39 @@ public class IssueReqController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("ERROR in /{id}/request-adjustment: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi yêu cầu điều chỉnh"));
+        }
+    }
+
+    // ==================== TẠO PHIẾU XIN LĨNH CHO CÁN BỘ ====================
+
+    @PostMapping("/canbo/create")
+    public ResponseEntity<IssueReqDetailResponseDTO> createIssueRequest(
+            @RequestBody CreateIssueReqDTO request,
+            @RequestHeader("X-User-Id") Long creatorId) {
+        try {
+            IssueReqDetailResponseDTO response = issueReqService.createIssueRequest(request, creatorId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi tạo phiếu xin lĩnh: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/canbo/my-requests")
+    public ResponseEntity<IssueReqListResponseDTO> getCanBoRequests(
+            @RequestHeader("X-User-Id") Long canBoId) {
+        try {
+            IssueReqListResponseDTO response = issueReqService.getRequestsForCanBo(canBoId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.ok(IssueReqListResponseDTO.success(
+                    "Chưa có phiếu xin lĩnh nào",
+                    new ArrayList<>(),
+                    0L, 0, 0, 0
+            ));
         }
     }
 }

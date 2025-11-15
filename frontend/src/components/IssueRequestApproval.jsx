@@ -16,8 +16,24 @@ export default function IssueRequestApproval() {
   const [approvalNote, setApprovalNote] = useState('');
   const [currentAction, setCurrentAction] = useState('');
   const [initialLoad, setInitialLoad] = useState(true);
+  const [categories, setCategories] = useState([]); 
 
   const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+  // Fetch categories từ backend
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch(`${API_URL}/materials/categories`);
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      } else {
+        setCategories([]);
+      }
+    } catch (error) {
+      setCategories([]);
+    }
+  };
 
   // Fetch all data on component mount
   const fetchAllData = async () => {
@@ -25,6 +41,8 @@ export default function IssueRequestApproval() {
     
     setIsLoading(true);
     try {
+      await fetchCategories(); // Fetch categories trước
+      
       const [pendingResponse, processedResponse] = await Promise.all([
         fetch(`${API_URL}/issue-requests/leader/pending`, {
           headers: { 'X-User-Id': currentUser.id.toString() }
@@ -103,7 +121,14 @@ export default function IssueRequestApproval() {
 
       const data = await response.json();
       if (data.success) {
-        setSelectedRequest(data);
+        // Xử lý dữ liệu category cho từng detail - chỉ dùng dữ liệu từ backend
+        const processedData = {
+          ...data,
+          details: data.details?.map(detail => ({
+            ...detail,
+          })) || []
+        };
+        setSelectedRequest(processedData);
       } else {
         toast.error(data.message || 'Không thể tải chi tiết');
       }
@@ -112,6 +137,21 @@ export default function IssueRequestApproval() {
     } finally {
       setIsDetailLoading(false);
     }
+  };
+
+  // Helper functions để xử lý category - chỉ dùng khi backend có trả về
+  const getCategoryInfo = (categoryValue) => {
+    // Nếu có categories từ backend, sử dụng
+    if (categories.length > 0) {
+      const category = categories.find(cat => cat.value === categoryValue);
+      return category || { label: `Loại ${categoryValue}`, description: 'Không xác định' };
+    }
+    
+    // Nếu không có categories từ backend, trả về thông tin cơ bản
+    return { 
+      label: `Loại ${categoryValue}`, 
+      description: 'Thông tin từ server' 
+    };
   };
 
   // Mở modal nhập lý do cho duyệt/từ chối/điều chỉnh
@@ -321,7 +361,6 @@ export default function IssueRequestApproval() {
                   
                   {activeTab === 'pending' && (
                     <div className="action-buttons">
-                      {/* TẤT CẢ HÀNH ĐỘNG ĐỀU MỞ MODAL NHẬP LÝ DO */}
                       <button 
                         className="btn-approve"
                         onClick={() => openApprovalModal('approve', request)}
@@ -368,14 +407,13 @@ export default function IssueRequestApproval() {
                     <div><strong>Người gửi:</strong> {selectedRequest.header.createdByName}</div>
                     <div><strong>Email:</strong> {selectedRequest.header.createdByEmail}</div>
                     <div><strong>Đơn vị:</strong> {selectedRequest.header.departmentName}</div>
-                    <div><strong>Bộ môn:</strong> {selectedRequest.header.subDepartmentName || 'Không có'}</div>
+                    <div><strong>Bộ môn:</strong> {selectedRequest.header.departmentName}</div>
                     <div><strong>Thời gian:</strong> {new Date(selectedRequest.header.requestedAt).toLocaleString()}</div>
                     <div><strong>Trạng thái:</strong> 
                       <span className={`status-badge ${selectedRequest.header.statusBadge}`}>
                         {selectedRequest.header.statusName}
                       </span>
                     </div>
-                    {/* Hiển thị thông tin phê duyệt nếu có */}
                     {selectedRequest.header.approvalByName && (
                       <div><strong>Người phê duyệt:</strong> {selectedRequest.header.approvalByName}</div>
                     )}
@@ -409,6 +447,26 @@ export default function IssueRequestApproval() {
                         <div className="summary-label">Vật tư mới</div>
                       </div>
                     </div>
+                    
+                    {/* Hiển thị breakdown theo category - chỉ khi có dữ liệu từ backend */}
+                    {selectedRequest.summary.categoryBreakdown && (
+                      <div className="category-breakdown">
+                        <h4>Phân loại:</h4>
+                        <div className="category-breakdown-cards">
+                          {Object.entries(selectedRequest.summary.categoryBreakdown).map(([category, count]) => {
+                            const categoryInfo = getCategoryInfo(category);
+                            return (
+                              <div key={category} className="category-breakdown-card">
+                                <span className={`category-badge category-${category.toLowerCase()}`}>
+                                  {categoryInfo.label}
+                                </span>
+                                <span className="category-count">{count} loại</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -419,36 +477,51 @@ export default function IssueRequestApproval() {
                     <table>
                       <thead>
                         <tr>
+                          <th>TT</th>
                           <th>Tên vật tư</th>
                           <th>Quy cách</th>
                           <th>Đơn vị</th>
                           <th>Số lượng</th>
                           <th>Loại</th>
+                          <th>Trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedRequest.details?.map((detail, index) => (
-                          <tr key={index}>
-                            <td>
-                              {detail.materialName}
-                              {detail.isNewMaterial && <span className="new-badge">Mới</span>}
-                            </td>
-                            <td>{detail.spec}</td>
-                            <td>{detail.unitName}</td>
-                            <td>{detail.qtyRequested}</td>
-                            <td>
-                              <span className={`category-badge ${detail.categoryBadge}`}>
-                                {detail.categoryName}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {selectedRequest.details?.map((detail, index) => {
+                          const categoryInfo = getCategoryInfo(detail.category);
+                          return (
+                            <tr key={index}>
+                              <td className="text-center">{index + 1}</td>
+                              <td>
+                                {detail.materialName}
+                                {detail.isNewMaterial && <span className="new-badge">Mới</span>}
+                              </td>
+                              <td>{detail.spec || '-'}</td>
+                              <td>{detail.unitName}</td>
+                              <td className="text-center">{detail.qtyRequested}</td>
+                              <td className="text-center">
+                                <span 
+                                  className={`category-badge category-${detail.category?.toLowerCase() || 'd'}`}
+                                  title={categoryInfo.description}
+                                >
+                                  {categoryInfo.label}
+                                </span>
+                              </td>
+                              <td className="text-center">
+                                {detail.isNewMaterial ? (
+                                  <span className="status-badge warning">Vật tư mới</span>
+                                ) : (
+                                  <span className="status-badge success">Có sẵn</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* CHỈ 1 NÚT ĐÓNG Ở FOOTER */}
                 <div className="modal-footer">
                   <button 
                     className="btn-close"
@@ -463,18 +536,12 @@ export default function IssueRequestApproval() {
         </div>
       )}
 
-      {/* Approval Modal - CHO TẤT CẢ HÀNH ĐỘNG */}
+      {/* Approval Modal */}
       {showApprovalModal && (
         <div className="approval-modal">
           <div className="modal-content">
             <div className="modal-header">
               <h2>{getModalTitle(currentAction)}</h2>
-              <button 
-                className="btn-close-small"
-                onClick={() => setShowApprovalModal(false)}
-              >
-                ×
-              </button>
             </div>
             <div className="modal-body">
               <p>Vui lòng nhập {currentAction === 'reject' ? 'lý do từ chối' : 'ghi chú'} {getActionName(currentAction)}:</p>

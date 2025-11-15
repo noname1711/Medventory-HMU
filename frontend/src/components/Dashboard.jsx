@@ -5,6 +5,7 @@ import EquipmentList from "./EquipmentList";
 import AddEquipment from "./AddEquipment";
 import ExportEquipment from "./ExportEquipment";
 import IssueRequestApproval from './IssueRequestApproval';
+import CreateIssueRequest from "./CreateIssueRequest";
 import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
 import "./Dashboard.css";
@@ -237,6 +238,7 @@ export default function Dashboard() {
             <EquipmentList equipmentData={equipmentData} onDelete={deleteEquipment} onEdit={editEquipment} />
           )}
           {activeTab === "approval" && <IssueRequestApproval />}
+          {activeTab === "create-issue" && <CreateIssueRequest />}
           {activeTab === "add" && <AddEquipment onAdd={addEquipment} />}
           {activeTab === "export" && <ExportEquipment equipmentData={equipmentData} onExport={handleExport} />}
         </div>

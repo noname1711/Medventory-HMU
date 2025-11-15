@@ -77,7 +77,11 @@ export default function ForgotPassword() {
         setResetToken(data.resetToken);
         setShowTokenModal(true);
       } else {
-        toast.error(data.message || "Gmail không tồn tại trong hệ thống!");
+        const errorMessage = data.message || 
+          (data.status === 'pending_approval' 
+            ? "Tài khoản chưa được phê duyệt. Vui lòng liên hệ quản trị viên!"
+            : "Gmail không tồn tại trong hệ thống!");
+        toast.error(errorMessage);
       }
     } catch (error) {
       toast.error("Không thể kết nối đến server!");
