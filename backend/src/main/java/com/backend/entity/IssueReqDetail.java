@@ -38,6 +38,9 @@ public class IssueReqDetail {
     @Column(name = "proposed_manufacturer")
     private String proposedManufacturer;
 
+    @Column(name = "material_category")
+    private Character materialCategory;
+
     // Helper methods
     public String getDisplayMaterialName() {
         return material != null ? material.getName() : materialName;
@@ -53,6 +56,8 @@ public class IssueReqDetail {
     }
 
     public Character getMaterialCategory() {
-        return material != null ? material.getCategory() : 'D'; // Default to D for new materials
+        // Ưu tiên lấy category từ material, nếu không thì lấy từ materialCategory
+        return material != null ? material.getCategory() :
+                (materialCategory != null ? materialCategory : 'D');
     }
 }

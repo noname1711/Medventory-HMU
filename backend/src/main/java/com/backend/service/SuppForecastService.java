@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class SuppForecastService {
 
     private final SuppForecastHeaderRepository headerRepository;
@@ -33,9 +34,8 @@ public class SuppForecastService {
                 return ResponseEntity.badRequest().body(Map.of("error", "Chỉ Ban Giám Hiệu được xem dự trù"));
             }
 
-            // Lấy dữ liệu từ repository - SỬA: thêm @Transactional hoặc fetch eager
+            // Lấy dữ liệu từ repository
             List<SuppForecastHeader> forecasts = headerRepository.findByStatusOrderByCreatedAtDesc(0);
-            System.out.println("Found " + forecasts.size() + " pending forecasts");
 
             // CHUYỂN ĐỔI sang DTO để tránh circular references
             List<Map<String, Object>> forecastDTOs = forecasts.stream()
@@ -51,8 +51,6 @@ public class SuppForecastService {
 
     public ResponseEntity<?> getProcessedForecasts(Long bghId) {
         try {
-            System.out.println("=== Getting processed forecasts for BGH: " + bghId + " ===");
-
             User bgh = userRepository.findById(bghId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
@@ -61,7 +59,6 @@ public class SuppForecastService {
             }
 
             List<SuppForecastHeader> forecasts = headerRepository.findByStatusInOrderByCreatedAtDesc(List.of(1, 2));
-            System.out.println("Found " + forecasts.size() + " processed forecasts");
 
             // CHUYỂN ĐỔI sang DTO
             List<Map<String, Object>> forecastDTOs = forecasts.stream()
@@ -110,7 +107,7 @@ public class SuppForecastService {
             dto.put("approvalBy", approverDTO);
         }
 
-        // Details info - CHỈ LẤY THÔNG TIN CẦN THIẾT
+        // Details info
         if (forecast.getDetails() != null) {
             List<Map<String, Object>> detailDTOs = forecast.getDetails().stream()
                     .map(detail -> {
@@ -143,7 +140,6 @@ public class SuppForecastService {
         return dto;
     }
 
-    @Transactional
     public ResponseEntity<?> approveForecast(SuppForecastApprovalDTO request) {
         try {
             SuppForecastHeader header = headerRepository.findById(request.getForecastId())
