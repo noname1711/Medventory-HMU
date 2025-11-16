@@ -25,6 +25,10 @@ export default function DashboardTabs({ active, setActive }) {
       {/* CHỈ HIỂN THỊ TAB NHẬP/XUẤT KHO NẾU LÀ THỦ KHO */}
       {isStorekeeper && (
         <>
+          <button className={btnClass("replenish")} onClick={() => setActive("replenish")}>
+            Tạo phiếu dự trù
+          </button>
+
           <button className={btnClass("add")} onClick={() => setActive("add")}>
             Nhập kho
           </button>
