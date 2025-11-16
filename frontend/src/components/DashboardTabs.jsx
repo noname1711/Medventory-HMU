@@ -7,7 +7,7 @@ export default function DashboardTabs({ active, setActive }) {
   
   // Kiểm tra role - chỉ hiển thị tab phê duyệt nếu là lãnh đạo
   const isLeader = currentUser.roleCheck === 1;
-  
+  const isThukho = currentUser.roleCheck === 2;
   const btnClass = (name) => `dt-tab ${active === name ? "active" : ""}`;
 
   return (
@@ -32,6 +32,12 @@ export default function DashboardTabs({ active, setActive }) {
       {isLeader && (
         <button className={btnClass("approval")} onClick={() => setActive("approval")}>
           Phê duyệt phiếu xin lĩnh
+        </button>
+      )}
+
+      {isThukho && (
+        <button className={btnClass("replenish")} onClick={() => setActive("replenish")}>
+          Tạo phiếu dự trù
         </button>
       )}
     </nav>

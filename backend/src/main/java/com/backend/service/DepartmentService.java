@@ -27,4 +27,6 @@ public class DepartmentService {
     public Department findByName(String name) {
         return departmentRepository.findByName(name).orElse(null);
     }
+
+
 }

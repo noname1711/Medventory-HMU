@@ -5,8 +5,11 @@ import com.backend.service.DepartmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.backend.dto.DepartmentDTO;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/departments")
@@ -50,4 +53,6 @@ public class DepartmentController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+
 }

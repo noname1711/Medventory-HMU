@@ -3,6 +3,7 @@ package com.backend.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -40,5 +41,13 @@ public class SuppForecastHeader {
     private String approvalNote;
 
     @OneToMany(mappedBy = "header", cascade = CascadeType.ALL)
-    private List<SuppForecastDetail> details;
+    private List<SuppForecastDetail> details = new ArrayList<>();
+
+
+    public void setDepartmentId(Long departmentId) {
+        if (department == null) {
+            department = new Department();
+        }
+        department.setId(departmentId);
+    }
 }

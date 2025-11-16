@@ -8,6 +8,7 @@ import IssueRequestApproval from './IssueRequestApproval';
 import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
 import "./Dashboard.css";
+import ReplenishmentRequest from "./ReplenishmentRequest";
 
 export default function Dashboard() {
   const [userInfo, setUserInfo] = useState(null);
@@ -239,6 +240,7 @@ export default function Dashboard() {
           {activeTab === "approval" && <IssueRequestApproval />}
           {activeTab === "add" && <AddEquipment onAdd={addEquipment} />}
           {activeTab === "export" && <ExportEquipment equipmentData={equipmentData} onExport={handleExport} />}
+          {activeTab === "replenish" && <ReplenishmentRequest />}
         </div>
       </div>
     </div>

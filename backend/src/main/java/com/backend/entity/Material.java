@@ -29,4 +29,8 @@ public class Material {
 
     @Column(nullable = false)
     private Character category; // A, B, C, D
+
+    public Long getUnitId() {
+        return (unit != null) ? unit.getId() : null;
+    }
 }
