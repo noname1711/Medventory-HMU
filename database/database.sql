@@ -95,6 +95,9 @@ CREATE TABLE issue_req_detail (
 
     proposed_code         VARCHAR(100),
     proposed_manufacturer VARCHAR(255),
+    
+    -- THÊM COLUMN MỚI: lưu category cho vật tư mới
+    material_category  CHAR(1) CHECK (material_category IN ('A','B','C','D')),
 
     CHECK (
         (material_id IS NOT NULL)
@@ -411,7 +414,7 @@ INSERT INTO supp_forecast_detail (header_id, material_id, current_stock, prev_ye
 
 
 -- ============================================
--- PHIẾU XIN LĨNH MẪU
+-- PHIẾU XIN LĨNH MẪU (CẬP NHẬT VỚI MATERIAL_CATEGORY)
 -- ============================================
 
 -- Phiếu 1: Đã phê duyệt
@@ -468,50 +471,64 @@ INSERT INTO issue_req_header(created_by, sub_department_id, department_id, reque
  'Số lượng yêu cầu vượt quá định mức cho phép', 
  'Xin lĩnh vật tư cho nghiên cứu dược lý - số lượng lớn');
 
+-- THÊM PHIẾU 7: Có vật tư mới (pending)
+INSERT INTO issue_req_header(created_by, sub_department_id, department_id, requested_at, status, note) VALUES
+((SELECT id FROM users WHERE email='canbo.hoasinh@gmail.com'), 
+ (SELECT id FROM sub_departments WHERE name='Hóa sinh'), 
+ (SELECT id FROM departments WHERE name='Khoa xét nghiệm'), 
+ NOW() - INTERVAL '1 day', 0, 
+ 'Xin lĩnh vật tư mới cho nghiên cứu đặc biệt');
+
 -- ============================================
--- CHI TIẾT PHIẾU XIN LĨNH
+-- CHI TIẾT PHIẾU XIN LĨNH (CẬP NHẬT VỚI MATERIAL_CATEGORY)
 -- ============================================
 
--- Chi tiết Phiếu 1 (approved)
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
-(1, (SELECT id FROM materials WHERE code='ETH96-500'), 15),
-(1, (SELECT id FROM materials WHERE code='GLOVE-100'), 10),
-(1, (SELECT id FROM materials WHERE code='MASK-50'), 5);
+-- Chi tiết Phiếu 1 (approved) - Vật tư có sẵn
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested, material_category) VALUES
+(1, (SELECT id FROM materials WHERE code='ETH96-500'), 15, 'B'),
+(1, (SELECT id FROM materials WHERE code='GLOVE-100'), 10, 'C'),
+(1, (SELECT id FROM materials WHERE code='MASK-50'), 5, 'C');
 
--- Chi tiết Phiếu 2 (pending)
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
-(2, (SELECT id FROM materials WHERE code='ETH96-500'), 15),
-(2, (SELECT id FROM materials WHERE code='GLOVE-100'), 20),
-(2, (SELECT id FROM materials WHERE code='TUBE-10'), 25),
-(2, (SELECT id FROM materials WHERE code='PIP1-100'), 8);
+-- Chi tiết Phiếu 2 (pending) - Vật tư có sẵn
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested, material_category) VALUES
+(2, (SELECT id FROM materials WHERE code='ETH96-500'), 15, 'B'),
+(2, (SELECT id FROM materials WHERE code='GLOVE-100'), 20, 'C'),
+(2, (SELECT id FROM materials WHERE code='TUBE-10'), 25, 'D'),
+(2, (SELECT id FROM materials WHERE code='PIP1-100'), 8, 'D');
 
--- Chi tiết Phiếu 3 (pending)  
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
-(3, (SELECT id FROM materials WHERE code='NACL-1000'), 12),
-(3, (SELECT id FROM materials WHERE code='MASK-50'), 15),
-(3, (SELECT id FROM materials WHERE code='GLUC-500'), 10),
-(3, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 8);
+-- Chi tiết Phiếu 3 (pending) - Vật tư có sẵn
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested, material_category) VALUES
+(3, (SELECT id FROM materials WHERE code='NACL-1000'), 12, 'B'),
+(3, (SELECT id FROM materials WHERE code='MASK-50'), 15, 'C'),
+(3, (SELECT id FROM materials WHERE code='GLUC-500'), 10, 'B'),
+(3, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 8, 'B');
 
--- Chi tiết Phiếu 4 (pending)
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
-(4, (SELECT id FROM materials WHERE code='GLOVE-100'), 30),
-(4, (SELECT id FROM materials WHERE code='MASK-50'), 25),
-(4, (SELECT id FROM materials WHERE code='COTTON-500'), 5),
-(4, (SELECT id FROM materials WHERE code='BANDAGE-100'), 4),
-(4, (SELECT id FROM materials WHERE code='GAUZE-50'), 6);
+-- Chi tiết Phiếu 4 (pending) - Vật tư có sẵn
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested, material_category) VALUES
+(4, (SELECT id FROM materials WHERE code='GLOVE-100'), 30, 'C'),
+(4, (SELECT id FROM materials WHERE code='MASK-50'), 25, 'C'),
+(4, (SELECT id FROM materials WHERE code='COTTON-500'), 5, 'C'),
+(4, (SELECT id FROM materials WHERE code='BANDAGE-100'), 4, 'C'),
+(4, (SELECT id FROM materials WHERE code='GAUZE-50'), 6, 'C');
 
--- Chi tiết Phiếu 5 (pending)
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
-(5, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 18),
-(5, (SELECT id FROM materials WHERE code='GLOVE-100'), 25),
-(5, (SELECT id FROM materials WHERE code='SYRINGE-100'), 12),
-(5, (SELECT id FROM materials WHERE code='TUBE-PLASTIC'), 15);
+-- Chi tiết Phiếu 5 (pending) - Vật tư có sẵn
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested, material_category) VALUES
+(5, (SELECT id FROM materials WHERE code='ALCOHOL-70'), 18, 'B'),
+(5, (SELECT id FROM materials WHERE code='GLOVE-100'), 25, 'C'),
+(5, (SELECT id FROM materials WHERE code='SYRINGE-100'), 12, 'A'),
+(5, (SELECT id FROM materials WHERE code='TUBE-PLASTIC'), 15, 'D');
 
--- Chi tiết Phiếu 6 (rejected) - số lượng lớn bị từ chối
-INSERT INTO issue_req_detail(header_id, material_id, qty_requested) VALUES
-(6, (SELECT id FROM materials WHERE code='ETH96-500'), 50),
-(6, (SELECT id FROM materials WHERE code='GLOVE-100'), 100),
-(6, (SELECT id FROM materials WHERE code='PARA500-100'), 30);
+-- Chi tiết Phiếu 6 (rejected) - Vật tư có sẵn
+INSERT INTO issue_req_detail(header_id, material_id, qty_requested, material_category) VALUES
+(6, (SELECT id FROM materials WHERE code='ETH96-500'), 50, 'B'),
+(6, (SELECT id FROM materials WHERE code='GLOVE-100'), 100, 'C'),
+(6, (SELECT id FROM materials WHERE code='PARA500-100'), 30, 'A');
+
+-- Chi tiết Phiếu 7 (pending) - CÓ VẬT TƯ MỚI (material_id = NULL)
+INSERT INTO issue_req_detail(header_id, material_id, material_name, spec, unit_id, qty_requested, proposed_code, proposed_manufacturer, material_category) VALUES
+(7, NULL, 'Hóa chất XYZ mới', 'Lọ 250ml', (SELECT id FROM units WHERE name='lọ'), 10, 'XYZ-NEW-250', 'NewChem Co', 'A'),
+(7, NULL, 'Dụng cụ thí nghiệm đặc biệt', 'Bộ 5 cái', (SELECT id FROM units WHERE name='bộ'), 2, 'SPECIAL-EQ-5', 'LabInnovate', 'B'),
+(7, (SELECT id FROM materials WHERE code='GLOVE-100'), NULL, NULL, NULL, 15, NULL, NULL, 'C');
 
 -- ============================================
 -- DỮ LIỆU NHẬP/XUẤT KHO
@@ -570,7 +587,8 @@ INSERT INTO notifications(user_id, entity_type, entity_id, event_type, title, co
 ((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 2, 0, 'Phiếu xin lĩnh mới #2 cần phê duyệt', 'Có phiếu xin lĩnh #2 từ CB Hóa sinh cần phê duyệt', false, NOW() - INTERVAL '2 days'),
 ((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 3, 0, 'Phiếu xin lĩnh mới #3 cần phê duyệt', 'Có phiếu xin lĩnh #3 từ CB Vi sinh cần phê duyệt', false, NOW() - INTERVAL '1 day'),
 ((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 4, 0, 'Phiếu xin lĩnh mới #4 cần phê duyệt', 'Có phiếu xin lĩnh #4 từ CB Khám bệnh cần phê duyệt', false, NOW() - INTERVAL '12 hours'),
-((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 5, 0, 'Phiếu xin lĩnh mới #5 cần phê duyệt', 'Có phiếu xin lĩnh #5 từ CB Cấp cứu cần phê duyệt', false, NOW() - INTERVAL '6 hours');
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 5, 0, 'Phiếu xin lĩnh mới #5 cần phê duyệt', 'Có phiếu xin lĩnh #5 từ CB Cấp cứu cần phê duyệt', false, NOW() - INTERVAL '6 hours'),
+((SELECT id FROM users WHERE email='lanhdao@gmail.com'), 0, 7, 0, 'Phiếu xin lĩnh mới #7 cần phê duyệt', 'Có phiếu xin lĩnh #7 từ CB Hóa sinh có vật tư mới cần phê duyệt', false, NOW() - INTERVAL '1 day');
 
 -- Thông báo đã đọc (lịch sử)
 INSERT INTO notifications(user_id, entity_type, entity_id, event_type, title, content, is_read, created_at, read_at) VALUES

@@ -54,7 +54,6 @@ public class IssueReqService {
             );
 
         } catch (Exception e) {
-            System.out.println("Error in getPendingRequestsForLeader: " + e.getMessage());
             return IssueReqListResponseDTO.success(
                     "Không có phiếu nào chờ phê duyệt",
                     new ArrayList<>(),
@@ -85,7 +84,6 @@ public class IssueReqService {
             );
 
         } catch (Exception e) {
-            System.out.println("Error in getProcessedRequestsForLeader: " + e.getMessage());
             return IssueReqListResponseDTO.success(
                     "Chưa có lịch sử phê duyệt",
                     new ArrayList<>(),
@@ -119,14 +117,12 @@ public class IssueReqService {
             );
 
         } catch (Exception e) {
-            System.out.println("Error in getRequestDetailWithSummary: " + e.getMessage());
             return IssueReqDetailResponseDTO.error("Không thể tải chi tiết phiếu");
         }
     }
 
     // ==================== THAO TÁC PHÊ DUYỆT ====================
 
-    @Transactional
     public IssueReqDetailResponseDTO processApproval(ApprovalActionDTO request) {
         try {
             IssueReqHeader header = headerRepository.findById(request.getIssueReqId())
@@ -145,6 +141,10 @@ public class IssueReqService {
             switch (request.getAction()) {
                 case ApprovalActionDTO.ACTION_APPROVE:
                     header.setStatus(1);
+
+                    // TẠO MATERIAL MỚI CHO CÁC VẬT TƯ MỚI KHI PHÊ DUYỆT
+                    createNewMaterialsForApprovedRequest(header);
+
                     notificationService.notifyApprovalResult(header, true, request.getNote());
                     break;
 
@@ -177,6 +177,43 @@ public class IssueReqService {
         } catch (Exception e) {
             return IssueReqDetailResponseDTO.error("Lỗi khi xử lý phê duyệt: " + e.getMessage());
         }
+    }
+
+    // Tạo material cho các vật tư mới khi được phê duyệt
+    private void createNewMaterialsForApprovedRequest(IssueReqHeader header) {
+        for (IssueReqDetail detail : header.getDetails()) {
+            // Chỉ xử lý các vật tư mới (chưa có material)
+            if (detail.getMaterial() == null && detail.getProposedCode() != null) {
+
+                // Kiểm tra lại xem code đã tồn tại chưa (phòng trường hợp trùng)
+                Material existingMaterial = materialRepository.findByCode(detail.getProposedCode());
+                if (existingMaterial != null) {
+                    // Nếu đã tồn tại, map đến vật tư có sẵn
+                    detail.setMaterial(existingMaterial);
+                } else {
+                    // Tạo material mới
+                    Material newMaterial = new Material();
+                    newMaterial.setName(detail.getMaterialName());
+                    newMaterial.setSpec(detail.getSpec());
+                    newMaterial.setCode(detail.getProposedCode());
+                    newMaterial.setManufacturer(detail.getProposedManufacturer());
+
+                    // Sử dụng category từ materialCategory (đã lưu khi tạo phiếu)
+                    newMaterial.setCategory(detail.getMaterialCategory() != null ? detail.getMaterialCategory() : 'D');
+
+                    if (detail.getUnit() != null) {
+                        newMaterial.setUnit(detail.getUnit());
+                    }
+
+                    // Lưu material mới
+                    newMaterial = materialRepository.save(newMaterial);
+                    detail.setMaterial(newMaterial);
+                }
+            }
+        }
+
+        // Lưu các detail đã được cập nhật
+        detailRepository.saveAll(header.getDetails());
     }
 
     // ==================== TẠO PHIẾU XIN LĨNH CHO CÁN BỘ ====================
@@ -362,36 +399,41 @@ public class IssueReqService {
             detail.setQtyRequested(detailDTO.getQtyRequested());
             detail.setProposedCode(detailDTO.getProposedCode());
             detail.setProposedManufacturer(detailDTO.getProposedManufacturer());
+            detail.setMaterialName(detailDTO.getMaterialName());
+            detail.setSpec(detailDTO.getSpec());
+
+            // LUÔN LUÔN LƯU CATEGORY TỪ FRONTEND VÀO MATERIAL_CATEGORY
+            if (detailDTO.getCategory() != null && !detailDTO.getCategory().isEmpty()) {
+                detail.setMaterialCategory(detailDTO.getCategory().charAt(0));
+            }
+
+            if (detailDTO.getUnitId() != null) {
+                Unit unit = unitRepository.findById(detailDTO.getUnitId())
+                        .orElseThrow(() -> new RuntimeException("Đơn vị tính không tồn tại"));
+                detail.setUnit(unit);
+            }
 
             if (detailDTO.getMaterialId() != null) {
-                // Vật tư có trong danh mục
+                // Vật tư có sẵn
                 Material material = materialRepository.findById(detailDTO.getMaterialId())
                         .orElseThrow(() -> new RuntimeException("Vật tư không tồn tại"));
                 detail.setMaterial(material);
             } else {
-                // VẬT TƯ MỚI - TẠO MATERIAL MỚI VỚI CATEGORY TỪ FRONTEND
-                Material newMaterial = new Material();
-                newMaterial.setName(detailDTO.getMaterialName());
-                newMaterial.setSpec(detailDTO.getSpec());
-                newMaterial.setCode(detailDTO.getProposedCode());
-                newMaterial.setManufacturer(detailDTO.getProposedManufacturer());
+                // Vật tư mới - KIỂM TRA CODE ĐÃ TỒN TẠI CHƯA
+                if (detailDTO.getProposedCode() != null && !detailDTO.getProposedCode().trim().isEmpty()) {
+                    Material existingMaterial = materialRepository.findByCode(detailDTO.getProposedCode());
 
-                // SET CATEGORY TỪ FRONTEND
-                if (detailDTO.getCategory() != null && !detailDTO.getCategory().isEmpty()) {
-                    newMaterial.setCategory(detailDTO.getCategory().charAt(0));
+                    if (existingMaterial != null) {
+                        // CODE ĐÃ TỒN TẠI -> Map đến vật tư có sẵn
+                        detail.setMaterial(existingMaterial);
+                    } else {
+                        // CODE CHƯA TỒN TẠI -> Vật tư mới
+                        detail.setMaterial(null); // Vật tư mới, chưa có trong danh mục
+                    }
                 } else {
-                    newMaterial.setCategory('D'); // Mặc định
+                    // Không có proposed code -> Vật tư mới
+                    detail.setMaterial(null);
                 }
-
-                if (detailDTO.getUnitId() != null) {
-                    Unit unit = unitRepository.findById(detailDTO.getUnitId())
-                            .orElseThrow(() -> new RuntimeException("Đơn vị tính không tồn tại"));
-                    newMaterial.setUnit(unit);
-                }
-
-                // Lưu material mới
-                newMaterial = materialRepository.save(newMaterial);
-                detail.setMaterial(newMaterial);
             }
 
             details.add(detail);
@@ -408,19 +450,16 @@ public class IssueReqService {
                 .map(IssueReqDetail::getQtyRequested)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Phân loại theo category - VẬT TƯ MỚI ĐÃ CÓ MATERIAL NÊN LẤY ĐÚNG CATEGORY
+        // Phân loại theo category
         Map<String, Long> categoryCount = header.getDetails().stream()
                 .collect(Collectors.groupingBy(
                         detail -> detail.getMaterialCategory().toString(),
                         Collectors.counting()
                 ));
 
+        // Đếm vật tư mới CHÍNH XÁC - vật tư mới là khi material == null
         long newMaterials = header.getDetails().stream()
-                .filter(detail -> {
-                    // Vật tư mới là những vật tư được tạo trong phiếu này
-                    Material material = detail.getMaterial();
-                    return material != null && material.getCode().equals(detail.getProposedCode());
-                })
+                .filter(detail -> detail.getMaterial() == null)
                 .count();
 
         summary.put("totalMaterials", totalMaterials);
@@ -480,9 +519,12 @@ public class IssueReqService {
         dto.setQtyRequested(detail.getQtyRequested());
         dto.setProposedCode(detail.getProposedCode());
         dto.setProposedManufacturer(detail.getProposedManufacturer());
-        dto.setCategory(detail.getMaterialCategory()); // LẤY CATEGORY TỪ MATERIAL
-        dto.setIsNewMaterial(detail.getMaterial() != null &&
-                detail.getMaterial().getCode().equals(detail.getProposedCode()));
+        dto.setCategory(detail.getMaterialCategory());
+
+        // Vật tư có sẵn nếu material != null (đã được map đến vật tư có sẵn)
+        // Vật tư mới nếu material == null (chưa có trong danh mục)
+        boolean isNewMaterial = (detail.getMaterial() == null);
+        dto.setIsNewMaterial(isNewMaterial);
 
         if (detail.getMaterial() != null) {
             dto.setMaterialId(detail.getMaterial().getId());
@@ -493,8 +535,8 @@ public class IssueReqService {
                 dto.setUnitName(detail.getMaterial().getUnit().getName());
             }
         } else {
-            dto.setMaterialName(detail.getDisplayMaterialName());
-            dto.setSpec(detail.getDisplaySpec());
+            dto.setMaterialName(detail.getMaterialName());
+            dto.setSpec(detail.getSpec());
             if (detail.getUnit() != null) {
                 dto.setUnitId(detail.getUnit().getId());
                 dto.setUnitName(detail.getUnit().getName());
