@@ -12,6 +12,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.backend.dto.MaterialDTO;
+import com.backend.service.MaterialService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+
+
 @RestController
 @RequestMapping("/api/materials")
 @RequiredArgsConstructor
@@ -19,15 +26,13 @@ import java.util.Map;
 public class MaterialController {
 
     private final MaterialRepository materialRepository;
+    private final MaterialService materialService;
 
+    // GET /api/materials (using service DTO)
     @GetMapping
-    public ResponseEntity<List<Material>> getAllMaterials() {
-        try {
-            List<Material> materials = materialRepository.findAll();
-            return ResponseEntity.ok(materials);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<List<MaterialDTO>> getAllMaterials() {
+        List<MaterialDTO> materials = materialService.getAllMaterials();
+        return ResponseEntity.ok(materials);
     }
 
     @GetMapping("/search")
@@ -51,29 +56,10 @@ public class MaterialController {
         try {
             List<Map<String, String>> categories = new ArrayList<>();
 
-            Map<String, String> categoryA = new HashMap<>();
-            categoryA.put("value", "A");
-            categoryA.put("label", "Loại A");
-            categoryA.put("description", "Vật tư quan trọng");
-            categories.add(categoryA);
-
-            Map<String, String> categoryB = new HashMap<>();
-            categoryB.put("value", "B");
-            categoryB.put("label", "Loại B");
-            categoryB.put("description", "Vật tư thiết yếu");
-            categories.add(categoryB);
-
-            Map<String, String> categoryC = new HashMap<>();
-            categoryC.put("value", "C");
-            categoryC.put("label", "Loại C");
-            categoryC.put("description", "Vật tư thông dụng");
-            categories.add(categoryC);
-
-            Map<String, String> categoryD = new HashMap<>();
-            categoryD.put("value", "D");
-            categoryD.put("label", "Loại D");
-            categoryD.put("description", "Vật tư ít quan trọng");
-            categories.add(categoryD);
+            categories.add(Map.of("value", "A", "label", "Loại A", "description", "Vật tư quan trọng"));
+            categories.add(Map.of("value", "B", "label", "Loại B", "description", "Vật tư thiết yếu"));
+            categories.add(Map.of("value", "C", "label", "Loại C", "description", "Vật tư thông dụng"));
+            categories.add(Map.of("value", "D", "label", "Loại D", "description", "Vật tư ít quan trọng"));
 
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
