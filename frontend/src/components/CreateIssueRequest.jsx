@@ -13,7 +13,6 @@ const API_ENDPOINTS = {
 };
 
 // Material Search Component với Modal
-// Material Search Component với Modal - CHỈ TÌM THEO TÊN
 const MaterialSearch = ({ 
   value, 
   onChange, 
@@ -26,7 +25,7 @@ const MaterialSearch = ({
   const [searchValue, setSearchValue] = useState(value);
   const inputRef = React.useRef(null);
 
-  // Filter materials CHỈ theo tên
+  // Filter materials 
   useEffect(() => {
     if (searchValue.trim() === '') {
       setFilteredMaterials(materials.slice(0, 10));
@@ -35,8 +34,6 @@ const MaterialSearch = ({
       
       const filtered = materials.filter(material => {
         const materialName = material.name.toLowerCase();
-        
-        // CHỈ kiểm tra trong tên vật tư, không kiểm tra mã code
         const matches = searchTerms.every(term => 
           materialName.includes(term)
         );
