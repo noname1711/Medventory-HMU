@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Swal from "sweetalert2";
 import "./CreateIssueRequest.css";
 
 // API Configuration
@@ -8,11 +9,12 @@ const API_ENDPOINTS = {
   UNITS: `${API_URL}/units`,
   MATERIALS: `${API_URL}/materials`,
   SUB_DEPARTMENTS: `${API_URL}/departments/sub-departments`,
-  ISSUE_REQUESTS: `${API_URL}/issue-requests/canbo`
+  ISSUE_REQUESTS: `${API_URL}/issue-requests`
 };
 
 export default function CreateIssueRequest() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("create");
   const [formData, setFormData] = useState({
     subDepartmentId: "",
     note: "",
@@ -33,52 +35,61 @@ export default function CreateIssueRequest() {
   const [units, setUnits] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [subDepartments, setSubDepartments] = useState([]);
-  const [categories, setCategories] = useState([]); // Categories sẽ được extract từ materials
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [materialSuggestions, setMaterialSuggestions] = useState([]);
   const [showMaterialSuggestions, setShowMaterialSuggestions] = useState({});
+  
+  const [requestHistory, setRequestHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
-  // Lấy thông tin user đầy đủ từ backend
+  // Lấy thông tin user và lịch sử ngay khi vào trang
   useEffect(() => {
-    const fetchUserInfo = async () => {
+    const fetchInitialData = async () => {
       try {
-        const userFromStorage = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const userEmail = userFromStorage.email;
-        
-        if (!userEmail) {
-          return;
-        }
-
-        const response = await fetch(`${API_ENDPOINTS.AUTH}/user-info?email=${encodeURIComponent(userEmail)}`);
-        
-        if (response.ok) {
-          const userData = await response.json();
-          setCurrentUser(userData);
-          
-          if (userData.departmentId) {
-            fetchSubDepartments(userData.departmentId);
-          }
-        } else {
-          const errorText = await response.text();
-        }
+        await fetchUserInfo();
+        await Promise.all([
+          fetchUnits(),
+          fetchMaterials() 
+        ]);
       } catch (error) {
-        console.error("Lỗi khi fetch user info:", error);
+        setMessage("Lỗi khi tải dữ liệu từ server");
       }
     };
 
-    fetchUserInfo();
     fetchInitialData();
   }, []);
 
-  const fetchInitialData = async () => {
+  // Fetch lịch sử khi user đã được thiết lập
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchRequestHistory();
+    }
+  }, [currentUser]);
+
+  const fetchUserInfo = async () => {
     try {
-      await Promise.all([
-        fetchUnits(),
-        fetchMaterials() 
-      ]);
+      const userFromStorage = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const userEmail = userFromStorage.email;
+      
+      if (!userEmail) {
+        return;
+      }
+
+      const response = await fetch(`${API_ENDPOINTS.AUTH}/user-info?email=${encodeURIComponent(userEmail)}`);
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser(userData);
+        
+        if (userData.departmentId) {
+          fetchSubDepartments(userData.departmentId);
+        }
+      }
     } catch (error) {
-      setMessage("Lỗi khi tải dữ liệu từ server");
+      console.error("Lỗi khi fetch user info:", error);
     }
   };
 
@@ -88,8 +99,6 @@ export default function CreateIssueRequest() {
       if (response.ok) {
         const data = await response.json();
         setUnits(data);
-      } else {
-        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       console.error("Lỗi khi lấy danh sách đơn vị tính:", error);
@@ -103,15 +112,41 @@ export default function CreateIssueRequest() {
         const data = await response.json();
         setMaterials(data);
         
-        // Extract unique categories từ danh sách materials
         const uniqueCategories = extractCategoriesFromMaterials(data);
         setCategories(uniqueCategories);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách vật tư:", error);
+    }
+  };
+
+  // Hàm lấy lịch sử phiếu xin lĩnh
+  const fetchRequestHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const response = await fetch(`${API_ENDPOINTS.ISSUE_REQUESTS}/canbo/my-requests`, {
+        method: "GET",
+        headers: {
+          "X-User-Id": currentUser.id.toString()
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
         
+        if (result.success) {
+          const historyData = result.requests || [];
+          setRequestHistory(historyData);
+        } else {
+          throw new Error(result.message);
+        }
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error("Lỗi khi lấy danh sách vật tư:", error);
+      console.error("Lỗi khi lấy lịch sử phiếu xin lĩnh:", error);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -125,13 +160,11 @@ export default function CreateIssueRequest() {
       }
     });
     
-    // Chuyển Set thành Array và map thành object có label
     const categoriesArray = Array.from(categorySet).map(category => ({
       value: category,
       label: getCategoryLabel(category)
     }));
     
-    // Thêm các category mặc định nếu chưa có
     const defaultCategories = ['A', 'B', 'C', 'D'];
     defaultCategories.forEach(cat => {
       if (!categorySet.has(cat)) {
@@ -142,7 +175,6 @@ export default function CreateIssueRequest() {
       }
     });
     
-    // Sắp xếp theo thứ tự A, B, C, D
     return categoriesArray.sort((a, b) => a.value.localeCompare(b.value));
   };
 
@@ -157,25 +189,12 @@ export default function CreateIssueRequest() {
     return labels[category] || `Loại ${category}`;
   };
 
-  // Hàm lấy description cho category
-  const getCategoryDescription = (category) => {
-    const descriptions = {
-      'A': 'Vật tư quan trọng',
-      'B': 'Vật tư thiết yếu',
-      'C': 'Vật tư thông dụng',
-      'D': 'Vật tư ít quan trọng'
-    };
-    return descriptions[category] || 'Không xác định';
-  };
-
   const fetchSubDepartments = async (departmentId) => {
     try {
       const response = await fetch(`${API_ENDPOINTS.SUB_DEPARTMENTS}?departmentId=${departmentId}`);
       if (response.ok) {
         const data = await response.json();
         setSubDepartments(data);
-      } else {
-        console.warn("Không thể lấy danh sách bộ môn");
       }
     } catch (error) {
       console.error("Lỗi khi lấy danh sách bộ môn:", error);
@@ -211,11 +230,29 @@ export default function CreateIssueRequest() {
           unitId: material.unit?.id || "",
           proposedCode: material.code,
           proposedManufacturer: material.manufacturer,
-          category: material.category // Lấy category từ vật tư có sẵn
+          category: material.category
         } : detail
       )
     }));
     setShowMaterialSuggestions(prev => ({...prev, [index]: false}));
+  };
+
+  // Hàm kiểm tra và xử lý số lượng hợp lệ
+  const handleQtyChange = (index, value) => {
+    const sanitizedValue = value.replace(/[^\d.,]/g, '');
+    const normalizedValue = sanitizedValue.replace(/,/g, '.');
+    
+    const dotCount = (normalizedValue.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      details: prev.details.map((detail, i) => 
+        i === index ? { ...detail, qtyRequested: normalizedValue } : detail
+      )
+    }));
   };
 
   const handleDetailChange = (index, field, value) => {
@@ -226,11 +263,9 @@ export default function CreateIssueRequest() {
       )
     }));
 
-    // Nếu là trường tên vật tư, thực hiện tìm kiếm
     if (field === 'materialName') {
       searchMaterials(value, index);
       
-      // Nếu người dùng nhập tay, reset materialId (vật tư mới)
       if (value && !materialSuggestions.find(m => m.name === value)) {
         setFormData(prev => ({
           ...prev,
@@ -247,12 +282,10 @@ export default function CreateIssueRequest() {
       }
     }
 
-    // Nếu là trường mã code, kiểm tra xem có trùng với vật tư có sẵn không
     if (field === 'proposedCode' && value.trim()) {
       const existingMaterial = materials.find(m => m.code === value.trim());
       if (existingMaterial) {
-        // Nếu mã code trùng với vật tư có sẵn, tự động điền tất cả thông tin TRỪ số lượng
-        const currentQty = formData.details[index].qtyRequested; // Giữ lại số lượng hiện tại
+        const currentQty = formData.details[index].qtyRequested;
         setFormData(prev => ({
           ...prev,
           details: prev.details.map((detail, i) => 
@@ -263,13 +296,12 @@ export default function CreateIssueRequest() {
               spec: existingMaterial.spec,
               unitId: existingMaterial.unit?.id || "",
               proposedManufacturer: existingMaterial.manufacturer,
-              category: existingMaterial.category, // Đảm bảo category được điền
-              qtyRequested: currentQty // Giữ nguyên số lượng xin cấp
+              category: existingMaterial.category,
+              qtyRequested: currentQty
             } : detail
           )
         }));
       } else {
-        // Nếu mã code không trùng, đánh dấu là vật tư mới
         setFormData(prev => ({
           ...prev,
           details: prev.details.map((detail, i) => 
@@ -327,19 +359,16 @@ export default function CreateIssueRequest() {
   };
 
   const validateForm = () => {
-    // Kiểm tra user có department không
     if (!currentUser?.departmentId) {
       setMessage("Không tìm thấy thông tin khoa phòng của bạn. Vui lòng liên hệ quản trị viên.");
       return false;
     }
 
-    // Kiểm tra ghi chú bắt buộc
     if (!formData.note || !formData.note.trim()) {
       setMessage("Vui lòng nhập mục đích sử dụng ghi chú");
       return false;
     }
 
-    // Lọc các dòng có dữ liệu hợp lệ
     const validDetails = formData.details.filter(detail => {
       const hasMaterialName = detail.materialName.trim() !== "";
       const hasSpec = detail.spec.trim() !== "";
@@ -357,21 +386,18 @@ export default function CreateIssueRequest() {
       return false;
     }
 
-    // Kiểm tra validation chi tiết cho từng dòng
     for (const detail of validDetails) {
-      // Kiểm tra số lượng hợp lệ
-      if (parseFloat(detail.qtyRequested) <= 0) {
-        setMessage("Số lượng phải lớn hơn 0");
+      const qtyValue = parseFloat(detail.qtyRequested);
+      if (isNaN(qtyValue) || qtyValue <= 0) {
+        setMessage("Số lượng phải là số lớn hơn 0");
         return false;
       }
 
-      // Kiểm tra mã code không được trùng (nếu là vật tư mới)
       if (isNewMaterial(detail) && isCodeExists(detail.proposedCode)) {
         setMessage(`Mã code "${detail.proposedCode}" đã tồn tại trong danh mục. Vui lòng chọn mã khác.`);
         return false;
       }
 
-      // Kiểm tra category hợp lệ
       if (categories.length > 0 && !categories.some(cat => cat.value === detail.category)) {
         setMessage("Loại vật tư không hợp lệ");
         return false;
@@ -381,19 +407,55 @@ export default function CreateIssueRequest() {
     return true;
   };
 
+  // Hàm hiển thị confirm dialog trước khi gửi
+  const showConfirmDialog = async () => {
+    const result = await Swal.fire({
+      title: 'Xác nhận gửi phiếu xin lĩnh',
+      html: `
+        <div style="text-align: left;">
+          <p><strong>Thông tin người gửi:</strong></p>
+          <p>Họ tên: ${currentUser?.fullName || "Chưa có thông tin"}</p>
+          <p>Khoa phòng: ${currentUser?.departmentName || "Chưa có thông tin"}</p>
+          <p>Mục đích sử dụng: ${formData.note}</p>
+          <br>
+          <p><strong>Danh sách vật tư (${formData.details.filter(d => d.materialName.trim() !== "").length} vật tư):</strong></p>
+          ${formData.details
+            .filter(detail => detail.materialName.trim() !== "")
+            .map((detail, index) => `
+              <p>${index + 1}. ${detail.materialName} - Số lượng: ${detail.qtyRequested}</p>
+            `).join('')}
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Xác nhận gửi',
+      cancelButtonText: 'Hủy bỏ',
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      reverseButtons: true,
+      width: '600px'
+    });
+
+    return result.isConfirmed;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
 
     try {
-      // Validate form
       if (!validateForm()) {
         setLoading(false);
         return;
       }
 
-      // Chuẩn bị dữ liệu gửi đi
+      const isConfirmed = await showConfirmDialog();
+      if (!isConfirmed) {
+        setLoading(false);
+        return;
+      }
+
       const submitData = {
         subDepartmentId: formData.subDepartmentId || null,
         note: formData.note,
@@ -419,7 +481,7 @@ export default function CreateIssueRequest() {
           }))
       };
 
-      const response = await fetch(`${API_ENDPOINTS.ISSUE_REQUESTS}/create`, {
+      const response = await fetch(`${API_ENDPOINTS.ISSUE_REQUESTS}/canbo/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -436,13 +498,29 @@ export default function CreateIssueRequest() {
       const result = await response.json();
 
       if (result.success) {
-        setMessage("Tạo phiếu xin lĩnh thành công! Phiếu đã được gửi cho lãnh đạo phê duyệt.");
+        await Swal.fire({
+          title: 'Thành công!',
+          text: result.message || 'Tạo phiếu xin lĩnh thành công! Phiếu đã được gửi cho lãnh đạo phê duyệt.',
+          icon: 'success',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#3085d6'
+        });
         resetForm();
+        // Chuyển sang tab lịch sử sau khi tạo thành công
+        setActiveTab("history");
+        // Refresh lịch sử
+        fetchRequestHistory();
       } else {
-        setMessage("Lỗi: " + result.message);
+        throw new Error(result.message);
       }
     } catch (error) {
-      setMessage("Lỗi: " + error.message);
+      await Swal.fire({
+        title: 'Lỗi!',
+        text: 'Lỗi: ' + error.message,
+        icon: 'error',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#d33'
+      });
     } finally {
       setLoading(false);
     }
@@ -469,252 +547,485 @@ export default function CreateIssueRequest() {
     setShowMaterialSuggestions({});
   };
 
+  // Hàm hiển thị chi tiết phiếu xin lĩnh
+  const showRequestDetails = (request) => {
+    setSelectedRequest(request);
+  };
+
+  // Hàm đóng modal chi tiết
+  const closeRequestDetails = () => {
+    setSelectedRequest(null);
+  };
+
+  // Hàm format ngày tháng
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Hàm lấy màu cho trạng thái (dựa vào status number)
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 1: // approved
+        return 'status-approved';
+      case 2: // rejected
+        return 'status-rejected';
+      case 0: // pending
+      default:
+        return 'status-pending';
+    }
+  };
+
+  // Hàm lấy label cho trạng thái (dựa vào status number)
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 1:
+        return 'Đã duyệt';
+      case 2:
+        return 'Từ chối';
+      case 0:
+      default:
+        return 'Chờ duyệt';
+    }
+  };
+
+  // Hàm lấy tên hiển thị cho vật tư
+  const getMaterialDisplayName = (detail) => {
+    return detail.materialName || detail.material?.name || 'N/A';
+  };
+
+  // Hàm lấy spec hiển thị cho vật tư
+  const getMaterialDisplaySpec = (detail) => {
+    return detail.spec || detail.material?.spec || 'N/A';
+  };
+
+  // Hàm lấy tên đơn vị tính
+  const getUnitName = (detail) => {
+    return detail.unitName || detail.unit?.name || units.find(u => u.id === detail.unitId)?.name || 'N/A';
+  };
+
   return (
     <div className="create-issue-request">
-      <h1 className="page-title">Tạo Phiếu Xin Lĩnh</h1>
+      <h1 className="page-title">Quản lý Phiếu Xin Lĩnh</h1>
       
+      {/* Tab Navigation */}
+      <div className="tab-navigation">
+        <button 
+          className={`tab-button ${activeTab === "create" ? "active" : ""}`}
+          onClick={() => setActiveTab("create")}
+        >
+          Tạo Phiếu Xin Lĩnh
+        </button>
+        <button 
+          className={`tab-button ${activeTab === "history" ? "active" : ""}`}
+          onClick={() => setActiveTab("history")}
+        >
+          Lịch Sử Phiếu Đã Gửi ({requestHistory.length})
+        </button>
+      </div>
+
       {message && (
         <div className={`message ${message.includes("thành công") ? "success" : "error"}`}>
           {message}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="issue-form">
-        {/* Thông tin chung */}
-        <div className="form-section">
-          <h3 className="section-title">Thông tin chung</h3>
-          
-          {/* Thông tin người xin lĩnh */}
-          <div className="user-info-card">
-            <h4>Thông tin người xin lĩnh</h4>
-            <div className="user-info-grid">
-              <div className="user-info-item">
-                <label>Họ và tên:</label>
-                <span className="user-info-value">{currentUser?.fullName || "Chưa có thông tin"}</span>
+      {/* Tab Tạo Phiếu Xin Lĩnh */}
+      {activeTab === "create" && (
+        <form onSubmit={handleSubmit} className="issue-form">
+          {/* Thông tin chung */}
+          <div className="form-section">
+            <h3 className="section-title">Thông tin chung</h3>
+            
+            {/* Thông tin người xin lĩnh */}
+            <div className="user-info-card">
+              <h4>Thông tin người xin lĩnh</h4>
+              <div className="user-info-grid">
+                <div className="user-info-item">
+                  <label>Họ và tên:</label>
+                  <span className="user-info-value">{currentUser?.fullName || "Chưa có thông tin"}</span>
+                </div>
+                <div className="user-info-item">
+                  <label>Khoa Phòng:</label>
+                  <span className="user-info-value">{currentUser?.departmentName || "Chưa có thông tin"}</span>
+                </div>
+                <div className="user-info-item">
+                  <label>Bộ môn trực thuộc:</label>
+                  <span className="user-info-value">
+                    {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || currentUser?.departmentName || "Chưa có thông tin"}
+                  </span>
+                </div>
+                <div className="user-info-item">
+                  <label>Email:</label>
+                  <span className="user-info-value">{currentUser?.email || "Chưa có thông tin"}</span>
+                </div>
+                <div className="user-info-item">
+                  <label>Chức vụ:</label>
+                  <span className="user-info-value">{currentUser?.role || "Cán bộ"}</span>
+                </div>
               </div>
-              <div className="user-info-item">
-                <label>Khoa Phòng:</label>
-                <span className="user-info-value">{currentUser?.departmentName || "Chưa có thông tin"}</span>
-              </div>
-              <div className="user-info-item">
-                <label>Bộ môn trực thuộc:</label>
-                <span className="user-info-value">
-                  {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || currentUser?.departmentName || "Chưa có thông tin"}
-                </span>
-              </div>
-              <div className="user-info-item">
-                <label>Email:</label>
-                <span className="user-info-value">{currentUser?.email || "Chưa có thông tin"}</span>
-              </div>
-              <div className="user-info-item">
-                <label>Chức vụ:</label>
-                <span className="user-info-value">{currentUser?.role || "Cán bộ"}</span>
-              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Mục đích sử dụng Ghi chú
+              </label>
+              <textarea
+                value={formData.note}
+                onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
+                className="form-textarea"
+                placeholder="Nhập mục đích sử dụng hoặc ghi chú cho phiếu xin lĩnh"
+                rows={3}
+                required
+              />
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Mục đích sử dụng Ghi chú
-            </label>
-            <textarea
-              value={formData.note}
-              onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-              className="form-textarea"
-              placeholder="Nhập mục đích sử dụng hoặc ghi chú cho phiếu xin lĩnh"
-              rows={3}
-              required
-            />
-          </div>
-        </div>
+          {/* Bảng vật tư */}
+          <div className="form-section">
+            <div className="section-header">
+              <h3 className="section-title">Danh sách vật tư xin lĩnh</h3>
+              <div className="section-actions">
+                <button
+                  type="button"
+                  onClick={addNewRow}
+                  className="btn-add-row"
+                >
+                  Thêm hàng
+                </button>
+              </div>
+            </div>
 
-        {/* Bảng vật tư */}
-        <div className="form-section">
+            <div className="table-container">
+              <table className="issue-table">
+                <thead>
+                  <tr>
+                    <th width="50">TT</th>
+                    <th>Mã code</th>
+                    <th>Tên vật tư hóa chất</th>
+                    <th>Quy cách đóng gói</th>
+                    <th width="120">Đơn vị tính</th>
+                    <th width="120">Số lượng xin cấp</th>
+                    <th>Hãng sản xuất</th>
+                    <th width="100">Loại</th>
+                    <th width="100">Phân loại</th>
+                    <th width="80">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.details.map((detail, index) => (
+                    <tr key={index} className={isNewMaterial(detail) ? 'new-material' : 'existing-material'}>
+                      <td className="text-center">{index + 1}</td>
+                      <td>
+                        <input
+                          type="text"
+                          value={detail.proposedCode}
+                          onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
+                          className="table-input"
+                          placeholder="Nhập mã code"
+                          required
+                        />
+                      </td>
+                      <td className="autocomplete-container">
+                        <input
+                          type="text"
+                          value={detail.materialName}
+                          onChange={(e) => handleDetailChange(index, "materialName", e.target.value)}
+                          className="table-input"
+                          placeholder="Nhập tên vật tư hoặc mã code"
+                          onFocus={() => searchMaterials(detail.materialName, index)}
+                          required
+                          disabled={!isNewMaterial(detail)}
+                        />
+                        {showMaterialSuggestions[index] && materialSuggestions.length > 0 && (
+                          <div className="autocomplete-dropdown">
+                            {materialSuggestions.map((material, idx) => (
+                              <div
+                                key={idx}
+                                className="autocomplete-item"
+                                onClick={() => handleMaterialSelect(material, index)}
+                              >
+                                <div className="material-name">{material.name}</div>
+                                <div className="material-details">
+                                  {material.code} - {material.spec} - {material.manufacturer} - Loại {material.category}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={detail.spec}
+                          onChange={(e) => handleDetailChange(index, "spec", e.target.value)}
+                          className="table-input"
+                          placeholder="Quy cách"
+                          required
+                          disabled={!isNewMaterial(detail)}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          value={detail.unitId}
+                          onChange={(e) => handleDetailChange(index, "unitId", e.target.value)}
+                          className="table-select"
+                          required
+                          disabled={!isNewMaterial(detail)}
+                        >
+                          <option value="">Chọn đơn vị</option>
+                          {units.map(unit => (
+                            <option key={unit.id} value={unit.id}>
+                              {unit.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={detail.qtyRequested}
+                          onChange={(e) => handleQtyChange(index, e.target.value)}
+                          className="table-input number-input"
+                          placeholder="0.000"
+                          required
+                          inputMode="decimal"
+                          pattern="[0-9.,]*"
+                          title="Chỉ được nhập số và dấu thập phân"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={detail.proposedManufacturer}
+                          onChange={(e) => handleDetailChange(index, "proposedManufacturer", e.target.value)}
+                          className="table-input"
+                          placeholder="Hãng sản xuất"
+                          required
+                          disabled={!isNewMaterial(detail)}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          value={detail.category}
+                          onChange={(e) => handleDetailChange(index, "category", e.target.value)}
+                          className="table-select category-select"
+                          required
+                          disabled={!isNewMaterial(detail)}
+                        >
+                          <option value="">Chọn loại</option>
+                          {categories.map(cat => (
+                            <option key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="text-center">
+                        <span className={`material-type-badge ${isNewMaterial(detail) ? 'new' : 'existing'}`}>
+                          {isNewMaterial(detail) ? 'Vật tư mới' : 'Vật tư có sẵn'}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeRow(index)}
+                          className="btn-remove-row"
+                          disabled={formData.details.length <= 1}
+                          title="Xóa hàng này"
+                        >
+                          Xóa
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="table-note">
+              <p>Ghi chú:</p>
+              <p>Tất cả các thông tin về vật tư đều bắt buộc phải nhập đầy đủ</p>
+              <p>Vật tư có sẵn: Khi nhập mã code trùng với danh mục, thông tin sẽ tự động điền (chỉ cần nhập số lượng)</p>
+              <p>Vật tư mới: Khi nhập mã code mới, cần điền đầy đủ tất cả thông tin</p>
+              <p><strong>Số lượng xin cấp chỉ được nhập số và dấu thập phân</strong></p>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="btn-cancel"
+              disabled={loading}
+            >
+              Làm mới
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !currentUser?.departmentId}
+              className="btn-submit"
+            >
+              {loading ? "Đang tạo..." : "Gửi Phiếu Xin Lĩnh"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Tab Lịch Sử Phiếu Đã Gửi */}
+      {activeTab === "history" && (
+        <div className="history-section">
           <div className="section-header">
-            <h3 className="section-title">Danh sách vật tư xin lĩnh</h3>
+            <h3 className="section-title">Lịch Sử Phiếu Xin Lĩnh Đã Gửi</h3>
             <div className="section-actions">
               <button
                 type="button"
-                onClick={addNewRow}
-                className="btn-add-row"
+                onClick={fetchRequestHistory}
+                className="btn-refresh"
+                disabled={historyLoading}
               >
-                Thêm hàng
+                {historyLoading ? "Đang tải..." : "Làm mới"}
               </button>
             </div>
           </div>
 
-          <div className="table-container">
-            <table className="issue-table">
-              <thead>
-                <tr>
-                  <th width="50">TT</th>
-                  <th>Tên vật tư hóa chất</th>
-                  <th>Quy cách đóng gói</th>
-                  <th width="120">Đơn vị tính</th>
-                  <th width="120">Số lượng xin cấp</th>
-                  <th>Mã code</th>
-                  <th>Hãng sản xuất</th>
-                  <th width="100">Loại</th>
-                  <th width="100">Phân loại</th>
-                  <th width="80">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.details.map((detail, index) => (
-                  <tr key={index} className={isNewMaterial(detail) ? 'new-material' : 'existing-material'}>
-                    <td className="text-center">{index + 1}</td>
-                    <td className="autocomplete-container">
-                      <input
-                        type="text"
-                        value={detail.materialName}
-                        onChange={(e) => handleDetailChange(index, "materialName", e.target.value)}
-                        className="table-input"
-                        placeholder="Nhập tên vật tư hoặc mã code"
-                        onFocus={() => searchMaterials(detail.materialName, index)}
-                        required
-                        disabled={!isNewMaterial(detail)}
-                      />
-                      {showMaterialSuggestions[index] && materialSuggestions.length > 0 && (
-                        <div className="autocomplete-dropdown">
-                          {materialSuggestions.map((material, idx) => (
-                            <div
-                              key={idx}
-                              className="autocomplete-item"
-                              onClick={() => handleMaterialSelect(material, index)}
-                            >
-                              <div className="material-name">{material.name}</div>
-                              <div className="material-details">
-                                {material.code} - {material.spec} - {material.manufacturer} - Loại {material.category}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={detail.spec}
-                        onChange={(e) => handleDetailChange(index, "spec", e.target.value)}
-                        className="table-input"
-                        placeholder="Quy cách"
-                        required
-                        disabled={!isNewMaterial(detail)}
-                      />
-                    </td>
-                    <td>
-                      <select
-                        value={detail.unitId}
-                        onChange={(e) => handleDetailChange(index, "unitId", e.target.value)}
-                        className="table-select"
-                        required
-                        disabled={!isNewMaterial(detail)}
-                      >
-                        <option value="">Chọn đơn vị</option>
-                        {units.map(unit => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0.001"
-                        value={detail.qtyRequested}
-                        onChange={(e) => handleDetailChange(index, "qtyRequested", e.target.value)}
-                        className="table-input number-input"
-                        placeholder="0.000"
-                        required
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={detail.proposedCode}
-                        onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
-                        className="table-input"
-                        placeholder="Nhập mã code"
-                        required
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={detail.proposedManufacturer}
-                        onChange={(e) => handleDetailChange(index, "proposedManufacturer", e.target.value)}
-                        className="table-input"
-                        placeholder="Hãng sản xuất"
-                        required
-                        disabled={!isNewMaterial(detail)}
-                      />
-                    </td>
-                    <td>
-                      <select
-                        value={detail.category}
-                        onChange={(e) => handleDetailChange(index, "category", e.target.value)}
-                        className="table-select category-select"
-                        required
-                        disabled={!isNewMaterial(detail)}
-                      >
-                        <option value="">Chọn loại</option>
-                        {categories.map(cat => (
-                          <option key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="text-center">
-                      <span className={`material-type-badge ${isNewMaterial(detail) ? 'new' : 'existing'}`}>
-                        {isNewMaterial(detail) ? 'Vật tư mới' : 'Vật tư có sẵn'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(index)}
-                        className="btn-remove-row"
-                        disabled={formData.details.length <= 1}
-                        title="Xóa hàng này"
-                      >
-                        Xóa
-                      </button>
-                    </td>
+          {historyLoading ? (
+            <div className="loading-message">Đang tải lịch sử phiếu xin lĩnh...</div>
+          ) : requestHistory.length === 0 ? (
+            <div className="empty-message">
+              <p>Chưa có phiếu xin lĩnh nào được gửi</p>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th width="80">Mã phiếu</th>
+                    <th width="120">Ngày gửi</th>
+                    <th>Mục đích sử dụng</th>
+                    <th width="100">Số lượng vật tư</th>
+                    <th width="120">Trạng thái</th>
+                    <th width="100">Thao tác</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {requestHistory.map((request) => (
+                    <tr key={request.id}>
+                      <td className="text-center">{request.id}</td>
+                      <td className="text-center">{formatDate(request.requestedAt)}</td>
+                      <td>{request.note}</td>
+                      <td className="text-center">{request.details?.length || 0}</td>
+                      <td className="text-center">
+                        <span className={`status-badge ${getStatusColor(request.status)}`}>
+                          {getStatusLabel(request.status)}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => showRequestDetails(request)}
+                          className="btn-view-details"
+                          title="Xem chi tiết"
+                        >
+                          Xem chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
-          <div className="table-note">
-            <p>Ghi chú:</p>
-            <p>Tất cả các thông tin về vật tư đều bắt buộc phải nhập đầy đủ</p>
-            <p>Vật tư có sẵn: Khi nhập mã code trùng với danh mục, thông tin sẽ tự động điền (chỉ cần nhập số lượng)</p>
-            <p>Vật tư mới: Khi nhập mã code mới, cần điền đầy đủ tất cả thông tin</p>
+      {/* Modal chi tiết phiếu xin lĩnh */}
+      {selectedRequest && (
+        <div className="modal-overlay" onClick={closeRequestDetails}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Chi tiết Phiếu Xin Lĩnh #{selectedRequest.id}</h3>
+              <button className="modal-close" onClick={closeRequestDetails}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="request-info">
+                <div className="info-row">
+                  <label>Mã phiếu:</label>
+                  <span>{selectedRequest.id}</span>
+                </div>
+                <div className="info-row">
+                  <label>Ngày gửi:</label>
+                  <span>{formatDate(selectedRequest.requestedAt)}</span>
+                </div>
+                <div className="info-row">
+                  <label>Mục đích sử dụng:</label>
+                  <span>{selectedRequest.note}</span>
+                </div>
+                <div className="info-row">
+                  <label>Trạng thái:</label>
+                  <span className={`status-badge ${getStatusColor(selectedRequest.status)}`}>
+                    {getStatusLabel(selectedRequest.status)}
+                  </span>
+                </div>
+                {selectedRequest.approvalNote && (
+                  <div className="info-row">
+                    <label>Ghi chú phê duyệt:</label>
+                    <span>{selectedRequest.approvalNote}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="details-section">
+                <h4>Danh sách vật tư ({selectedRequest.details?.length || 0} vật tư)</h4>
+                <div className="table-container">
+                  <table className="details-table">
+                    <thead>
+                      <tr>
+                        <th width="50">TT</th>
+                        <th>Mã code</th>
+                        <th>Tên vật tư</th>
+                        <th>Quy cách</th>
+                        <th width="100">Đơn vị tính</th>
+                        <th width="100">Số lượng</th>
+                        <th>Hãng SX</th>
+                        <th width="80">Loại</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRequest.details?.map((detail, index) => (
+                        <tr key={index}>
+                          <td className="text-center">{index + 1}</td>
+                          <td>{detail.proposedCode}</td>
+                          <td>{getMaterialDisplayName(detail)}</td>
+                          <td>{getMaterialDisplaySpec(detail)}</td>
+                          <td className="text-center">
+                            {getUnitName(detail)}
+                          </td>
+                          <td className="text-center">{detail.qtyRequested}</td>
+                          <td>{detail.proposedManufacturer}</td>
+                          <td className="text-center">{detail.category}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={closeRequestDetails} className="btn-close-modal">
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="form-actions">
-          <button
-            type="button"
-            onClick={resetForm}
-            className="btn-cancel"
-            disabled={loading}
-          >
-            Làm mới
-          </button>
-          <button
-            type="submit"
-            disabled={loading || !currentUser?.departmentId}
-            className="btn-submit"
-          >
-            {loading ? "Đang tạo..." : "Gửi Phiếu Xin Lĩnh"}
-          </button>
-        </div>
-      </form>
+      )}
     </div>
   );
 }
