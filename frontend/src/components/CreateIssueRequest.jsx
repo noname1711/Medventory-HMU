@@ -12,6 +12,170 @@ const API_ENDPOINTS = {
   ISSUE_REQUESTS: `${API_URL}/issue-requests`
 };
 
+// Material Search Component với Modal
+// Material Search Component với Modal - CHỈ TÌM THEO TÊN
+const MaterialSearch = ({ 
+  value, 
+  onChange, 
+  onSelect, 
+  materials, 
+  placeholder = "Tên vật tư hóa chất" 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [filteredMaterials, setFilteredMaterials] = useState([]);
+  const [searchValue, setSearchValue] = useState(value);
+  const inputRef = React.useRef(null);
+
+  // Filter materials CHỈ theo tên
+  useEffect(() => {
+    if (searchValue.trim() === '') {
+      setFilteredMaterials(materials.slice(0, 10));
+    } else {
+      const searchTerms = searchValue.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
+      
+      const filtered = materials.filter(material => {
+        const materialName = material.name.toLowerCase();
+        
+        // CHỈ kiểm tra trong tên vật tư, không kiểm tra mã code
+        const matches = searchTerms.every(term => 
+          materialName.includes(term)
+        );
+        return matches;
+      });
+      
+      setFilteredMaterials(filtered);
+    }
+  }, [searchValue, materials]);
+
+  const handleInputFocus = () => {
+    setSearchValue(value);
+    setIsOpen(true);
+  };
+
+  const handleModalInputChange = (e) => {
+    const newValue = e.target.value;
+    setSearchValue(newValue);
+    onChange(newValue);
+  };
+
+  const handleSelectMaterial = (material) => {
+    onSelect(material);
+    setIsOpen(false);
+  };
+
+  const handleCloseModal = () => {
+    setIsOpen(false);
+  };
+
+  // Hàm highlight từ khóa tìm kiếm trong kết quả
+  const highlightText = (text, searchValue) => {
+    if (!searchValue.trim() || !text) return text;
+    
+    const searchTerms = searchValue.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
+    let highlightedText = text;
+    
+    searchTerms.forEach(term => {
+      const regex = new RegExp(`(${term})`, 'gi');
+      highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
+    });
+    
+    return highlightedText;
+  };
+
+  // Hàm format thông tin material để hiển thị
+  const getMaterialDisplayInfo = (material) => {
+    const parts = [];
+    if (material.code) parts.push(`Mã: ${material.code}`);
+    if (material.spec) parts.push(`QC: ${material.spec}`);
+    if (material.manufacturer) parts.push(`HSX: ${material.manufacturer}`);
+    if (material.category) parts.push(`Loại: ${material.category}`);
+    
+    return parts.join(' - ');
+  };
+
+  return (
+    <div className="material-search-container">
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={handleInputFocus}
+        className="material-search-input"
+        required
+      />
+
+      {/* MODAL SEARCH */}
+      {isOpen && (
+        <div className="material-search-modal">
+          <div className="modal-backdrop" onClick={handleCloseModal}></div>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h4>Tìm kiếm vật tư</h4>
+            </div>
+            
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Nhập tên vật tư để tìm kiếm..."
+                value={searchValue}
+                onChange={handleModalInputChange}
+                autoFocus
+                className="search-input"
+              />
+            </div>
+
+            <div className="search-results">
+              {filteredMaterials.length > 0 ? (
+                <>
+                  <div className="results-count">
+                    Tìm thấy {filteredMaterials.length} kết quả
+                  </div>
+                  {filteredMaterials.map((material) => (
+                    <div
+                      key={material.id}
+                      className="result-item"
+                      onClick={() => handleSelectMaterial(material)}
+                    >
+                      <div className="material-main-info">
+                        <span 
+                          dangerouslySetInnerHTML={{ 
+                            __html: highlightText(material.name, searchValue) 
+                          }} 
+                        />
+                      </div>
+                      <div className="material-details">
+                        {getMaterialDisplayInfo(material)}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : searchValue.trim() !== '' ? (
+                <div className="no-results">
+                  <p>Không tìm thấy vật tư phù hợp với "{searchValue}"</p>
+                  <p className="hint-text">Thử tìm với từ khóa khác hoặc nhập thành vật tư mới</p>
+                </div>
+              ) : (
+                <div className="initial-state">
+                  <p>Nhập tên vật tư để tìm kiếm</p>
+                  <p className="hint-text">Danh sách {materials.length} vật tư có sẵn trong hệ thống</p>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={handleCloseModal} className="btn-cancel">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function CreateIssueRequest() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState("create");
@@ -38,14 +202,12 @@ export default function CreateIssueRequest() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [materialSuggestions, setMaterialSuggestions] = useState([]);
-  const [showMaterialSuggestions, setShowMaterialSuggestions] = useState({});
   
   const [requestHistory, setRequestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  // Lấy thông tin user và lịch sử ngay khi vào trang
+  // Lấy thông tin user và dữ liệu
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -201,23 +363,7 @@ export default function CreateIssueRequest() {
     }
   };
 
-  // Hàm tìm kiếm vật tư theo tên hoặc mã code
-  const searchMaterials = (searchTerm, index) => {
-    if (!searchTerm.trim()) {
-      setMaterialSuggestions([]);
-      setShowMaterialSuggestions(prev => ({...prev, [index]: false}));
-      return;
-    }
-
-    const filtered = materials.filter(material =>
-      material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (material.code && material.code.toLowerCase().includes(searchTerm.toLowerCase()))
-    ).slice(0, 5);
-
-    setMaterialSuggestions(filtered);
-    setShowMaterialSuggestions(prev => ({...prev, [index]: true}));
-  };
-
+  // Hàm xử lý chọn vật tư từ search
   const handleMaterialSelect = (material, index) => {
     setFormData(prev => ({
       ...prev,
@@ -234,7 +380,6 @@ export default function CreateIssueRequest() {
         } : detail
       )
     }));
-    setShowMaterialSuggestions(prev => ({...prev, [index]: false}));
   };
 
   // Hàm kiểm tra và xử lý số lượng hợp lệ
@@ -263,25 +408,7 @@ export default function CreateIssueRequest() {
       )
     }));
 
-    if (field === 'materialName') {
-      searchMaterials(value, index);
-      
-      if (value && !materialSuggestions.find(m => m.name === value)) {
-        setFormData(prev => ({
-          ...prev,
-          details: prev.details.map((detail, i) => 
-            i === index ? { 
-              ...detail, 
-              materialId: null,
-              proposedCode: "",
-              proposedManufacturer: "",
-              category: ""
-            } : detail
-          )
-        }));
-      }
-    }
-
+    // Auto-fill khi nhập mã code trùng
     if (field === 'proposedCode' && value.trim()) {
       const existingMaterial = materials.find(m => m.code === value.trim());
       if (existingMaterial) {
@@ -365,7 +492,7 @@ export default function CreateIssueRequest() {
     }
 
     if (!formData.note || !formData.note.trim()) {
-      setMessage("Vui lòng nhập mục đích sử dụng ghi chú");
+      setMessage("Vui lòng nhập ghi chú");
       return false;
     }
 
@@ -422,7 +549,7 @@ export default function CreateIssueRequest() {
           ${formData.details
             .filter(detail => detail.materialName.trim() !== "")
             .map((detail, index) => `
-              <p>${index + 1}. ${detail.materialName} - Số lượng: ${detail.qtyRequested}</p>
+              <p>${index + 1}. ${detail.materialName} - Số lượng: ${detail.qtyRequested} - Mã: ${detail.proposedCode}</p>
             `).join('')}
         </div>
       `,
@@ -506,9 +633,7 @@ export default function CreateIssueRequest() {
           confirmButtonColor: '#3085d6'
         });
         resetForm();
-        // Chuyển sang tab lịch sử sau khi tạo thành công
         setActiveTab("history");
-        // Refresh lịch sử
         fetchRequestHistory();
       } else {
         throw new Error(result.message);
@@ -543,8 +668,6 @@ export default function CreateIssueRequest() {
         }
       ]
     });
-    setMaterialSuggestions([]);
-    setShowMaterialSuggestions({});
   };
 
   // Hàm hiển thị chi tiết phiếu xin lĩnh
@@ -570,29 +693,23 @@ export default function CreateIssueRequest() {
     });
   };
 
-  // Hàm lấy màu cho trạng thái (dựa vào status number)
+  // Hàm lấy màu cho trạng thái
   const getStatusColor = (status) => {
     switch (status) {
-      case 1: // approved
-        return 'status-approved';
-      case 2: // rejected
-        return 'status-rejected';
-      case 0: // pending
-      default:
-        return 'status-pending';
+      case 1: return 'status-approved';
+      case 2: return 'status-rejected';
+      case 0:
+      default: return 'status-pending';
     }
   };
 
-  // Hàm lấy label cho trạng thái (dựa vào status number)
+  // Hàm lấy label cho trạng thái
   const getStatusLabel = (status) => {
     switch (status) {
-      case 1:
-        return 'Đã duyệt';
-      case 2:
-        return 'Từ chối';
+      case 1: return 'Đã duyệt';
+      case 2: return 'Từ chối';
       case 0:
-      default:
-        return 'Chờ duyệt';
+      default: return 'Chờ duyệt';
     }
   };
 
@@ -675,13 +792,13 @@ export default function CreateIssueRequest() {
 
             <div className="form-group">
               <label className="form-label">
-                Mục đích sử dụng Ghi chú
+                Ghi chú
               </label>
               <textarea
                 value={formData.note}
                 onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                 className="form-textarea"
-                placeholder="Nhập mục đích sử dụng hoặc ghi chú cho phiếu xin lĩnh"
+                placeholder="Nhập ghi chú cho phiếu xin lĩnh"
                 rows={3}
                 required
               />
@@ -733,33 +850,14 @@ export default function CreateIssueRequest() {
                           required
                         />
                       </td>
-                      <td className="autocomplete-container">
-                        <input
-                          type="text"
+                      <td className="material-search-cell">
+                        <MaterialSearch
                           value={detail.materialName}
-                          onChange={(e) => handleDetailChange(index, "materialName", e.target.value)}
-                          className="table-input"
-                          placeholder="Nhập tên vật tư hoặc mã code"
-                          onFocus={() => searchMaterials(detail.materialName, index)}
-                          required
-                          disabled={!isNewMaterial(detail)}
+                          onChange={(value) => handleDetailChange(index, "materialName", value)}
+                          onSelect={(material) => handleMaterialSelect(material, index)}
+                          materials={materials}
+                          placeholder="Nhập tên vật tư hoặc mã code..."
                         />
-                        {showMaterialSuggestions[index] && materialSuggestions.length > 0 && (
-                          <div className="autocomplete-dropdown">
-                            {materialSuggestions.map((material, idx) => (
-                              <div
-                                key={idx}
-                                className="autocomplete-item"
-                                onClick={() => handleMaterialSelect(material, index)}
-                              >
-                                <div className="material-name">{material.name}</div>
-                                <div className="material-details">
-                                  {material.code} - {material.spec} - {material.manufacturer} - Loại {material.category}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </td>
                       <td>
                         <input
@@ -851,11 +949,12 @@ export default function CreateIssueRequest() {
             </div>
 
             <div className="table-note">
-              <p>Ghi chú:</p>
-              <p>Tất cả các thông tin về vật tư đều bắt buộc phải nhập đầy đủ</p>
-              <p>Vật tư có sẵn: Khi nhập mã code trùng với danh mục, thông tin sẽ tự động điền (chỉ cần nhập số lượng)</p>
-              <p>Vật tư mới: Khi nhập mã code mới, cần điền đầy đủ tất cả thông tin</p>
-              <p><strong>Số lượng xin cấp chỉ được nhập số và dấu thập phân</strong></p>
+              <p><strong>Hướng dẫn sử dụng:</strong></p>
+              <p>• <strong>Nhập mã code</strong>: Hệ thống tự động điền thông tin nếu mã tồn tại</p>
+              <p>• <strong>Nhập tên vật tư</strong>: Click vào ô để mở cửa sổ tìm kiếm thông minh</p>
+              <p>• <strong>Vật tư có sẵn</strong>: Thông tin được khóa, chỉ nhập số lượng</p>
+              <p>• <strong>Vật tư mới</strong>: Cần nhập đầy đủ tất cả thông tin</p>
+              <p>• <strong>Số lượng</strong>: Chỉ nhập số và dấu thập phân (ví dụ: 10.5)</p>
             </div>
           </div>
 
@@ -952,7 +1051,6 @@ export default function CreateIssueRequest() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Chi tiết Phiếu Xin Lĩnh #{selectedRequest.id}</h3>
-              <button className="modal-close" onClick={closeRequestDetails}>×</button>
             </div>
             <div className="modal-body">
               <div className="request-info">
