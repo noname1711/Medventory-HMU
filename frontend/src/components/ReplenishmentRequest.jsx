@@ -92,7 +92,7 @@ export default function ReplenishmentRequest() {
     };
 
     try {
-      const res = await fetch("http://localhost:8080/api/supp-forecasts", {
+      const res = await fetch("http://localhost:8080/api/supp-forecast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -130,8 +130,8 @@ export default function ReplenishmentRequest() {
   async function loadPreviousForecast() {
     try {
       const url = selectedDept
-        ? `http://localhost:8080/api/supp-forecasts/previous?departmentId=${selectedDept}`
-        : `http://localhost:8080/api/supp-forecasts/previous`;
+        ? `http://localhost:8080/api/supp-forecast/previous?departmentId=${selectedDept}`
+        : `http://localhost:8080/api/supp-forecast/previous`;
 
       const res = await fetch(url);
       const data = await res.json();
