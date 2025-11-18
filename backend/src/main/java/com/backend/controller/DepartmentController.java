@@ -50,4 +50,5 @@ public class DepartmentController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
 }

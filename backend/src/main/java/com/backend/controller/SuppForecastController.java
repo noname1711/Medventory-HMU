@@ -14,37 +14,32 @@ import org.springframework.web.bind.annotation.*;
 public class SuppForecastController {
 
     @Autowired
-    private SuppForecastService suppForecastService;
+    private SuppForecastService forecastService; // chỉ giữ 1 biến!
 
     @GetMapping("/bgh/pending")
     public ResponseEntity<?> getPendingForecasts(@RequestParam Long bghId) {
-        return suppForecastService.getPendingForecasts(bghId);
+        return forecastService.getPendingForecasts(bghId);
     }
 
     @GetMapping("/bgh/processed")
     public ResponseEntity<?> getProcessedForecasts(@RequestParam Long bghId) {
-        return suppForecastService.getProcessedForecasts(bghId);
+        return forecastService.getProcessedForecasts(bghId);
     }
 
     @PostMapping("/approve")
     public ResponseEntity<?> approveForecast(@RequestBody SuppForecastApprovalDTO request) {
-        return suppForecastService.approveForecast(request);
+        return forecastService.approveForecast(request);
     }
 
     @GetMapping("/bgh/stats")
     public ResponseEntity<?> getStats(@RequestParam Long bghId) {
-        return suppForecastService.getStats(bghId);
+        return forecastService.getStats(bghId);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getForecastDetail(@PathVariable Long id, @RequestParam Long userId) {
-        try {
-            return ResponseEntity.ok().body("Chi tiết dự trù #" + id);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
-        }
+        return ResponseEntity.ok().body("Chi tiết dự trù #" + id);
     }
-    private SuppForecastService forecastService;
 
     @PostMapping
     public ResponseEntity<?> createForecast(@RequestBody SuppForecastRequestDTO request) {
@@ -62,14 +57,10 @@ public class SuppForecastController {
     }
 
     @GetMapping("/previous")
-    public ResponseEntity<?> loadPrevious(
-            @RequestParam(required = false) Long departmentId
-    ) {
+    public ResponseEntity<?> loadPrevious(@RequestParam(required = false) Long departmentId) {
         try {
             var data = forecastService.loadPreviousForecast(departmentId);
-
             return ResponseEntity.ok(data);
-
         } catch (Exception ex) {
             ex.printStackTrace();
             return ResponseEntity.badRequest().body(
