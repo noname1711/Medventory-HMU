@@ -30,6 +30,7 @@ public class MaterialService {
         dto.setUnitId(material.getUnitId());
         dto.setManufacturer(material.getManufacturer());
         dto.setMaterialCode(material.getCode());
+        dto.setCategory(material.getCategory() != null ? material.getCategory().toString() : "");
         return dto;
     }
 }

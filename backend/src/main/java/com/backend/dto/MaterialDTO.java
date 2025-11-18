@@ -10,4 +10,5 @@ public class MaterialDTO {
     private Long unitId;
     private String manufacturer;
     private String materialCode;
+    private String category;
 }

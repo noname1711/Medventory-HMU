@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import "./CreateIssueRequest.css";
+import { createPortal } from 'react-dom';
 
 // API Configuration
 const API_URL = 'http://localhost:8080/api';
@@ -12,162 +13,104 @@ const API_ENDPOINTS = {
   ISSUE_REQUESTS: `${API_URL}/issue-requests`
 };
 
-// Material Search Component với Modal
-const MaterialSearch = ({ 
-  value, 
-  onChange, 
-  onSelect, 
-  materials, 
-  placeholder = "Tên vật tư hóa chất" 
-}) => {
+const MaterialSearch = ({ value, onChange, onSelect, materials = [], placeholder = "Tên vật tư" }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState(value || "");
   const [filteredMaterials, setFilteredMaterials] = useState([]);
-  const [searchValue, setSearchValue] = useState(value);
-  const inputRef = React.useRef(null);
+  const inputRef = useRef(null);
 
-  // Filter materials 
+  // Filter materials - CHỈ TÌM THEO TÊN
   useEffect(() => {
-    if (searchValue.trim() === '') {
-      setFilteredMaterials(materials.slice(0, 10));
+    const validMaterials = materials.filter(m => m && m.id && m.name);
+    if (!searchValue.trim()) {
+      setFilteredMaterials(validMaterials.slice(0, 10));
     } else {
-      const searchTerms = searchValue.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
-      
-      const filtered = materials.filter(material => {
-        const materialName = material.name.toLowerCase();
-        const matches = searchTerms.every(term => 
-          materialName.includes(term)
-        );
-        return matches;
-      });
-      
-      setFilteredMaterials(filtered);
+      const terms = searchValue.toLowerCase().trim().split(/\s+/);
+      // CHỈ tìm theo tên vật tư, không tìm theo code
+      setFilteredMaterials(validMaterials.filter(m =>
+        terms.every(t => m.name.toLowerCase().includes(t))
+      ));
     }
   }, [searchValue, materials]);
 
-  const handleInputFocus = () => {
-    setSearchValue(value);
-    setIsOpen(true);
-  };
+  // Click outside để đóng dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        inputRef.current && !inputRef.current.contains(event.target) &&
+        !document.getElementById('material-dropdown')?.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
-  const handleModalInputChange = (e) => {
-    const newValue = e.target.value;
-    setSearchValue(newValue);
-    onChange(newValue);
-  };
-
-  const handleSelectMaterial = (material) => {
-    onSelect(material);
-    setIsOpen(false);
-  };
-
-  const handleCloseModal = () => {
-    setIsOpen(false);
-  };
-
-  // Hàm highlight từ khóa tìm kiếm trong kết quả
-  const highlightText = (text, searchValue) => {
-    if (!searchValue.trim() || !text) return text;
-    
-    const searchTerms = searchValue.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
-    let highlightedText = text;
-    
-    searchTerms.forEach(term => {
-      const regex = new RegExp(`(${term})`, 'gi');
-      highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
+  // Dropdown position
+  const [dropdownStyle, setDropdownStyle] = useState({});
+  const updateDropdownPosition = () => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: 'absolute',
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+      width: rect.width,
+      maxHeight: 200,
+      overflowY: 'auto',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      zIndex: 9999,
+      borderRadius: 4,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
     });
-    
-    return highlightedText;
   };
 
-  // Hàm format thông tin material để hiển thị
-  const getMaterialDisplayInfo = (material) => {
-    const parts = [];
-    if (material.code) parts.push(`Mã: ${material.code}`);
-    if (material.spec) parts.push(`QC: ${material.spec}`);
-    if (material.manufacturer) parts.push(`HSX: ${material.manufacturer}`);
-    if (material.category) parts.push(`Loại: ${material.category}`);
-    
-    return parts.join(' - ');
+  useEffect(() => {
+    if (isOpen) updateDropdownPosition();
+    const handleResize = () => { if (isOpen) updateDropdownPosition(); };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleResize);
+    };
+  }, [isOpen]);
+
+  // Chọn vật tư
+  const handleSelect = (material) => {
+    onSelect(material);            // truyền material lên parent
+    setSearchValue(material.name); // hiện tên lên ô input
+    onChange(material.name);       // cập nhật giá trị input
+    setIsOpen(false);              // đóng dropdown
   };
 
   return (
-    <div className="material-search-container">
+    <div style={{ position: 'relative' }}>
       <input
         ref={inputRef}
         type="text"
         placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={handleInputFocus}
-        className="material-search-input"
-        required
+        value={searchValue}
+        onChange={e => { setSearchValue(e.target.value); onChange(e.target.value); }}
+        onFocus={() => setIsOpen(true)}
+        autoComplete="off"
       />
 
-      {/* MODAL SEARCH */}
-      {isOpen && (
-        <div className="material-search-modal">
-          <div className="modal-backdrop" onClick={handleCloseModal}></div>
-          <div className="modal-content">
-            <div className="modal-header">
-              <h4>Tìm kiếm vật tư</h4>
+      {isOpen && createPortal(
+        <div id="material-dropdown" style={dropdownStyle}>
+          {filteredMaterials.length > 0 ? filteredMaterials.map(m => (
+            <div
+              key={m.id}
+              style={{ padding: 6, cursor: 'pointer' }}
+              onClick={() => handleSelect(m)}
+            >
+              <strong>{m.name}</strong> {m.code && <span style={{ color: '#666' }}>({m.code})</span>}
             </div>
-            
-            <div className="search-box">
-              <input
-                type="text"
-                placeholder="Nhập tên vật tư để tìm kiếm..."
-                value={searchValue}
-                onChange={handleModalInputChange}
-                autoFocus
-                className="search-input"
-              />
-            </div>
-
-            <div className="search-results">
-              {filteredMaterials.length > 0 ? (
-                <>
-                  <div className="results-count">
-                    Tìm thấy {filteredMaterials.length} kết quả
-                  </div>
-                  {filteredMaterials.map((material) => (
-                    <div
-                      key={material.id}
-                      className="result-item"
-                      onClick={() => handleSelectMaterial(material)}
-                    >
-                      <div className="material-main-info">
-                        <span 
-                          dangerouslySetInnerHTML={{ 
-                            __html: highlightText(material.name, searchValue) 
-                          }} 
-                        />
-                      </div>
-                      <div className="material-details">
-                        {getMaterialDisplayInfo(material)}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              ) : searchValue.trim() !== '' ? (
-                <div className="no-results">
-                  <p>Không tìm thấy vật tư phù hợp với "{searchValue}"</p>
-                  <p className="hint-text">Thử tìm với từ khóa khác hoặc nhập thành vật tư mới</p>
-                </div>
-              ) : (
-                <div className="initial-state">
-                  <p>Nhập tên vật tư để tìm kiếm</p>
-                  <p className="hint-text">Danh sách {materials.length} vật tư có sẵn trong hệ thống</p>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button onClick={handleCloseModal} className="btn-cancel">
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
+          )) : <div style={{ padding: 6, color: '#666' }}>Vật tư mới</div>}
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -192,17 +135,22 @@ export default function CreateIssueRequest() {
       }
     ]
   });
-  
+
   const [units, setUnits] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [subDepartments, setSubDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  
+
   const [requestHistory, setRequestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+
+  // Debug: log materials để kiểm tra
+  useEffect(() => {
+    console.log('Materials loaded:', materials);
+  }, [materials]);
 
   // Lấy thông tin user và dữ liệu
   useEffect(() => {
@@ -211,7 +159,7 @@ export default function CreateIssueRequest() {
         await fetchUserInfo();
         await Promise.all([
           fetchUnits(),
-          fetchMaterials() 
+          fetchMaterials()
         ]);
       } catch (error) {
         setMessage("Lỗi khi tải dữ liệu từ server");
@@ -232,23 +180,26 @@ export default function CreateIssueRequest() {
     try {
       const userFromStorage = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const userEmail = userFromStorage.email;
-      
+
       if (!userEmail) {
+        setMessage("Không tìm thấy thông tin người dùng");
         return;
       }
 
       const response = await fetch(`${API_ENDPOINTS.AUTH}/user-info?email=${encodeURIComponent(userEmail)}`);
-      
+
       if (response.ok) {
         const userData = await response.json();
         setCurrentUser(userData);
-        
+
         if (userData.departmentId) {
           fetchSubDepartments(userData.departmentId);
         }
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error("Lỗi khi fetch user info:", error);
+      setMessage("Lỗi khi tải thông tin người dùng");
     }
   };
 
@@ -257,10 +208,12 @@ export default function CreateIssueRequest() {
       const response = await fetch(API_ENDPOINTS.UNITS);
       if (response.ok) {
         const data = await response.json();
-        setUnits(data);
+        setUnits(Array.isArray(data) ? data : []);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error("Lỗi khi lấy danh sách đơn vị tính:", error);
+      setUnits([]);
     }
   };
 
@@ -269,18 +222,33 @@ export default function CreateIssueRequest() {
       const response = await fetch(API_ENDPOINTS.MATERIALS);
       if (response.ok) {
         const data = await response.json();
-        setMaterials(data);
-        
-        const uniqueCategories = extractCategoriesFromMaterials(data);
+        const validMaterials = Array.isArray(data) ? data.map(m => ({
+          id: m.materialId,
+          name: m.materialName,
+          code: m.materialCode,
+          spec: m.specification,
+          unitId: m.unitId,
+          manufacturer: m.manufacturer,
+          category: m.category || "",
+          unit: { id: m.unitId }
+        }))
+          : [];
+
+        setMaterials(validMaterials);
+        const uniqueCategories = extractCategoriesFromMaterials(validMaterials);
         setCategories(uniqueCategories);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error("Lỗi khi lấy danh sách vật tư:", error);
+      setMaterials([]);
     }
   };
 
   // Hàm lấy lịch sử phiếu xin lĩnh
   const fetchRequestHistory = async () => {
+    if (!currentUser?.id) return;
+
     setHistoryLoading(true);
     try {
       const response = await fetch(`${API_ENDPOINTS.ISSUE_REQUESTS}/canbo/my-requests`, {
@@ -289,21 +257,21 @@ export default function CreateIssueRequest() {
           "X-User-Id": currentUser.id.toString()
         }
       });
-      
+
       if (response.ok) {
         const result = await response.json();
-        
+
         if (result.success) {
           const historyData = result.requests || [];
           setRequestHistory(historyData);
         } else {
-          throw new Error(result.message);
+          throw new Error(result.message || "Lỗi không xác định");
         }
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error("Lỗi khi lấy lịch sử phiếu xin lĩnh:", error);
+      setMessage("Lỗi khi tải lịch sử phiếu xin lĩnh");
     } finally {
       setHistoryLoading(false);
     }
@@ -311,19 +279,23 @@ export default function CreateIssueRequest() {
 
   // Hàm extract categories từ danh sách materials
   const extractCategoriesFromMaterials = (materialsList) => {
+    if (!Array.isArray(materialsList)) return [];
+
     const categorySet = new Set();
-    
+
     materialsList.forEach(material => {
-      if (material.category) {
+      if (material && material.category) {
         categorySet.add(material.category);
       }
     });
-    
-    const categoriesArray = Array.from(categorySet).map(category => ({
-      value: category,
-      label: getCategoryLabel(category)
-    }));
-    
+
+    const categoriesArray = Array.from(categorySet)
+      .filter(category => category)
+      .map(category => ({
+        value: category,
+        label: getCategoryLabel(category)
+      }));
+
     const defaultCategories = ['A', 'B', 'C', 'D'];
     defaultCategories.forEach(cat => {
       if (!categorySet.has(cat)) {
@@ -333,15 +305,15 @@ export default function CreateIssueRequest() {
         });
       }
     });
-    
-    return categoriesArray.sort((a, b) => a.value.localeCompare(b.value));
+
+    return categoriesArray.sort((a, b) => (a.value || '').localeCompare(b.value || ''));
   };
 
   // Hàm lấy label cho category
   const getCategoryLabel = (category) => {
     const labels = {
       'A': 'Loại A',
-      'B': 'Loại B', 
+      'B': 'Loại B',
       'C': 'Loại C',
       'D': 'Loại D'
     };
@@ -353,27 +325,30 @@ export default function CreateIssueRequest() {
       const response = await fetch(`${API_ENDPOINTS.SUB_DEPARTMENTS}?departmentId=${departmentId}`);
       if (response.ok) {
         const data = await response.json();
-        setSubDepartments(data);
+        setSubDepartments(Array.isArray(data) ? data : []);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error("Lỗi khi lấy danh sách bộ môn:", error);
+      setSubDepartments([]);
     }
   };
 
-  // Hàm xử lý chọn vật tư từ search
+  // Hàm xử lý chọn vật tư từ search 
   const handleMaterialSelect = (material, index) => {
+    if (!material || !material.id) return;
     setFormData(prev => ({
       ...prev,
-      details: prev.details.map((detail, i) => 
+      details: prev.details.map((detail, i) =>
         i === index ? {
-          ...detail,
           materialId: material.id,
-          materialName: material.name,
-          spec: material.spec,
-          unitId: material.unit?.id || "",
-          proposedCode: material.code,
-          proposedManufacturer: material.manufacturer,
-          category: material.category
+          materialName: material.name || "",
+          spec: material.spec || "",
+          unitId: material.unit?.id || material.unitId || "",
+          proposedCode: material.code || "",
+          proposedManufacturer: material.manufacturer || "",
+          category: material.category || "", // TỰ ĐỘNG ĐIỀN CATEGORY TỪ VẬT TƯ
+          qtyRequested: detail.qtyRequested || "" // Giữ nguyên số lượng
         } : detail
       )
     }));
@@ -381,60 +356,109 @@ export default function CreateIssueRequest() {
 
   // Hàm kiểm tra và xử lý số lượng hợp lệ
   const handleQtyChange = (index, value) => {
-    const sanitizedValue = value.replace(/[^\d.,]/g, '');
-    const normalizedValue = sanitizedValue.replace(/,/g, '.');
+    // Chỉ cho phép nhập số (0-9), không cho phép dấu thập phân (.,)
+    const sanitizedValue = value.replace(/[^\d]/g, '');
     
-    const dotCount = (normalizedValue.match(/\./g) || []).length;
-    if (dotCount > 1) {
+    // Nếu giá trị rỗng sau khi sanitize, set thành chuỗi rỗng
+    if (sanitizedValue === '') {
+      setFormData(prev => ({
+        ...prev,
+        details: prev.details.map((detail, i) =>
+          i === index ? { ...detail, qtyRequested: '' } : detail
+        )
+      }));
       return;
     }
 
-    setFormData(prev => ({
-      ...prev,
-      details: prev.details.map((detail, i) => 
-        i === index ? { ...detail, qtyRequested: normalizedValue } : detail
-      )
-    }));
+    // Chuyển thành số nguyên và kiểm tra > 0
+    const intValue = parseInt(sanitizedValue, 10);
+    if (intValue > 0) {
+      setFormData(prev => ({
+        ...prev,
+        details: prev.details.map((detail, i) =>
+          i === index ? { ...detail, qtyRequested: intValue.toString() } : detail
+        )
+      }));
+    }
   };
 
+  // Hàm xử lý thay đổi chi tiết 
   const handleDetailChange = (index, field, value) => {
+
+    // First update the field
     setFormData(prev => ({
       ...prev,
-      details: prev.details.map((detail, i) => 
+      details: prev.details.map((detail, i) =>
         i === index ? { ...detail, [field]: value } : detail
       )
     }));
 
     // Auto-fill khi nhập mã code trùng
-    if (field === 'proposedCode' && value.trim()) {
-      const existingMaterial = materials.find(m => m.code === value.trim());
+    if (field === 'proposedCode' && value && value.trim()) {
+      const existingMaterial = materials.find(m =>
+        m.code && m.code.toString().trim().toLowerCase() === value.trim().toLowerCase()
+      );
+
       if (existingMaterial) {
-        const currentQty = formData.details[index].qtyRequested;
-        setFormData(prev => ({
-          ...prev,
-          details: prev.details.map((detail, i) => 
-            i === index ? {
-              ...detail,
-              materialId: existingMaterial.id,
-              materialName: existingMaterial.name,
-              spec: existingMaterial.spec,
-              unitId: existingMaterial.unit?.id || "",
-              proposedManufacturer: existingMaterial.manufacturer,
-              category: existingMaterial.category,
-              qtyRequested: currentQty
-            } : detail
-          )
-        }));
+        // Use setTimeout to ensure state is updated properly
+        setTimeout(() => {
+          setFormData(prev => ({
+            ...prev,
+            details: prev.details.map((detail, i) =>
+              i === index ? {
+                materialId: existingMaterial.id,
+                materialName: existingMaterial.name || "",
+                spec: existingMaterial.spec || "",
+                unitId: existingMaterial.unit?.id || existingMaterial.unitId || "",
+                proposedCode: existingMaterial.code || "",
+                proposedManufacturer: existingMaterial.manufacturer || "",
+                category: existingMaterial.category || "", // TỰ ĐỘNG ĐIỀN CATEGORY
+                qtyRequested: prev.details[index].qtyRequested || "" // Keep existing quantity
+              } : detail
+            )
+          }));
+        }, 0);
       } else {
-        setFormData(prev => ({
-          ...prev,
-          details: prev.details.map((detail, i) => 
-            i === index ? { 
-              ...detail, 
-              materialId: null 
-            } : detail
-          )
-        }));
+        // Nếu không tìm thấy mã, reset materialId để đánh dấu là vật tư mới
+        setTimeout(() => {
+          setFormData(prev => ({
+            ...prev,
+            details: prev.details.map((detail, i) =>
+              i === index ? {
+                ...detail,
+                materialId: null,
+                // Keep other values except reset materialId
+              } : detail
+            )
+          }));
+        }, 0);
+      }
+    }
+
+    // BỔ SUNG: Tự động điền tên vật tư và CATEGORY khi mã code trùng (trường hợp người dùng nhập mã code trước)
+    if (field === 'proposedCode' && value && value.trim() && !formData.details[index].materialName) {
+      const existingMaterial = materials.find(m =>
+        m.code && m.code.toString().trim().toLowerCase() === value.trim().toLowerCase()
+      );
+
+      if (existingMaterial && existingMaterial.name) {
+        // Tự động điền tên vật tư và CATEGORY nếu tìm thấy mã code trùng
+        setTimeout(() => {
+          setFormData(prev => ({
+            ...prev,
+            details: prev.details.map((detail, i) =>
+              i === index ? {
+                ...detail,
+                materialName: existingMaterial.name,
+                materialId: existingMaterial.id,
+                spec: existingMaterial.spec || detail.spec,
+                unitId: existingMaterial.unit?.id || existingMaterial.unitId || detail.unitId,
+                proposedManufacturer: existingMaterial.manufacturer || detail.proposedManufacturer,
+                category: existingMaterial.category || detail.category // TỰ ĐỘNG ĐIỀN CATEGORY
+              } : detail
+            )
+          }));
+        }, 0);
       }
     }
   };
@@ -465,7 +489,7 @@ export default function CreateIssueRequest() {
       setMessage("Phải có ít nhất một hàng vật tư");
       return;
     }
-    
+
     setFormData(prev => ({
       ...prev,
       details: prev.details.filter((_, i) => i !== index)
@@ -482,9 +506,52 @@ export default function CreateIssueRequest() {
     return materials.some(material => material.code === code);
   };
 
+  // Hàm xử lý khi blur khỏi ô mã code 
+  const handleCodeBlur = (index, value) => {
+    if (!value || !value.trim()) return;
+
+    const existingMaterial = materials.find(m =>
+      m.code && m.code.toString().trim().toLowerCase() === value.trim().toLowerCase()
+    );
+
+    if (existingMaterial) {
+      setFormData(prev => ({
+        ...prev,
+        details: prev.details.map((detail, i) =>
+          i === index ? {
+            materialId: existingMaterial.id,
+            materialName: existingMaterial.name || detail.materialName,
+            spec: existingMaterial.spec || detail.spec,
+            unitId: existingMaterial.unit?.id || existingMaterial.unitId || detail.unitId,
+            proposedCode: existingMaterial.code || value,
+            proposedManufacturer: existingMaterial.manufacturer || detail.proposedManufacturer,
+            category: existingMaterial.category || detail.category, // TỰ ĐỘNG ĐIỀN CATEGORY
+            qtyRequested: detail.qtyRequested || ""
+          } : detail
+        )
+      }));
+    }
+  };
+
+  // Hàm xử lý thay đổi loại - CHỈ CHO PHÉP THAY ĐỔI KHI LÀ VẬT TƯ MỚI
+  const handleCategoryChange = (index, value) => {
+    // CHỈ cho phép thay đổi khi là vật tư mới
+    const currentDetail = formData.details[index];
+    if (currentDetail.materialId) {
+      return; // Không cho phép thay đổi nếu là vật tư có sẵn
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      details: prev.details.map((detail, i) =>
+        i === index ? { ...detail, category: value } : detail
+      )
+    }));
+  };
+
   const validateForm = () => {
     if (!currentUser?.departmentId) {
-      setMessage("Không tìm thấy thông tin khoa phòng của bạn. Vui lòng liên hệ quản trị viên.");
+      setMessage("Không tìm thấy thông tin khoa phòng của bạn. Vui lòng liên hệ ban giám hiệu.");
       return false;
     }
 
@@ -494,14 +561,14 @@ export default function CreateIssueRequest() {
     }
 
     const validDetails = formData.details.filter(detail => {
-      const hasMaterialName = detail.materialName.trim() !== "";
-      const hasSpec = detail.spec.trim() !== "";
+      const hasMaterialName = detail.materialName && detail.materialName.trim() !== "";
+      const hasSpec = detail.spec && detail.spec.trim() !== "";
       const hasUnit = detail.unitId !== "";
       const hasQty = detail.qtyRequested !== "" && parseFloat(detail.qtyRequested) > 0;
-      const hasCode = detail.proposedCode.trim() !== "";
-      const hasManufacturer = detail.proposedManufacturer.trim() !== "";
+      const hasCode = detail.proposedCode && detail.proposedCode.trim() !== "";
+      const hasManufacturer = detail.proposedManufacturer && detail.proposedManufacturer.trim() !== "";
       const hasCategory = detail.category !== "";
-      
+
       return hasMaterialName && hasSpec && hasUnit && hasQty && hasCode && hasManufacturer && hasCategory;
     });
 
@@ -533,6 +600,10 @@ export default function CreateIssueRequest() {
 
   // Hàm hiển thị confirm dialog trước khi gửi
   const showConfirmDialog = async () => {
+    const validDetails = formData.details.filter(detail =>
+      detail.materialName && detail.materialName.trim() !== ""
+    );
+
     const result = await Swal.fire({
       title: 'Xác nhận gửi phiếu xin lĩnh',
       html: `
@@ -542,11 +613,10 @@ export default function CreateIssueRequest() {
           <p>Khoa phòng: ${currentUser?.departmentName || "Chưa có thông tin"}</p>
           <p>Mục đích sử dụng: ${formData.note}</p>
           <br>
-          <p><strong>Danh sách vật tư (${formData.details.filter(d => d.materialName.trim() !== "").length} vật tư):</strong></p>
-          ${formData.details
-            .filter(detail => detail.materialName.trim() !== "")
-            .map((detail, index) => `
-              <p>${index + 1}. ${detail.materialName} - Số lượng: ${detail.qtyRequested} - Mã: ${detail.proposedCode}</p>
+          <p><strong>Danh sách vật tư (${validDetails.length} vật tư):</strong></p>
+          ${validDetails
+          .map((detail, index) => `
+              <p>${index + 1}. ${detail.materialName} - Số lượng: ${detail.qtyRequested} - Mã: ${detail.proposedCode} - Loại: ${detail.category}</p>
             `).join('')}
         </div>
       `,
@@ -584,13 +654,13 @@ export default function CreateIssueRequest() {
         subDepartmentId: formData.subDepartmentId || null,
         note: formData.note,
         details: formData.details
-          .filter(detail => 
-            detail.materialName.trim() !== "" && 
-            detail.spec.trim() !== "" &&
+          .filter(detail =>
+            detail.materialName && detail.materialName.trim() !== "" &&
+            detail.spec && detail.spec.trim() !== "" &&
             detail.unitId !== "" &&
             detail.qtyRequested !== "" &&
-            detail.proposedCode.trim() !== "" &&
-            detail.proposedManufacturer.trim() !== "" &&
+            detail.proposedCode && detail.proposedCode.trim() !== "" &&
+            detail.proposedManufacturer && detail.proposedManufacturer.trim() !== "" &&
             detail.category !== ""
           )
           .map(detail => ({
@@ -665,6 +735,7 @@ export default function CreateIssueRequest() {
         }
       ]
     });
+    setMessage("");
   };
 
   // Hàm hiển thị chi tiết phiếu xin lĩnh
@@ -680,14 +751,18 @@ export default function CreateIssueRequest() {
   // Hàm format ngày tháng
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   // Hàm lấy màu cho trạng thái
@@ -727,17 +802,17 @@ export default function CreateIssueRequest() {
 
   return (
     <div className="create-issue-request">
-      <h1 className="page-title">Quản lý Phiếu Xin Lĩnh</h1>
-      
+      <h1 className="page-title">Phiếu Xin Lĩnh</h1>
+
       {/* Tab Navigation */}
       <div className="tab-navigation">
-        <button 
+        <button
           className={`tab-button ${activeTab === "create" ? "active" : ""}`}
           onClick={() => setActiveTab("create")}
         >
           Tạo Phiếu Xin Lĩnh
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === "history" ? "active" : ""}`}
           onClick={() => setActiveTab("history")}
         >
@@ -757,7 +832,7 @@ export default function CreateIssueRequest() {
           {/* Thông tin chung */}
           <div className="form-section">
             <h3 className="section-title">Thông tin chung</h3>
-            
+
             {/* Thông tin người xin lĩnh */}
             <div className="user-info-card">
               <h4>Thông tin người xin lĩnh</h4>
@@ -792,7 +867,7 @@ export default function CreateIssueRequest() {
                 Ghi chú
               </label>
               <textarea
-                value={formData.note}
+                value={formData.note || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                 className="form-textarea"
                 placeholder="Nhập ghi chú cho phiếu xin lĩnh"
@@ -840,26 +915,32 @@ export default function CreateIssueRequest() {
                       <td>
                         <input
                           type="text"
-                          value={detail.proposedCode}
+                          value={detail.proposedCode || ""}
                           onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
+                          onBlur={(e) => handleCodeBlur(index, e.target.value)}
                           className="table-input"
                           placeholder="Nhập mã code"
                           required
                         />
+                        {detail.materialId && (
+                          <div className="hint-text" style={{ fontSize: '11px', color: '#666' }}>
+                            Mã code vật tư có sẵn
+                          </div>
+                        )}
                       </td>
                       <td className="material-search-cell">
                         <MaterialSearch
-                          value={detail.materialName}
+                          value={detail.materialName || ""}
                           onChange={(value) => handleDetailChange(index, "materialName", value)}
                           onSelect={(material) => handleMaterialSelect(material, index)}
                           materials={materials}
-                          placeholder="Nhập tên vật tư hoặc mã code..."
+                          placeholder="Nhập tên vật tư để tìm kiếm..."
                         />
                       </td>
                       <td>
                         <input
                           type="text"
-                          value={detail.spec}
+                          value={detail.spec || ""}
                           onChange={(e) => handleDetailChange(index, "spec", e.target.value)}
                           className="table-input"
                           placeholder="Quy cách"
@@ -869,7 +950,7 @@ export default function CreateIssueRequest() {
                       </td>
                       <td>
                         <select
-                          value={detail.unitId}
+                          value={detail.unitId || ""}
                           onChange={(e) => handleDetailChange(index, "unitId", e.target.value)}
                           className="table-select"
                           required
@@ -886,20 +967,20 @@ export default function CreateIssueRequest() {
                       <td>
                         <input
                           type="text"
-                          value={detail.qtyRequested}
+                          value={detail.qtyRequested || ""}
                           onChange={(e) => handleQtyChange(index, e.target.value)}
                           className="table-input number-input"
-                          placeholder="0.000"
+                          placeholder="0"
                           required
-                          inputMode="decimal"
-                          pattern="[0-9.,]*"
-                          title="Chỉ được nhập số và dấu thập phân"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          title="Chỉ được nhập số nguyên"
                         />
                       </td>
                       <td>
                         <input
                           type="text"
-                          value={detail.proposedManufacturer}
+                          value={detail.proposedManufacturer || ""}
                           onChange={(e) => handleDetailChange(index, "proposedManufacturer", e.target.value)}
                           className="table-input"
                           placeholder="Hãng sản xuất"
@@ -909,11 +990,11 @@ export default function CreateIssueRequest() {
                       </td>
                       <td>
                         <select
-                          value={detail.category}
-                          onChange={(e) => handleDetailChange(index, "category", e.target.value)}
+                          value={detail.category || ""}
+                          onChange={(e) => handleCategoryChange(index, e.target.value)}
                           className="table-select category-select"
                           required
-                          disabled={!isNewMaterial(detail)}
+                          disabled={!isNewMaterial(detail)} // CHỈ CHO PHÉP THAY ĐỔI KHI LÀ VẬT TƯ MỚI
                         >
                           <option value="">Chọn loại</option>
                           {categories.map(cat => (
@@ -947,11 +1028,12 @@ export default function CreateIssueRequest() {
 
             <div className="table-note">
               <p><strong>Hướng dẫn sử dụng:</strong></p>
-              <p>• <strong>Nhập mã code</strong>: Hệ thống tự động điền thông tin nếu mã tồn tại</p>
-              <p>• <strong>Nhập tên vật tư</strong>: Click vào ô để mở cửa sổ tìm kiếm thông minh</p>
-              <p>• <strong>Vật tư có sẵn</strong>: Thông tin được khóa, chỉ nhập số lượng</p>
+              <p>• <strong>Nhập mã code</strong>: Hệ thống tự động điền thông tin nếu mã tồn tại trong danh mục (bao gồm cả loại)</p>
+              <p>• <strong>Nhập tên vật tư</strong>: Click vào ô để mở cửa sổ tìm kiếm thông minh (chỉ tìm theo tên)</p>
+              <p>• <strong>Vật tư có sẵn</strong>: Thông tin được khóa, chỉ nhập số lượng, loại không thể thay đổi</p>
               <p>• <strong>Vật tư mới</strong>: Cần nhập đầy đủ tất cả thông tin</p>
-              <p>• <strong>Số lượng</strong>: Chỉ nhập số và dấu thập phân (ví dụ: 10.5)</p>
+              <p>• <strong>Loại vật tư</strong>: Tự động điền khi chọn vật tư có sẵn, không thể thay đổi</p>
+              <p>• <strong>Số lượng</strong>: Chỉ nhập số nguyên</p>
             </div>
           </div>
 
@@ -1097,15 +1179,15 @@ export default function CreateIssueRequest() {
                       {selectedRequest.details?.map((detail, index) => (
                         <tr key={index}>
                           <td className="text-center">{index + 1}</td>
-                          <td>{detail.proposedCode}</td>
+                          <td>{detail.proposedCode || 'N/A'}</td>
                           <td>{getMaterialDisplayName(detail)}</td>
                           <td>{getMaterialDisplaySpec(detail)}</td>
                           <td className="text-center">
                             {getUnitName(detail)}
                           </td>
-                          <td className="text-center">{detail.qtyRequested}</td>
-                          <td>{detail.proposedManufacturer}</td>
-                          <td className="text-center">{detail.category}</td>
+                          <td className="text-center">{detail.qtyRequested || 'N/A'}</td>
+                          <td>{detail.proposedManufacturer || 'N/A'}</td>
+                          <td className="text-center">{detail.category || 'N/A'}</td>
                         </tr>
                       ))}
                     </tbody>
