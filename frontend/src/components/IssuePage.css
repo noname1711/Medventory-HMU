@@ -1,0 +1,274 @@
+.issue-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.issue-header {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 24px;
+}
+
+.issue-header h1 {
+  margin: 0 0 20px 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.issue-tabs {
+  display: flex;
+  gap: 10px;
+}
+
+.issue-tabs .tab {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.issue-tabs .tab:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.issue-tabs .tab.active {
+  background: white;
+  color: #059669;
+  font-weight: 600;
+}
+
+.issue-content {
+  padding: 24px;
+}
+
+/* Selected request */
+.selected-request {
+  background: #ecfdf5;
+  border: 2px solid #10b981;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.selected-request h4 {
+  color: #065f46;
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.selected-request p {
+  margin: 6px 0;
+  color: #047857;
+  font-size: 14px;
+}
+
+/* Requests list */
+.requests-list {
+  display: grid;
+  gap: 16px;
+}
+
+.request-card {
+  background: white;
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.request-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+  transform: translateY(-2px);
+}
+
+.request-card h4 {
+  color: #1e293b;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.request-card p {
+  margin: 4px 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.btn-select {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.btn-select:hover {
+  background: #059669;
+}
+
+/* Issue details table */
+.issue-details {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.issue-details table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+
+.issue-details th {
+  background: #10b981;
+  color: white;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 14px;
+  position: sticky;
+  top: 0;
+}
+
+.issue-details td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: white;
+}
+
+.issue-details tbody tr:hover {
+  background: #f1f5f9;
+}
+
+.issue-details input,
+.issue-details select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.issue-details input:focus,
+.issue-details select:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+/* Stock badges */
+.stock-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stock-badge.sufficient {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.stock-badge.insufficient {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Issue cards */
+.issue-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s;
+}
+
+.issue-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+}
+
+.issue-card .issue-header {
+  background: none;
+  color: inherit;
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.issue-card h3 {
+  color: #1e293b;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.issue-card p {
+  margin: 4px 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.issue-ref {
+  padding: 8px 12px;
+  background: #ecfdf5;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #065f46;
+  border-left: 3px solid #10b981;
+}
+
+/* Share styles from ReceiptPage */
+.form-section,
+.summary-section,
+.access-denied,
+.loading,
+.empty-state,
+.btn-view,
+.btn-submit,
+.text-center,
+.text-success,
+.text-warning,
+.text-danger {
+  /* Same styles as ReceiptPage.css */
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .issue-header {
+    padding: 16px;
+  }
+  
+  .issue-header h1 {
+    font-size: 24px;
+  }
+  
+  .issue-tabs {
+    flex-direction: column;
+  }
+  
+  .request-card {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .btn-select {
+    width: 100%;
+  }
+}
