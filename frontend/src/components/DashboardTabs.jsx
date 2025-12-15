@@ -29,20 +29,12 @@ export default function DashboardTabs({ active, setActive }) {
             Tạo phiếu dự trù
           </button>
 
-          <button className={btnClass("add")} onClick={() => setActive("add")}>
+          <button className={btnClass("receipt")} onClick={() => setActive("receipt")}>
             Nhập kho
           </button>
           
-          <button className={btnClass("export")} onClick={() => setActive("export")}>
-            Xuất kho
-          </button>
-
-          <button className={btnClass("receipt")} onClick={() => setActive("receipt")}>
-            Nhập kho real
-          </button>
-          
           <button className={btnClass("issue")} onClick={() => setActive("issue")}>
-            Xuất kho real
+            Xuất kho
           </button>
         </>
       )}

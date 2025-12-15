@@ -1,680 +1,800 @@
-import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
-import './ReceiptPage.css';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import Swal from "sweetalert2";
+import { createPortal } from "react-dom";
+import "./ReceiptPage.css";
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = "http://localhost:8080/api";
+const API_ENDPOINTS = {
+  AUTH: `${API_URL}/auth`,
+  MATERIALS: `${API_URL}/materials`,
+  RECEIPTS: `${API_URL}/receipts`,
+};
 
-export default function ReceiptPage() {
-  const [activeTab, setActiveTab] = useState('create');
-  const [isLoading, setIsLoading] = useState(false);
-  const [materials, setMaterials] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [receipts, setReceipts] = useState([]);
-  
-  // Form data
-  const [formData, setFormData] = useState({
-    receivedFrom: '',
-    reason: '',
-    receiptDate: new Date().toISOString().split('T')[0]
-  });
-  
-  const [items, setItems] = useState([
-    { id: 1, materialId: null, materialName: '', spec: '', code: '', unitId: null, unitName: '', price: 0, qtyDoc: 1, qtyActual: 1, lotNumber: '', mfgDate: '', expDate: '', category: 'D' }
-  ]);
+const moneyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [showSearch, setShowSearch] = useState(false);
-  const [activeSearchIndex, setActiveSearchIndex] = useState(null);
-  const [debounceTimer, setDebounceTimer] = useState(null);
+function toNumber(value) {
+  if (value === null || value === undefined) return 0;
+  const s = String(value).replace(/,/g, ".").trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
 
-  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
-  // Fetch dữ liệu ban đầu
-  useEffect(() => {
-    if (currentUser.roleCheck === 2) { // Chỉ thủ kho
-      fetchInitialData();
-    }
-  }, []);
-
-  const fetchInitialData = async () => {
-    try {
-      setIsLoading(true);
-      const [unitsRes, receiptsRes] = await Promise.all([
-        fetch(`${API_URL}/units`),
-        fetch(`${API_URL}/receipts/my-receipts`, {
-          headers: { 'X-User-Id': currentUser.id.toString() }
-        })
-      ]);
-
-      const unitsData = await unitsRes.json();
-      const receiptsData = await receiptsRes.json();
-
-      if (Array.isArray(unitsData)) {
-        setUnits(unitsData);
-      }
-
-      if (receiptsData.success) {
-        setReceipts(receiptsData.data || []);
-      }
-    } catch (error) {
-      toast.error('Lỗi kết nối server');
-    } finally {
-      setIsLoading(false);
-    }
+function makeRow() {
+  return {
+    key: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    materialId: null,
+    name: "",
+    code: "",
+    spec: "",
+    unitId: "",
+    unitName: "",
+    qtyDoc: "",
+    qtyActual: "",
+    price: "",
+    lotNumber: "",
+    mfgDate: "",
+    expDate: "",
   };
+}
 
-  // Xử lý tìm kiếm vật tư từ BACKEND
-  const handleSearch = async (term, index) => {
-    setSearchTerm(term);
-    if (term.trim() === '') {
-      setSearchResults([]);
-      return;
-    }
+const MaterialSearch = ({
+  value,
+  onChange,
+  onPick,
+  fetchMaterials,
+  placeholder = "Gõ để tìm...",
+  mode = "name", // "name" | "code"
+  isDuplicate = false, // Thêm prop để nhận trạng thái trùng
+}) => {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+  const [dropdownStyle, setDropdownStyle] = useState({});
+  const debounceRef = useRef(null);
+  const [duplicateItems, setDuplicateItems] = useState([]); // State để lưu các item trùng
 
-    try {
-      const response = await fetch(`${API_URL}/receipts/materials/search?keyword=${encodeURIComponent(term)}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setSearchResults(data.data || []);
-        setShowSearch(true);
-        setActiveSearchIndex(index);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (error) {
-      console.error('Lỗi tìm kiếm:', error);
-      setSearchResults([]);
-    }
-  };
-
-  // Debounced search để tránh gọi API quá nhiều
-  const debouncedSearch = (term, index) => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    
-    const timer = setTimeout(() => {
-      if (term.length >= 2) { // Chỉ tìm kiếm khi có ít nhất 2 ký tự
-        handleSearch(term, index);
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-    
-    setDebounceTimer(timer);
-  };
-
-  // Lấy chi tiết vật tư khi chọn
-  const fetchMaterialDetails = async (materialId, index) => {
-    try {
-      const response = await fetch(`${API_URL}/receipts/materials/${materialId}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        const material = data.data;
-        const newItems = [...items];
-        
-        // Tự động điền thông tin
-        newItems[index] = {
-          ...newItems[index],
-          materialId: material.id,
-          materialName: material.name,
-          spec: material.spec,
-          code: material.code,
-          unitId: material.unitId,
-          unitName: material.unitName,
-          category: material.category || 'D'
-        };
-        
-        // Gợi ý từ lần nhập trước
-        if (material.recentReceipt) {
-          newItems[index] = {
-            ...newItems[index],
-            lotNumber: material.recentReceipt.lotNumber || ''
-          };
-        }
-        
-        // Gợi ý supplier từ form chính
-        if (!formData.receivedFrom && material.recentReceipt?.supplier) {
-          setFormData(prev => ({
-            ...prev,
-            receivedFrom: material.recentReceipt.supplier
-          }));
-        }
-        
-        setItems(newItems);
-        
-        // Hiển thị thông tin tồn kho
-        if (material.totalStock) {
-          toast.success(`${material.name} - Tồn kho hiện tại: ${material.totalStock} ${material.unitName}`, {
-            duration: 3000
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Lỗi lấy chi tiết vật tư:', error);
-    }
-  };
-
-  // Chọn vật tư từ kết quả tìm kiếm
-  const selectMaterial = async (material, index) => {
-    setShowSearch(false);
-    setSearchTerm('');
-    setSearchResults([]);
-    
-    // Điền thông tin cơ bản ngay lập tức
-    const newItems = [...items];
-    newItems[index] = {
-      ...newItems[index],
-      materialId: material.id,
-      materialName: material.name,
-      spec: material.spec || '',
-      code: material.code || '',
-      unitId: material.unitId || null,
-      unitName: material.unitName || '',
-      category: material.category || 'D'
-    };
-    setItems(newItems);
-    
-    // Lấy thêm chi tiết từ backend
-    await fetchMaterialDetails(material.id, index);
-  };
-
-  // Thêm dòng mới
-  const addNewItem = () => {
-    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-    setItems([
-      ...items,
-      { 
-        id: newId, 
-        materialId: null, 
-        materialName: '', 
-        spec: '', 
-        code: '', 
-        unitId: null, 
-        unitName: '', 
-        price: 0, 
-        qtyDoc: 1, 
-        qtyActual: 1, 
-        lotNumber: '', 
-        mfgDate: '', 
-        expDate: '', 
-        category: 'D' 
-      }
-    ]);
-  };
-
-  // Xóa dòng
-  const removeItem = (id) => {
-    if (items.length <= 1) {
-      toast.error('Phải có ít nhất 1 vật tư');
-      return;
-    }
-    setItems(items.filter(item => item.id !== id));
-  };
-
-  // Cập nhật thông tin dòng
-  const updateItem = (id, field, value) => {
-    const newItems = items.map(item => {
-      if (item.id === id) {
-        const updatedItem = { ...item, [field]: value };
-        
-        // Nếu đang nhập tên vật tư, trigger search
-        if (field === 'materialName') {
-          const itemIndex = items.findIndex(item => item.id === id);
-          debouncedSearch(value, itemIndex);
-        }
-        
-        return updatedItem;
-      }
-      return item;
+  const updatePosition = () => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "absolute",
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+      width: rect.width,
+      maxHeight: 260,
+      overflowY: "auto",
+      background: "#fff",
+      border: "1px solid #dbeafe",
+      zIndex: 9999,
+      borderRadius: 8,
+      boxShadow: "0 10px 20px rgba(2, 132, 199, 0.12)",
     });
-    setItems(newItems);
   };
 
-  // Tính tổng tiền
-  const calculateTotal = () => {
-    return items.reduce((sum, item) => {
-      const price = parseFloat(item.price) || 0;
-      const qty = parseFloat(item.qtyActual) || 0;
-      return sum + (price * qty);
-    }, 0);
-  };
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const fn = () => updatePosition();
+    window.addEventListener("resize", fn);
+    window.addEventListener("scroll", fn);
+    return () => {
+      window.removeEventListener("resize", fn);
+      window.removeEventListener("scroll", fn);
+    };
+  }, [open]);
 
-  // Validate form
-  const validateForm = () => {
-    if (!formData.receivedFrom.trim()) {
-      toast.error('Vui lòng nhập nhà cung cấp');
-      return false;
-    }
-
-    for (const item of items) {
-      if (!item.materialId && !item.materialName.trim()) {
-        toast.error('Vui lòng nhập tên vật tư hoặc chọn từ danh mục');
-        return false;
+  useEffect(() => {
+    const onDown = (e) => {
+      if (
+        inputRef.current &&
+        !inputRef.current.contains(e.target) &&
+        !document.getElementById("material-dropdown")?.contains(e.target)
+      ) {
+        setOpen(false);
       }
+    };
+    if (open) document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
 
-      if (!item.qtyActual || item.qtyActual <= 0) {
-        toast.error('Số lượng phải lớn hơn 0');
-        return false;
-      }
-
-      if (!item.price || item.price < 0) {
-        toast.error('Giá không hợp lệ');
-        return false;
-      }
-
-      if (!item.lotNumber.trim()) {
-        toast.error('Vui lòng nhập số lô');
-        return false;
-      }
-    }
-
-    return true;
-  };
-
-  // Submit phiếu nhập
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    if (!currentUser.id || currentUser.roleCheck !== 2) {
-      toast.error('Chỉ thủ kho được tạo phiếu nhập');
+  const doSearch = async (q) => {
+    const keyword = q.trim();
+    if (!keyword) {
+      setItems([]);
+      setLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     try {
-      const requestData = {
-        receivedFrom: formData.receivedFrom,
-        reason: formData.reason,
-        receiptDate: formData.receiptDate,
-        details: items.map(item => ({
-          materialId: item.materialId,
-          materialName: item.materialName,
-          spec: item.spec,
-          code: item.code,
-          unitId: item.unitId,
-          price: item.price,
-          qtyDoc: item.qtyDoc,
-          qtyActual: item.qtyActual,
-          lotNumber: item.lotNumber,
-          mfgDate: item.mfgDate || null,
-          expDate: item.expDate || null,
-          category: item.category
-        }))
-      };
+      const data = await fetchMaterials(keyword);
+      let list = Array.isArray(data) ? data : [];
 
-      const response = await fetch(`${API_URL}/receipts/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id.toString()
-        },
-        body: JSON.stringify(requestData)
-      });
+      const kw = keyword.toLowerCase();
 
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Tạo phiếu nhập kho thành công');
-        // Reset form
-        setFormData({
-          receivedFrom: '',
-          reason: '',
-          receiptDate: new Date().toISOString().split('T')[0]
-        });
-        setItems([{ 
-          id: 1, 
-          materialId: null, 
-          materialName: '', 
-          spec: '', 
-          code: '', 
-          unitId: null, 
-          unitName: '', 
-          price: 0, 
-          qtyDoc: 1, 
-          qtyActual: 1, 
-          lotNumber: '', 
-          mfgDate: '', 
-          expDate: '', 
-          category: 'D' 
-        }]);
-        
-        // Clear search
-        setSearchTerm('');
-        setSearchResults([]);
-        setShowSearch(false);
-        
-        // Refresh danh sách
-        fetchReceipts();
-        setActiveTab('history');
-      } else {
-        toast.error(data.message || 'Lỗi khi tạo phiếu nhập');
+      if (mode === "name") {
+        list = list.filter(
+          (m) => m.name && m.name.toLowerCase().includes(kw)
+        );
       }
-    } catch (error) {
-      toast.error('Lỗi kết nối server');
+
+      if (mode === "code") {
+        list = list.filter(
+          (m) => m.code && m.code.toLowerCase().includes(kw)
+        );
+      }
+
+      setItems(list.slice(0, 12));
+      
+      // Kiểm tra và đánh dấu các item trùng
+      const duplicates = list.filter(item => {
+        if (mode === "name") {
+          return item.name && item.name.toLowerCase().includes(kw) && 
+                 list.filter(i => i.name && i.name.toLowerCase() === item.name.toLowerCase()).length > 1;
+        } else {
+          return item.code && item.code.toLowerCase().includes(kw) && 
+                 list.filter(i => i.code && i.code.toLowerCase() === item.code.toLowerCase()).length > 1;
+        }
+      });
+      setDuplicateItems(duplicates);
+    } catch {
+      setItems([]);
+      setDuplicateItems([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // Lấy danh sách phiếu nhập
-  const fetchReceipts = async () => {
-    try {
-      const response = await fetch(`${API_URL}/receipts/my-receipts`, {
-        headers: { 'X-User-Id': currentUser.id.toString() }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setReceipts(data.data || []);
-      }
-    } catch (error) {
-      toast.error('Lỗi tải danh sách phiếu nhập');
-    }
-  };
-
-  // Đóng dropdown khi click bên ngoài
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.search-container')) {
-        setShowSearch(false);
-      }
-    };
-    
-    document.addEventListener('click', handleClickOutside);
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, []);
+    if (!open) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(value), 200);
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line
+  }, [value, open]);
 
-  // Kiểm tra quyền truy cập
-  if (currentUser.roleCheck !== 2) {
-    return (
-      <div className="receipt-container">
-        <div className="access-denied">
-          <h2>Truy cập bị từ chối</h2>
-          <p>Chỉ thủ kho được sử dụng tính năng nhập kho.</p>
-          <p>Role của bạn: {currentUser.roleName}</p>
-        </div>
-      </div>
-    );
-  }
+  const pick = (m) => {
+    onPick(m);
+    setOpen(false);
+  };
+
+  // Kiểm tra xem item có bị trùng không
+  const isItemDuplicate = (item) => {
+    if (mode === "name") {
+      return duplicateItems.some(dup => 
+        dup.name && item.name && dup.name.toLowerCase() === item.name.toLowerCase()
+      );
+    } else {
+      return duplicateItems.some(dup => 
+        dup.code && item.code && dup.code.toLowerCase() === item.code.toLowerCase()
+      );
+    }
+  };
 
   return (
-    <div className="receipt-container">
-      {/* Header */}
-      <div className="receipt-header">
-        <h1>Quản lý nhập kho</h1>
-        <div className="receipt-tabs">
-          <button 
-            className={`tab ${activeTab === 'create' ? 'active' : ''}`}
-            onClick={() => setActiveTab('create')}
+    <div style={{ position: "relative" }}>
+      <input
+        ref={inputRef}
+        className={`table-input ${isDuplicate ? 'duplicate-highlight' : ''}`} // Thêm class khi trùng
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        autoComplete="off"
+        style={{
+          backgroundColor: isDuplicate ? '#fee2e2' : 'white',
+          borderColor: isDuplicate ? '#f87171' : '#e2e8f0'
+        }}
+      />
+
+      {open &&
+        createPortal(
+          <div id="material-dropdown" style={dropdownStyle}>
+            {loading ? (
+              <div className="material-dropdown__empty">Đang tìm...</div>
+            ) : items.length ? (
+              items.map((m) => {
+                const itemIsDuplicate = isItemDuplicate(m);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="material-dropdown__item"
+                    onClick={() => pick(m)}
+                    style={{
+                      backgroundColor: itemIsDuplicate ? '#fee2e2' : 'white',
+                      borderLeft: itemIsDuplicate ? '4px solid #ef4444' : 'none'
+                    }}
+                  >
+                    <div className="material-dropdown__name">
+                      {m.name} <span className="material-pill">({m.code})</span>
+                      {itemIsDuplicate && (
+                        <span style={{
+                          marginLeft: 'auto',
+                          fontSize: '12px',
+                          color: '#ef4444',
+                          fontWeight: 'bold'
+                        }}>
+                          ⚠️ Trùng
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="material-dropdown__empty">Không có kết quả</div>
+            )}
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+};
+
+export default function ReceiptPage() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
+
+  // Không auto-fill: reason để rỗng, receivedFrom rỗng
+  const [header, setHeader] = useState({
+    receivedFrom: "",
+    reason: "",
+    receiptDate: todayISO(),
+  });
+
+  const [rows, setRows] = useState([makeRow()]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const userFromStorage = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const email = userFromStorage.email;
+        if (!email) {
+          setMessage({ type: "error", text: "Không tìm thấy email người dùng trong localStorage" });
+          return;
+        }
+        const res = await fetch(
+          `${API_ENDPOINTS.AUTH}/user-info?email=${encodeURIComponent(email)}`
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setCurrentUser(data);
+      } catch {
+        setMessage({ type: "error", text: "Không thể tải thông tin người dùng" });
+      }
+    };
+    init();
+  }, []);
+
+  const fetchMaterials = async (keyword) => {
+    const q = (keyword || "").trim();
+    const url = `${API_ENDPOINTS.MATERIALS}/search?keyword=${encodeURIComponent(q)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  };
+
+  // Hàm kiểm tra trùng tên vật tư TRONG CÙNG BẢNG
+  const checkDuplicateNamesInTable = useMemo(() => {
+    const nameCounts = {};
+    const duplicates = new Set();
+    
+    rows.forEach(row => {
+      if (row.name.trim()) {
+        const normalizedName = row.name.toLowerCase().trim();
+        nameCounts[normalizedName] = (nameCounts[normalizedName] || 0) + 1;
+      }
+    });
+    
+    Object.keys(nameCounts).forEach(name => {
+      if (nameCounts[name] > 1) {
+        duplicates.add(name);
+      }
+    });
+    
+    return duplicates;
+  }, [rows]);
+
+  // Hàm kiểm tra trùng mã vật tư TRONG CÙNG BẢNG
+  const checkDuplicateCodesInTable = useMemo(() => {
+    const codeCounts = {};
+    const duplicates = new Set();
+    
+    rows.forEach(row => {
+      if (row.code.trim()) {
+        const normalizedCode = row.code.toLowerCase().trim();
+        codeCounts[normalizedCode] = (codeCounts[normalizedCode] || 0) + 1;
+      }
+    });
+    
+    Object.keys(codeCounts).forEach(code => {
+      if (codeCounts[code] > 1) {
+        duplicates.add(code);
+      }
+    });
+    
+    return duplicates;
+  }, [rows]);
+
+  const totals = useMemo(() => {
+    const rowTotals = rows.map((r) => {
+      const qty = toNumber(r.qtyActual);
+      const price = toNumber(r.price);
+      return qty * price;
+    });
+    const grand = rowTotals.reduce((a, b) => a + b, 0);
+    return { rowTotals, grand };
+  }, [rows]);
+
+  const setRow = (rowKey, patch) => {
+    setRows((prev) => prev.map((r) => (r.key === rowKey ? { ...r, ...patch } : r)));
+  };
+
+  const addRow = () => setRows((prev) => [...prev, makeRow()]);
+  const removeRow = (rowKey) =>
+    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== rowKey)));
+
+  const pickMaterial = (rowKey, material) => {
+    if (!material) return;
+    setRow(rowKey, {
+      materialId: material.id,
+      name: material.name || "",
+      code: material.code || "",
+      spec: material.spec || "",
+      unitId: material.unit?.id || material.unitId || "",
+      unitName: material.unit?.name || material.unitName || "",
+    });
+  };
+
+  const validateBeforeSubmit = () => {
+    if (!currentUser?.id) return "Chưa xác định được người dùng (X-User-Id)";
+    if (!header.receivedFrom.trim()) return "Vui lòng nhập người giao hàng";
+    if (!header.receiptDate) return "Vui lòng chọn ngày nhập";
+
+    // Kiểm tra trùng tên/mã trong bảng
+    if (checkDuplicateNamesInTable.size > 0) {
+      return `Có vật tư trùng tên trong bảng: ${Array.from(checkDuplicateNamesInTable).join(', ')}. Vui lòng kiểm tra lại.`;
+    }
+    
+    if (checkDuplicateCodesInTable.size > 0) {
+      return `Có vật tư trùng mã trong bảng: ${Array.from(checkDuplicateCodesInTable).join(', ')}. Vui lòng kiểm tra lại.`;
+    }
+
+    const usableRows = rows.filter((r) => r.materialId || r.name.trim() || r.code.trim());
+    if (!usableRows.length) return "Phiếu nhập phải có ít nhất 1 dòng vật tư";
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const isBlank = !r.materialId && !r.name.trim() && !r.code.trim();
+      if (isBlank) continue;
+
+      if (!r.materialId) return `Dòng ${i + 1}: Vui lòng chọn vật tư (tìm theo tên hoặc mã)`;
+      const qty = toNumber(r.qtyActual);
+      if (qty <= 0) return `Dòng ${i + 1}: Số lượng thực nhập phải > 0`;
+      const price = toNumber(r.price);
+      if (price < 0) return `Dòng ${i + 1}: Đơn giá không hợp lệ`;
+      if (!String(r.lotNumber || "").trim()) return `Dòng ${i + 1}: Vui lòng nhập số lô`;
+      if (r.mfgDate && r.expDate && r.mfgDate > r.expDate)
+        return `Dòng ${i + 1}: Ngày SX không được sau HSD`;
+    }
+    return "";
+  };
+
+  const buildPayload = () => {
+    const details = rows
+      .filter((r) => r.materialId)
+      .map((r) => ({
+        materialId: r.materialId,
+        name: r.name,
+        spec: r.spec,
+        code: r.code,
+        unitId: r.unitId || null,
+        price: toNumber(r.price),
+        qtyDoc: r.qtyDoc === "" ? null : toNumber(r.qtyDoc),
+        qtyActual: toNumber(r.qtyActual),
+        lotNumber: (r.lotNumber || "").trim(),
+        mfgDate: r.mfgDate || null,
+        expDate: r.expDate || null,
+      }));
+
+    return {
+      receivedFrom: header.receivedFrom.trim(),
+      reason: header.reason?.trim() ? header.reason.trim() : null,
+      receiptDate: header.receiptDate,
+      details,
+    };
+  };
+
+  const submit = async () => {
+    const err = validateBeforeSubmit();
+    if (err) {
+      setMessage({ type: "error", text: err });
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+    try {
+      const payload = buildPayload();
+      const res = await fetch(`${API_ENDPOINTS.RECEIPTS}/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": String(currentUser.id),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.message || "Tạo phiếu nhập thất bại");
+
+      await Swal.fire({
+        icon: "success",
+        title: "Tạo phiếu nhập thành công",
+        text: data?.message || "Phiếu nhập đã được lưu và cập nhật thẻ kho.",
+        confirmButtonText: "OK",
+      });
+
+      setHeader({
+        receivedFrom: "",
+        reason: "",
+        receiptDate: todayISO(),
+      });
+      setRows([makeRow()]);
+    } catch (e) {
+      setMessage({ type: "error", text: e?.message || "Có lỗi xảy ra" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Kiểm tra trùng cho mỗi dòng trong bảng
+  const getDuplicateStatusForRow = (row) => {
+    const isNameDuplicate = row.name.trim() && 
+      checkDuplicateNamesInTable.has(row.name.toLowerCase().trim());
+    const isCodeDuplicate = row.code.trim() && 
+      checkDuplicateCodesInTable.has(row.code.toLowerCase().trim());
+    
+    return {
+      isNameDuplicate,
+      isCodeDuplicate
+    };
+  };
+
+  return (
+    <div className="receipt-page">
+      <h1 className="page-title">Nhập kho</h1>
+
+      {message.text ? (
+        <div className={`message ${message.type === "error" ? "error" : "success"}`}>
+          {message.text}
+        </div>
+      ) : null}
+
+      {/* Thông báo trùng tên/mã nếu có */}
+      {(() => {
+        const hasNameDuplicates = checkDuplicateNamesInTable.size > 0;
+        const hasCodeDuplicates = checkDuplicateCodesInTable.size > 0;
+        
+        if (hasNameDuplicates || hasCodeDuplicates) {
+          return (
+            <div className="message warning" style={{
+              backgroundColor: '#fef3c7',
+              color: '#d97706',
+              borderLeft: '4px solid #f59e0b',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{ fontSize: '18px' }}>⚠️</span>
+              <div>
+                <strong>Cảnh báo trùng lặp:</strong>
+                {hasNameDuplicates && (
+                  <div>Trùng tên: {Array.from(checkDuplicateNamesInTable).join(', ')}</div>
+                )}
+                {hasCodeDuplicates && (
+                  <div>Trùng mã: {Array.from(checkDuplicateCodesInTable).join(', ')}</div>
+                )}
+                <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                  Các ô bị trùng được tô màu đỏ nhạt.
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
+      <div className="receipt-form">
+        <div className="section-header">
+          <h2 className="section-title">Thông tin phiếu nhập</h2>
+        </div>
+
+        <div className="header-grid">
+          <div className="form-group">
+            <label className="form-label">Người giao hàng</label>
+            <input
+              className="form-input"
+              value={header.receivedFrom}
+              onChange={(e) => setHeader((p) => ({ ...p, receivedFrom: e.target.value }))}
+              placeholder="Ví dụ: Nguyễn Văn A / Công ty ABC"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Ngày nhập</label>
+            <input
+              className="form-input"
+              type="date"
+              value={header.receiptDate}
+              onChange={(e) => setHeader((p) => ({ ...p, receiptDate: e.target.value }))}
+            />
+          </div>
+
+          <div className="form-group header-reason">
+            <label className="form-label">Lý do nhập</label>
+            <input
+              className="form-input"
+              value={header.reason}
+              onChange={(e) => setHeader((p) => ({ ...p, reason: e.target.value }))}
+              placeholder="Ví dụ: Nhu cầu từ đơn vị / Nhập theo hợp đồng..."
+            />
+          </div>
+        </div>
+
+        <div className="section-header">
+          <h2 className="section-title">Danh sách vật tư nhập</h2>
+          <div className="section-actions">
+            <button type="button" className="btn-add-row" onClick={addRow}>
+              + Thêm dòng
+            </button>
+          </div>
+        </div>
+
+        <div className="table-container">
+          <table className="receipt-table">
+            <thead>
+              <tr>
+                <th style={{ minWidth: 260 }}>Tên vật tư</th>
+                <th style={{ minWidth: 150 }}>Mã</th>
+                <th style={{ minWidth: 180 }}>Quy cách</th>
+                <th style={{ minWidth: 90 }}>ĐVT</th>
+                <th style={{ minWidth: 120 }} className="text-right">
+                  SL chứng từ
+                </th>
+                <th style={{ minWidth: 120 }} className="text-right">
+                  SL thực nhập
+                </th>
+                <th style={{ minWidth: 130 }} className="text-right">
+                  Đơn giá
+                </th>
+                <th style={{ minWidth: 140 }}>Số lô</th>
+                <th style={{ minWidth: 130 }}>Ngày SX</th>
+                <th style={{ minWidth: 130 }}>Hạn dùng</th>
+                <th style={{ minWidth: 130 }} className="text-right">
+                  Thành tiền
+                </th>
+                <th style={{ width: 90 }} className="text-center">
+                  Thao tác
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((r, idx) => {
+                const { isNameDuplicate, isCodeDuplicate } = getDuplicateStatusForRow(r);
+                
+                return (
+                  <tr key={r.key} style={{
+                    backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fef2f2' : 'transparent'
+                  }}>
+                    <td>
+                      <MaterialSearch
+                        mode="name"
+                        value={r.name}
+                        onChange={(v) =>
+                          setRow(r.key, {
+                            name: v,
+                            materialId: null,
+                            code: "",
+                            spec: "",
+                            unitId: "",
+                            unitName: "",
+                          })
+                        }
+                        onPick={(m) => pickMaterial(r.key, m)}
+                        fetchMaterials={fetchMaterials}
+                        placeholder="Gõ tên vật tư..."
+                        isDuplicate={isNameDuplicate} // Truyền trạng thái trùng
+                      />
+                    </td>
+
+                    <td>
+                      <MaterialSearch
+                        mode="code"
+                        value={r.code}
+                        onChange={(v) =>
+                          setRow(r.key, {
+                            code: v,
+                            materialId: null,
+                            name: "",
+                            spec: "",
+                            unitId: "",
+                            unitName: "",
+                          })
+                        }
+                        onPick={(m) => pickMaterial(r.key, m)}
+                        fetchMaterials={fetchMaterials}
+                        placeholder="Gõ mã vật tư..."
+                        isDuplicate={isCodeDuplicate} // Truyền trạng thái trùng
+                      />
+                    </td>
+
+                    <td>
+                      <input 
+                        className="table-input" 
+                        value={r.spec} 
+                        disabled 
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : '#f8fafc'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input 
+                        className="table-input" 
+                        value={r.unitName || ""} 
+                        disabled 
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : '#f8fafc'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="table-input number-input"
+                        value={r.qtyDoc}
+                        onChange={(e) => setRow(r.key, { qtyDoc: e.target.value })}
+                        placeholder="0"
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : 'white'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="table-input number-input"
+                        value={r.qtyActual}
+                        onChange={(e) => setRow(r.key, { qtyActual: e.target.value })}
+                        placeholder="0"
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : 'white'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="table-input number-input"
+                        value={r.price}
+                        onChange={(e) => setRow(r.key, { price: e.target.value })}
+                        placeholder="0"
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : 'white'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="table-input"
+                        value={r.lotNumber}
+                        onChange={(e) => setRow(r.key, { lotNumber: e.target.value })}
+                        placeholder="Ví dụ: LOT-0125-A"
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : 'white'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="table-input"
+                        type="date"
+                        value={r.mfgDate}
+                        onChange={(e) => setRow(r.key, { mfgDate: e.target.value })}
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : 'white'
+                        }}
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="table-input"
+                        type="date"
+                        value={r.expDate}
+                        onChange={(e) => setRow(r.key, { expDate: e.target.value })}
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fee2e2' : 'white'
+                        }}
+                      />
+                    </td>
+
+                    <td className="text-right">
+                      <div className="money" style={{
+                        color: (isNameDuplicate || isCodeDuplicate) ? '#dc2626' : '#1e293b'
+                      }}>
+                        {moneyFmt.format(totals.rowTotals[idx] || 0)}
+                      </div>
+                    </td>
+
+                    <td className="text-center">
+                      <button
+                        type="button"
+                        className="btn-remove-row"
+                        onClick={() => removeRow(r.key)}
+                        disabled={rows.length <= 1}
+                        title="Xóa dòng"
+                        style={{
+                          backgroundColor: (isNameDuplicate || isCodeDuplicate) ? '#fca5a5' : '#fee2e2'
+                        }}
+                      >
+                        Xóa
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="totals">
+          <div className="totals__row">
+            <div className="totals__value">Tổng chi phí: {moneyFmt.format(totals.grand)}</div>
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button
+            type="button"
+            className="btn-cancel"
+            onClick={() => {
+              setHeader({
+                receivedFrom: "",
+                reason: "",
+                receiptDate: todayISO(),
+              });
+              setRows([makeRow()]);
+              setMessage({ type: "", text: "" });
+            }}
+            disabled={loading}
           >
-            Tạo phiếu nhập
+            Làm mới
           </button>
-          <button 
-            className={`tab ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            Lịch sử nhập ({receipts.length})
+
+          <button type="button" className="btn-submit" onClick={submit} disabled={loading}>
+            {loading ? "Đang lưu..." : "Lưu phiếu nhập"}
           </button>
         </div>
-      </div>
-
-      {/* Content */}
-      <div className="receipt-content">
-        {activeTab === 'create' ? (
-          <div className="create-receipt">
-            {/* Thông tin chung */}
-            <div className="form-section">
-              <h3>Thông tin nhập kho</h3>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Nhà cung cấp *</label>
-                  <input
-                    type="text"
-                    value={formData.receivedFrom}
-                    onChange={(e) => setFormData({...formData, receivedFrom: e.target.value})}
-                    placeholder="Nhập tên nhà cung cấp"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Lý do nhập</label>
-                  <input
-                    type="text"
-                    value={formData.reason}
-                    onChange={(e) => setFormData({...formData, reason: e.target.value})}
-                    placeholder="Nhập lý do nhập kho"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Ngày nhập</label>
-                  <input
-                    type="date"
-                    value={formData.receiptDate}
-                    onChange={(e) => setFormData({...formData, receiptDate: e.target.value})}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Danh sách vật tư */}
-            <div className="form-section">
-              <div className="section-header">
-                <h3>Danh sách vật tư</h3>
-                <button className="btn-add" onClick={addNewItem}>
-                  + Thêm dòng
-                </button>
-              </div>
-              
-              <div className="items-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>STT</th>
-                      <th>Tên vật tư *</th>
-                      <th>Mã</th>
-                      <th>Quy cách</th>
-                      <th>Đơn vị</th>
-                      <th>Đơn giá</th>
-                      <th>SL thực nhận</th>
-                      <th>Thành tiền</th>
-                      <th>Số lô *</th>
-                      <th>Hạn dùng</th>
-                      <th>Loại</th>
-                      <th>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item, index) => (
-                      <tr key={item.id}>
-                        <td className="text-center">{index + 1}</td>
-                        <td>
-                          <div className="search-container">
-                            <input
-                              type="text"
-                              value={item.materialName}
-                              onChange={(e) => {
-                                updateItem(item.id, 'materialName', e.target.value);
-                              }}
-                              onFocus={() => {
-                                if (item.materialName.length >= 2) {
-                                  handleSearch(item.materialName, index);
-                                }
-                              }}
-                              placeholder="Nhập tên hoặc mã vật tư"
-                              autoComplete="off"
-                            />
-                            {showSearch && activeSearchIndex === index && searchResults.length > 0 && (
-                              <div className="search-results">
-                                {searchResults.map(material => (
-                                  <div
-                                    key={material.id}
-                                    className="search-result-item"
-                                    onClick={() => selectMaterial(material, index)}
-                                  >
-                                    <div className="material-info">
-                                      <div className="material-name">
-                                        <span className="material-code">{material.code}</span>
-                                        {material.name}
-                                      </div>
-                                      <div className="material-details">
-                                        {material.spec && <span className="spec">{material.spec}</span>}
-                                        {material.unitName && <span className="unit">{material.unitName}</span>}
-                                        {material.currentStock > 0 && (
-                                          <span className="stock">Tồn: {material.currentStock}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={item.code}
-                            onChange={(e) => updateItem(item.id, 'code', e.target.value)}
-                            placeholder="Mã vật tư"
-                            readOnly={item.materialId} // Chỉ đọc nếu đã chọn từ danh mục
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={item.spec}
-                            onChange={(e) => updateItem(item.id, 'spec', e.target.value)}
-                            placeholder="Quy cách"
-                          />
-                        </td>
-                        <td>
-                          <select
-                            value={item.unitId || ''}
-                            onChange={(e) => updateItem(item.id, 'unitId', e.target.value)}
-                          >
-                            <option value="">Chọn đơn vị</option>
-                            {units.map(unit => (
-                              <option key={unit.id} value={unit.id}>{unit.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={item.price}
-                            onChange={(e) => updateItem(item.id, 'price', e.target.value)}
-                            min="0"
-                            step="1000"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={item.qtyActual}
-                            onChange={(e) => updateItem(item.id, 'qtyActual', e.target.value)}
-                            min="0.001"
-                            step="0.001"
-                          />
-                        </td>
-                        <td className="text-center">
-                          {(item.price * item.qtyActual).toLocaleString('vi-VN')}
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={item.lotNumber}
-                            onChange={(e) => updateItem(item.id, 'lotNumber', e.target.value)}
-                            placeholder="Số lô"
-                            required
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="date"
-                            value={item.expDate}
-                            onChange={(e) => updateItem(item.id, 'expDate', e.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <select
-                            value={item.category}
-                            onChange={(e) => updateItem(item.id, 'category', e.target.value)}
-                          >
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                          </select>
-                        </td>
-                        <td className="text-center">
-                          <button 
-                            className="btn-remove"
-                            onClick={() => removeItem(item.id)}
-                            disabled={items.length <= 1}
-                          >
-                            Xóa
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Tổng kết */}
-            <div className="summary-section">
-              <div className="total-amount">
-                <span>Tổng tiền:</span>
-                <strong>{calculateTotal().toLocaleString('vi-VN')} đ</strong>
-              </div>
-              <button 
-                className="btn-submit"
-                onClick={handleSubmit}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Đang xử lý...' : 'Tạo phiếu nhập'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="receipt-history">
-            {isLoading ? (
-              <div className="loading">Đang tải dữ liệu...</div>
-            ) : receipts.length === 0 ? (
-              <div className="empty-state">
-                <h3>Chưa có phiếu nhập nào</h3>
-                <p>Hãy tạo phiếu nhập đầu tiên bằng cách chuyển sang tab "Tạo phiếu nhập"</p>
-              </div>
-            ) : (
-              <div className="receipts-list">
-                {receipts.map(receipt => (
-                  <div key={receipt.id} className="receipt-card">
-                    <div className="receipt-header">
-                      <div className="receipt-info">
-                        <h3>Phiếu nhập #{receipt.id}</h3>
-                        <p><strong>Nhà cung cấp:</strong> {receipt.receivedFrom}</p>
-                        <p><strong>Ngày nhập:</strong> {new Date(receipt.receiptDate).toLocaleDateString('vi-VN')}</p>
-                        <p><strong>Tổng tiền:</strong> {receipt.totalAmount?.toLocaleString('vi-VN')} đ</p>
-                      </div>
-                      <div className="receipt-actions">
-                        <button className="btn-view">Xem chi tiết</button>
-                      </div>
-                    </div>
-                    {receipt.reason && (
-                      <div className="receipt-reason">
-                        <strong>Lý do:</strong> {receipt.reason}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
