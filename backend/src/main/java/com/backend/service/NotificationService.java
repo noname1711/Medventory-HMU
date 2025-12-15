@@ -1,6 +1,7 @@
 package com.backend.service;
 
 import com.backend.entity.IssueReqHeader;
+import com.backend.entity.ReceiptHeader;
 import com.backend.entity.User;
 import com.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,5 +49,14 @@ public class NotificationService {
         System.out.println("Thông báo: Phiếu xin lĩnh #" + header.getId() + " cần điều chỉnh");
         System.out.println("Người gửi: " + requester.getFullName() + " (" + requester.getEmail() + ")");
         System.out.println("Yêu cầu điều chỉnh: " + note);
+    }
+
+    public void notifyNewReceipt(ReceiptHeader header) {
+        // Vì schema notifications không có entity_type cho receipt (giữ nguyên SQL),
+        // tạm thời implement theo đúng phong cách hiện tại: log/console.
+        System.out.println("📦 Phiếu nhập mới #" + header.getId()
+                + " | NCC: " + header.getReceivedFrom()
+                + " | Ngày: " + header.getReceiptDate()
+                + " | Tổng tiền: " + header.getTotalAmount());
     }
 }

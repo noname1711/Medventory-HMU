@@ -2,6 +2,7 @@ package com.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -9,77 +10,51 @@ import java.time.LocalDate;
 @Table(name = "inventory_card")
 @Data
 public class InventoryCard {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "material_id", nullable = false)
+    @JoinColumn(name = "material_id")
     private Material material;
 
     @ManyToOne
-    @JoinColumn(name = "unit_id", nullable = false)
+    @JoinColumn(name = "unit_id")
     private Unit unit;
 
-    @Column(name = "warehouse_name", length = 255)
-    private String warehouseName; // Tên kho
+    @Column(name = "warehouse_name")
+    private String warehouseName;
 
     @Column(name = "record_date")
     private LocalDate recordDate = LocalDate.now();
 
     @Column(name = "opening_stock", precision = 18, scale = 3)
-    private BigDecimal openingStock = BigDecimal.ZERO; // Tồn đầu kỳ
+    private BigDecimal openingStock = BigDecimal.ZERO;
 
     @Column(name = "qty_in", precision = 18, scale = 3)
-    private BigDecimal qtyIn = BigDecimal.ZERO; // Số lượng nhập
+    private BigDecimal qtyIn = BigDecimal.ZERO;
 
     @Column(name = "qty_out", precision = 18, scale = 3)
-    private BigDecimal qtyOut = BigDecimal.ZERO; // Số lượng xuất
+    private BigDecimal qtyOut = BigDecimal.ZERO;
 
-    @Column(name = "closing_stock", precision = 18, scale = 3)
-    private BigDecimal closingStock; // Tồn cuối kỳ = opening + in - out
+    // generated column in DB: opening_stock + qty_in - qty_out
+    @Column(name = "closing_stock", precision = 18, scale = 3, insertable = false, updatable = false)
+    private BigDecimal closingStock;
 
-    @Column(name = "supplier", length = 255)
-    private String supplier; // Nhà cung cấp
+    @Column(name = "supplier")
+    private String supplier;
 
-    @Column(name = "lot_number", length = 100)
-    private String lotNumber; // Số lô
+    @Column(name = "lot_number")
+    private String lotNumber;
 
     @Column(name = "mfg_date")
-    private LocalDate mfgDate; // Ngày sản xuất
+    private LocalDate mfgDate;
 
     @Column(name = "exp_date")
-    private LocalDate expDate; // Hạn sử dụng
+    private LocalDate expDate;
 
     @ManyToOne
     @JoinColumn(name = "sub_department_id")
-    private SubDepartment subDepartment; // Khoa/phòng quản lý
-
-    @PrePersist
-    @PreUpdate
-    private void calculateClosingStock() {
-        closingStock = openingStock
-                .add(qtyIn != null ? qtyIn : BigDecimal.ZERO)
-                .subtract(qtyOut != null ? qtyOut : BigDecimal.ZERO);
-    }
-
-    // Check if stock is available
-    public boolean hasStock(BigDecimal requestedQty) {
-        BigDecimal available = closingStock != null ? closingStock : BigDecimal.ZERO;
-        return available.compareTo(requestedQty) >= 0;
-    }
-
-    // Consume stock
-    public void consumeStock(BigDecimal qty) {
-        if (qtyOut == null) qtyOut = BigDecimal.ZERO;
-        qtyOut = qtyOut.add(qty);
-        calculateClosingStock();
-    }
-
-    // Add stock
-    public void addStock(BigDecimal qty) {
-        if (qtyIn == null) qtyIn = BigDecimal.ZERO;
-        qtyIn = qtyIn.add(qty);
-        calculateClosingStock();
-    }
+    private SubDepartment subDepartment;
 }
