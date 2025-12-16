@@ -907,7 +907,7 @@ public class IssueService {
 
             String msg = eligible.isEmpty()
                     ? "Không có phiếu nào đủ điều kiện để xuất"
-                    : "Lấy danh sách eligible + lý do bị loại thành công";
+                    : "Lấy danh sách + lý do bị loại thành công";
 
             return EligibleIssueReqResponseDTO.success(msg, eligible, ineligible, summary);
 

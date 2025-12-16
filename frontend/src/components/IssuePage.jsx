@@ -10,10 +10,10 @@ const API_ENDPOINTS = {
 };
 
 // điều kiện đạt:
-//Phiếu đã duyệt
-//Phiếu chưa từng xuất
-//Mỗi vật tư đều map được material
-//Tổng tồn (theo FEFO) ≥ số lượng xin lĩnh
+// - Phiếu đã duyệt
+// - Phiếu chưa từng xuất
+// - Mỗi vật tư đều map được material
+// - Tổng tồn (theo FEFO) ≥ số lượng xin lĩnh
 
 const moneyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 const qtyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
@@ -85,12 +85,28 @@ function vnReason(reasonCode) {
   }
 }
 
+/** Chuẩn hoá response: hỗ trợ cả {success,...} và {success,data:{...}} */
+function unwrapApiResponse(raw) {
+  if (!raw) return { ok: false, payload: null, message: "Không có phản hồi từ server" };
+
+  // Nếu backend bọc trong data
+  if (raw?.data && typeof raw.data === "object") {
+    const inner = raw.data;
+    const ok = !!inner?.success;
+    return { ok, payload: inner, message: inner?.message || raw?.message || "" };
+  }
+
+  // Trường hợp trả thẳng
+  const ok = !!raw?.success;
+  return { ok, payload: raw, message: raw?.message || "" };
+}
+
 export default function IssuePage() {
   // -------- Current user (thủ kho) ----------
   const [currentUser, setCurrentUser] = useState(null);
   const [bootError, setBootError] = useState("");
 
-  // -------- Filters  ----------
+  // -------- Filters ----------
   const [departmentId, setDepartmentId] = useState("");
   const [subDepartmentId, setSubDepartmentId] = useState("");
   const [limit, setLimit] = useState("80");
@@ -101,8 +117,6 @@ export default function IssuePage() {
   const [eligible, setEligible] = useState([]);
   const [ineligible, setIneligible] = useState([]);
   const [summary, setSummary] = useState(null);
-
-  // Ẩn mặc định để UI không “quá nhiều”
   const [showIneligible, setShowIneligible] = useState(false);
 
   // -------- Selected request & preview ----------
@@ -151,7 +165,7 @@ export default function IssuePage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setCurrentUser(data);
-      } catch {
+      } catch (e) {
         setBootError("Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.");
       }
     };
@@ -169,7 +183,7 @@ export default function IssuePage() {
   const fetchJson = async (url, options = {}) => {
     const res = await fetch(url, options);
     const data = await res.json().catch(() => null);
-    return data;
+    return { res, data };
   };
 
   // ------------------ load list ------------------
@@ -187,33 +201,43 @@ export default function IssuePage() {
       if (departmentId.trim()) params.set("departmentId", departmentId.trim());
       if (subDepartmentId.trim()) params.set("subDepartmentId", subDepartmentId.trim());
 
-      // GIỮ LIMIT
       const lim = Number(limit);
       if (Number.isFinite(lim) && lim > 0) params.set("limit", String(lim));
       else params.set("limit", "80");
 
-      const data = await fetchJson(
-        `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`,
-        { headers: authHeaders }
-      );
+      const url = `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`;
+      const { res, data: raw } = await fetchJson(url, { headers: authHeaders });
 
-      if (!data?.success) {
-        setListMsg({ type: "error", text: data?.message || "Không thể tải danh sách." });
+      if (!res.ok) {
+        setListMsg({ type: "error", text: `HTTP ${res.status}: Không thể tải danh sách.` });
         setEligible([]);
         setIneligible([]);
         setSummary(null);
         return;
       }
 
-      setEligible(Array.isArray(data?.eligible) ? data.eligible : []);
-      setIneligible(Array.isArray(data?.ineligible) ? data.ineligible : []);
-      setSummary(data?.summary || null);
+      const { ok, payload, message } = unwrapApiResponse(raw);
 
-      setListMsg({ type: "success", text: data?.message || "Đã tải danh sách." });
+      if (!ok) {
+        setListMsg({ type: "error", text: message || "Không thể tải danh sách." });
+        setEligible([]);
+        setIneligible([]);
+        setSummary(null);
+        return;
+      }
+
+      const nextEligible = Array.isArray(payload?.eligible) ? payload.eligible : [];
+      const nextIneligible = Array.isArray(payload?.ineligible) ? payload.ineligible : [];
+
+      setEligible(nextEligible);
+      setIneligible(nextIneligible);
+      setSummary(payload?.summary || null);
+
+      setListMsg({ type: "success", text: message || "Đã tải danh sách." });
 
       // Nếu selected không còn trong eligible thì reset preview
       if (selected?.id) {
-        const still = (data.eligible || []).some((x) => x?.id === selected.id);
+        const still = nextEligible.some((x) => x?.id === selected.id);
         if (!still) {
           setSelected(null);
           setPreviewData(null);
@@ -223,8 +247,11 @@ export default function IssuePage() {
           setCreatedIssueId(null);
         }
       }
-    } catch {
+    } catch (e) {
       setListMsg({ type: "error", text: "Lỗi khi tải danh sách." });
+      setEligible([]);
+      setIneligible([]);
+      setSummary(null);
     } finally {
       setLoadingList(false);
     }
@@ -237,8 +264,7 @@ export default function IssuePage() {
 
   // ------------------ select & preview ------------------
   const loadPreview = async (req) => {
-    if (!req?.id) return;
-    if (!currentUser?.id) return;
+    if (!req?.id || !currentUser?.id) return;
 
     setSelected(req);
     setPreviewData(null);
@@ -255,19 +281,23 @@ export default function IssuePage() {
     setPreviewMsg({ type: "", text: "" });
 
     try {
-      const data = await fetchJson(
-        `${API_ENDPOINTS.ISSUES}/preview?issueReqId=${encodeURIComponent(req.id)}`,
-        { headers: authHeaders }
-      );
+      const url = `${API_ENDPOINTS.ISSUES}/preview?issueReqId=${encodeURIComponent(req.id)}`;
+      const { res, data: raw } = await fetchJson(url, { headers: authHeaders });
 
-      if (!data?.success) {
-        setPreviewMsg({ type: "error", text: data?.message || "Không thể xem trước phiếu xuất." });
+      if (!res.ok) {
+        setPreviewMsg({ type: "error", text: `HTTP ${res.status}: Không thể xem trước.` });
         return;
       }
 
-      setPreviewData(data);
-      setPreviewMsg({ type: "success", text: data?.message || "Đã xem trước phiếu xuất." });
-    } catch {
+      const { ok, payload, message } = unwrapApiResponse(raw);
+      if (!ok) {
+        setPreviewMsg({ type: "error", text: message || "Không thể xem trước phiếu xuất." });
+        return;
+      }
+
+      setPreviewData(payload);
+      setPreviewMsg({ type: "success", text: message || "Đã xem trước phiếu xuất." });
+    } catch (e) {
       setPreviewMsg({ type: "error", text: "Lỗi khi xem trước phiếu." });
     } finally {
       setLoadingPreview(false);
@@ -303,22 +333,26 @@ export default function IssuePage() {
     setModalLoading(true);
 
     try {
-      const lots = await fetchJson(`${API_ENDPOINTS.ISSUES}/materials/${line.materialId}/lots`, {
-        headers: authHeaders,
-      });
+      const url = `${API_ENDPOINTS.ISSUES}/materials/${line.materialId}/lots`;
+      const { res, data: raw } = await fetchJson(url, { headers: authHeaders });
 
-      const arr = Array.isArray(lots) ? lots : [];
-      setModalLots(arr);
+      if (!res.ok) {
+        setModalError(`HTTP ${res.status}: Không thể tải danh sách lô.`);
+        return;
+      }
+
+      const lotsArr = Array.isArray(raw) ? raw : [];
+      setModalLots(lotsArr);
 
       const saved = manualAlloc?.[line.materialId]?.lots || {};
       const draft = {};
-      arr.forEach((l) => {
+      lotsArr.forEach((l) => {
         const lot = safeStr(l?.lotNumber).trim();
         if (!lot) return;
         draft[lot] = saved[lot] ?? 0;
       });
       setModalDraft(draft);
-    } catch {
+    } catch (e) {
       setModalError("Không thể tải danh sách lô.");
     } finally {
       setModalLoading(false);
@@ -438,13 +472,17 @@ export default function IssuePage() {
     if (!issueId) return;
     setLoadingDetail(true);
     setIssueDetail(null);
+
     try {
-      const data = await fetchJson(`${API_ENDPOINTS.ISSUES}/${issueId}/detail`, { headers: authHeaders });
-      if (!data?.success) {
-        setIssueDetail(null);
-        return;
-      }
-      setIssueDetail(data);
+      const url = `${API_ENDPOINTS.ISSUES}/${issueId}/detail`;
+      const { res, data: raw } = await fetchJson(url, { headers: authHeaders });
+
+      if (!res.ok) return;
+
+      const { ok, payload } = unwrapApiResponse(raw);
+      if (!ok) return;
+
+      setIssueDetail(payload);
     } finally {
       setLoadingDetail(false);
     }
@@ -472,32 +510,39 @@ export default function IssuePage() {
     try {
       const payload = buildCreatePayload();
 
-      const data = await fetchJson(`${API_ENDPOINTS.ISSUES}/create-from-issue-req`, {
+      const url = `${API_ENDPOINTS.ISSUES}/create-from-issue-req`;
+      const { res, data: raw } = await fetchJson(url, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify(payload),
       });
 
-      if (!data?.success) {
-        setCreateMsg({ type: "error", text: data?.message || "Xuất kho thất bại." });
+      if (!res.ok) {
+        setCreateMsg({ type: "error", text: `HTTP ${res.status}: Xuất kho thất bại.` });
         return;
       }
 
-      const issueId = data?.header?.id || data?.data?.header?.id || null;
+      const { ok, payload: out, message } = unwrapApiResponse(raw);
+      if (!ok) {
+        setCreateMsg({ type: "error", text: message || "Xuất kho thất bại." });
+        return;
+      }
+
+      const issueId = out?.header?.id || null;
       setCreatedIssueId(issueId);
 
       await Swal.fire({
         icon: "success",
         title: "Xuất kho thành công",
-        text: data?.message || "Phiếu xuất đã được lưu và cập nhật thẻ kho.",
+        text: message || "Phiếu xuất đã được lưu và cập nhật thẻ kho.",
         confirmButtonText: "OK",
       });
 
-      setCreateMsg({ type: "success", text: data?.message || "Xuất kho thành công." });
+      setCreateMsg({ type: "success", text: message || "Xuất kho thành công." });
 
       await loadEligibleList();
       if (issueId) await loadIssueDetail(issueId);
-    } catch {
+    } catch (e) {
       setCreateMsg({ type: "error", text: "Lỗi khi tạo phiếu xuất." });
     } finally {
       setCreating(false);
@@ -541,7 +586,7 @@ export default function IssuePage() {
           <div className={`message ${listMsg.type === "error" ? "error" : "success"}`}>{listMsg.text}</div>
         ) : null}
 
-        {/* Bộ lọc: GIỮ limit, BỎ tìm nhanh */}
+        {/* Bộ lọc */}
         <div className="filters">
           <div className="form-group">
             <label className="form-label">Lọc theo Khoa (ID)</label>
@@ -565,16 +610,11 @@ export default function IssuePage() {
 
           <div className="form-group">
             <label className="form-label">Số phiếu hiển thị</label>
-            <input
-              className="form-input"
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-              placeholder="80"
-            />
+            <input className="form-input" value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="80" />
           </div>
         </div>
 
-        {/* Summary gọn */}
+        {/* Summary */}
         {summary ? (
           <div className="summary-strip">
             <div className="summary-item">
@@ -639,7 +679,7 @@ export default function IssuePage() {
           </table>
         </div>
 
-        {/* Không đủ điều kiện - ẩn mặc định, hiển thị gọn */}
+        {/* Không đủ điều kiện */}
         <div className="ineligible-toggle">
           <button className="btn btn-outline" onClick={() => setShowIneligible((p) => !p)}>
             {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
@@ -751,49 +791,26 @@ export default function IssuePage() {
               <div className="config-grid">
                 <div className="form-group">
                   <label className="form-label">Ngày xuất</label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={issueDate}
-                    onChange={(e) => setIssueDate(e.target.value)}
-                  />
+                  <input type="date" className="form-input" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Kho</label>
-                  <input
-                    className="form-input"
-                    value={warehouseName}
-                    onChange={(e) => setWarehouseName(e.target.value)}
-                    placeholder="Kho chính"
-                  />
+                  <input className="form-input" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} placeholder="Kho chính" />
                 </div>
 
                 <div className="form-group grow">
                   <label className="form-label">Người nhận (nếu cần)</label>
-                  <input
-                    className="form-input"
-                    value={receiverName}
-                    onChange={(e) => setReceiverName(e.target.value)}
-                    placeholder="Có thể để trống"
-                  />
+                  <input className="form-input" value={receiverName} onChange={(e) => setReceiverName(e.target.value)} placeholder="Có thể để trống" />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Cách chọn lô</label>
                   <div className="segmented">
-                    <button
-                      className={`seg-btn ${autoAllocate ? "active" : ""}`}
-                      type="button"
-                      onClick={() => setAutoAllocate(true)}
-                    >
+                    <button className={`seg-btn ${autoAllocate ? "active" : ""}`} type="button" onClick={() => setAutoAllocate(true)}>
                       Tự động (FEFO)
                     </button>
-                    <button
-                      className={`seg-btn ${!autoAllocate ? "active" : ""}`}
-                      type="button"
-                      onClick={() => setAutoAllocate(false)}
-                    >
+                    <button className={`seg-btn ${!autoAllocate ? "active" : ""}`} type="button" onClick={() => setAutoAllocate(false)}>
                       Thủ công
                     </button>
                   </div>
@@ -810,25 +827,15 @@ export default function IssuePage() {
                     <th style={{ minWidth: 140 }}>Mã</th>
                     <th style={{ minWidth: 200 }}>Quy cách</th>
                     <th style={{ minWidth: 90 }}>ĐVT</th>
-                    <th style={{ minWidth: 120 }} className="text-right">
-                      SL yêu cầu
-                    </th>
-                    <th style={{ minWidth: 120 }} className="text-right">
-                      SL xuất
-                    </th>
+                    <th style={{ minWidth: 120 }} className="text-right">SL yêu cầu</th>
+                    <th style={{ minWidth: 120 }} className="text-right">SL xuất</th>
                     <th style={{ minWidth: 320 }}>Gợi ý lô theo hạn dùng</th>
-                    <th style={{ width: 160 }} className="text-right">
-                      Thao tác
-                    </th>
+                    <th style={{ width: 160 }} className="text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingPreview ? (
-                    <tr>
-                      <td colSpan={8} className="table-empty">
-                        Đang tải...
-                      </td>
-                    </tr>
+                    <tr><td colSpan={8} className="table-empty">Đang tải...</td></tr>
                   ) : previewLines.length ? (
                     previewLines.map((ln) => {
                       const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
@@ -836,9 +843,7 @@ export default function IssuePage() {
 
                       return (
                         <tr key={ln.materialId}>
-                          <td>
-                            <div className="cell-main">{ln.name}</div>
-                          </td>
+                          <td><div className="cell-main">{ln.name}</div></td>
                           <td className="mono">{ln.code}</td>
                           <td className="muted">{ln.spec}</td>
                           <td>{ln.unitName || "-"}</td>
@@ -856,9 +861,7 @@ export default function IssuePage() {
                                     </span>
                                   </div>
                                 ))}
-                                {ln.lots.length > 3 ? (
-                                  <div className="muted mini">+{ln.lots.length - 3} lô khác</div>
-                                ) : null}
+                                {ln.lots.length > 3 ? <div className="muted mini">+{ln.lots.length - 3} lô khác</div> : null}
                               </div>
                             ) : (
                               <span className="mini">Không có gợi ý</span>
@@ -881,20 +884,14 @@ export default function IssuePage() {
                       );
                     })
                   ) : (
-                    <tr>
-                      <td colSpan={8} className="table-empty">
-                        Chưa có dữ liệu.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={8} className="table-empty">Chưa có dữ liệu.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
             {createMsg.text ? (
-              <div className={`message ${createMsg.type === "error" ? "error" : "success"}`}>
-                {createMsg.text}
-              </div>
+              <div className={`message ${createMsg.type === "error" ? "error" : "success"}`}>{createMsg.text}</div>
             ) : null}
 
             <div className="actions">
@@ -931,12 +928,7 @@ export default function IssuePage() {
                 <div className="detail-head">
                   <h3 className="detail-title">Chi tiết phiếu xuất</h3>
                   <div className="detail-actions">
-                    <button
-                      className="btn btn-outline"
-                      type="button"
-                      onClick={() => loadIssueDetail(createdIssueId)}
-                      disabled={loadingDetail}
-                    >
+                    <button className="btn btn-outline" type="button" onClick={() => loadIssueDetail(createdIssueId)} disabled={loadingDetail}>
                       {loadingDetail ? "Đang tải..." : "Tải lại"}
                     </button>
                   </div>
@@ -970,15 +962,9 @@ export default function IssuePage() {
                             <th>Tên vật tư</th>
                             <th style={{ minWidth: 120 }}>Mã</th>
                             <th style={{ minWidth: 90 }}>ĐVT</th>
-                            <th className="text-right" style={{ minWidth: 120 }}>
-                              SL xuất
-                            </th>
-                            <th className="text-right" style={{ minWidth: 140 }}>
-                              Đơn giá
-                            </th>
-                            <th className="text-right" style={{ minWidth: 140 }}>
-                              Thành tiền
-                            </th>
+                            <th className="text-right" style={{ minWidth: 120 }}>SL xuất</th>
+                            <th className="text-right" style={{ minWidth: 140 }}>Đơn giá</th>
+                            <th className="text-right" style={{ minWidth: 140 }}>Thành tiền</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1054,21 +1040,13 @@ export default function IssuePage() {
                       <tr>
                         <th style={{ minWidth: 160 }}>Số lô</th>
                         <th style={{ minWidth: 140 }}>Hạn dùng</th>
-                        <th style={{ minWidth: 140 }} className="text-right">
-                          Tồn còn lại
-                        </th>
-                        <th style={{ minWidth: 160 }} className="text-right">
-                          Số lượng xuất
-                        </th>
+                        <th style={{ minWidth: 140 }} className="text-right">Tồn còn lại</th>
+                        <th style={{ minWidth: 160 }} className="text-right">Số lượng xuất</th>
                       </tr>
                     </thead>
                     <tbody>
                       {modalLoading ? (
-                        <tr>
-                          <td colSpan={4} className="table-empty">
-                            Đang tải...
-                          </td>
-                        </tr>
+                        <tr><td colSpan={4} className="table-empty">Đang tải...</td></tr>
                       ) : modalLots.length ? (
                         modalLots.map((l) => {
                           const lot = safeStr(l?.lotNumber).trim();
@@ -1096,11 +1074,7 @@ export default function IssuePage() {
                           );
                         })
                       ) : (
-                        <tr>
-                          <td colSpan={4} className="table-empty">
-                            Không có lô còn tồn.
-                          </td>
-                        </tr>
+                        <tr><td colSpan={4} className="table-empty">Không có lô còn tồn.</td></tr>
                       )}
                     </tbody>
                   </table>
