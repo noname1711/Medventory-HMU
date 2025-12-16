@@ -152,4 +152,15 @@ public class IssueReqController {
             ));
         }
     }
+
+    @GetMapping("/canbo/previous")
+    public ResponseEntity<IssueReqDetailResponseDTO> loadPrevious(
+            @RequestParam(value = "subDepartmentId", required = false) Long subDepartmentId,
+            @RequestHeader("X-User-Id") Long canBoId) {
+        try {
+            return ResponseEntity.ok(issueReqService.loadPreviousRequestTemplate(canBoId, subDepartmentId));
+        } catch (Exception e) {
+            return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Không thể load kỳ trước"));
+        }
+    }
 }

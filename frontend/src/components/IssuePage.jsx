@@ -1,862 +1,1140 @@
-import React, { useState, useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
-import './IssuePage.css';
+import React, { useEffect, useMemo, useState } from "react";
+import Swal from "sweetalert2";
+import { createPortal } from "react-dom";
+import "./IssuePage.css";
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = "http://localhost:8080/api";
+const API_ENDPOINTS = {
+  AUTH: `${API_URL}/auth`,
+  ISSUES: `${API_URL}/issues`,
+};
 
-async function fetchJson(url, options = {}) {
-  const res = await fetch(url, options);
-  const ct = res.headers.get('content-type') || '';
-  const data = ct.includes('application/json') ? await res.json().catch(() => null) : null;
+const moneyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
+const qtyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
-  if (!res.ok) {
-    const msg = data?.message || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data;
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-function toLocalDateTimeString(datetimeLocal) {
-  // input: "YYYY-MM-DDTHH:mm"
-  if (!datetimeLocal) return null;
-  return datetimeLocal.length === 16 ? `${datetimeLocal}:00` : datetimeLocal;
+function toNumber(v) {
+  if (v === null || v === undefined || v === "") return 0;
+  const s = String(v).replace(/,/g, ".").trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
 }
 
-function sumObjectValues(obj) {
-  return Object.values(obj || {}).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+function fmtDateTime(v) {
+  if (!v) return "";
+  return String(v).replace("T", " ");
 }
 
-// ---------- Notifications ----------
-function useNotifications(currentUser) {
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState([]);
-  const [unread, setUnread] = useState(0);
-  const seenRef = useRef(new Set());
+function safeStr(s) {
+  return s == null ? "" : String(s);
+}
 
-  const load = async () => {
-    if (!currentUser?.id) return;
-    try {
-      const page = await fetchJson(
-        `${API_URL}/notifications/my?unreadOnly=false&page=0&size=20`,
-        { headers: { 'X-User-Id': currentUser.id.toString() } }
-      );
+function sumLotDraft(draft) {
+  return Object.values(draft || {}).reduce((a, b) => a + toNumber(b), 0);
+}
 
-      const list = Array.isArray(page?.content) ? page.content : [];
-      let newCount = 0;
-      for (const n of list) {
-        if (n?.id != null && !seenRef.current.has(n.id)) {
-          seenRef.current.add(n.id);
-          newCount++;
-        }
-      }
-      if (newCount > 0) toast.success(`Bạn có ${newCount} thông báo mới`);
+function groupLinesByMaterial(lines) {
+  const map = new Map();
+  (lines || []).forEach((ln) => {
+    const materialId = ln?.materialId;
+    if (!materialId) return;
 
-      setRows(list);
-      setUnread(list.filter(x => x && x.isRead === false).length);
-    } catch (_) {}
-  };
+    const existed = map.get(materialId);
+    const need = toNumber(ln?.qtyRequested);
+    const toIssue = toNumber(ln?.qtyToIssue);
 
-  const markRead = async (id) => {
-    if (!currentUser?.id) return;
-    try {
-      await fetch(`${API_URL}/notifications/${id}/read`, {
-        method: 'POST',
-        headers: { 'X-User-Id': currentUser.id.toString() }
+    if (!existed) {
+      map.set(materialId, {
+        ...ln,
+        qtyRequested: need,
+        qtyToIssue: toIssue,
+        lots: Array.isArray(ln?.lots) ? ln.lots : [],
       });
-      await load();
-    } catch (_) {}
-  };
+    } else {
+      existed.qtyRequested += need;
+      existed.qtyToIssue += toIssue;
+    }
+  });
+  return Array.from(map.values());
+}
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 15000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]);
-
-  return { open, setOpen, rows, unread, reload: load, markRead };
+// Hiển thị lý do bị loại bằng tiếng Việt
+function vnReason(reasonCode) {
+  const code = safeStr(reasonCode).toUpperCase();
+  switch (code) {
+    case "ALREADY_ISSUED":
+      return { label: "Đã xuất kho trước đó", badge: "badge-warn" };
+    case "HAS_UNMAPPED_MATERIAL":
+      return { label: "Có vật tư chưa có mã (chưa map)", badge: "badge-warn" };
+    case "NOT_ENOUGH_STOCK":
+      return { label: "Không đủ tồn kho", badge: "badge-warn" };
+    default:
+      return { label: "Không đủ điều kiện", badge: "badge-warn" };
+  }
 }
 
 export default function IssuePage() {
-  const [activeTab, setActiveTab] = useState('create');
-  const [isLoading, setIsLoading] = useState(false);
-  const [approvedRequests, setApprovedRequests] = useState([]);
-  const [issues, setIssues] = useState([]);
+  // -------- Current user (thủ kho) ----------
+  const [currentUser, setCurrentUser] = useState(null);
+  const [bootError, setBootError] = useState("");
 
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [formData, setFormData] = useState({
-    receiverName: '',
-    departmentId: null,
-    issueDate: new Date().toISOString().split('T')[0],
-    issueReqHeaderId: null
-  });
+  // -------- Filters ----------
+  const [departmentId, setDepartmentId] = useState("");
+  const [subDepartmentId, setSubDepartmentId] = useState("");
+  const [limit, setLimit] = useState("80");
+  const [search, setSearch] = useState("");
 
-  const [issueDetails, setIssueDetails] = useState([]);
+  // -------- List eligible/ineligible ----------
+  const [loadingList, setLoadingList] = useState(false);
+  const [listMsg, setListMsg] = useState({ type: "", text: "" });
+  const [eligible, setEligible] = useState([]);
+  const [ineligible, setIneligible] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [showIneligible, setShowIneligible] = useState(false);
 
-  // schedule pickup
-  const [schedule, setSchedule] = useState({
-    scheduledAt: '',
-    location: 'Kho chính',
-    note: ''
-  });
+  // -------- Selected request & preview ----------
+  const [selected, setSelected] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewMsg, setPreviewMsg] = useState({ type: "", text: "" });
+  const [previewData, setPreviewData] = useState(null);
 
-  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-  const notif = useNotifications(currentUser);
+  // -------- Issue config ----------
+  const [issueDate, setIssueDate] = useState(todayISO());
+  const [warehouseName, setWarehouseName] = useState("Kho chính");
+  const [receiverName, setReceiverName] = useState("");
+  const [autoAllocate, setAutoAllocate] = useState(true);
 
+  // -------- Manual allocations ----------
+  const [manualAlloc, setManualAlloc] = useState({});
+
+  // -------- Create issue ----------
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState({ type: "", text: "" });
+  const [createdIssueId, setCreatedIssueId] = useState(null);
+
+  // -------- Issue detail ----------
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [issueDetail, setIssueDetail] = useState(null);
+
+  // -------- Manual lot modal ----------
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalLine, setModalLine] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState("");
+  const [modalLots, setModalLots] = useState([]);
+  const [modalDraft, setModalDraft] = useState({});
+
+  // ------------------ boot user ------------------
   useEffect(() => {
-    if (currentUser.roleCheck === 2) fetchInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const init = async () => {
+      try {
+        const userFromStorage = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const email = userFromStorage.email;
+        if (!email) {
+          setBootError("Không lấy được thông tin đăng nhập. Vui lòng đăng nhập lại.");
+          return;
+        }
+        const res = await fetch(`${API_ENDPOINTS.AUTH}/user-info?email=${encodeURIComponent(email)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setCurrentUser(data);
+      } catch {
+        setBootError("Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.");
+      }
+    };
+    init();
   }, []);
 
-  const fetchInitialData = async () => {
-    try {
-      setIsLoading(true);
-      const [requestsData, issuesData] = await Promise.all([
-        fetchJson(`${API_URL}/issues/approved-requests`, { headers: { 'X-User-Id': currentUser.id.toString() } }),
-        fetchJson(`${API_URL}/issues/today`, { headers: { 'X-User-Id': currentUser.id.toString() } })
-      ]);
+  // ------------------ API helpers ------------------
+  const authHeaders = useMemo(() => {
+    return {
+      "Content-Type": "application/json",
+      "X-User-Id": currentUser?.id ? String(currentUser.id) : "",
+    };
+  }, [currentUser]);
 
-      setApprovedRequests(requestsData || []);
-      setIssues(issuesData || []);
-    } catch (error) {
-      toast.error('Lỗi kết nối server: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
+  const fetchJson = async (url, options = {}) => {
+    const res = await fetch(url, options);
+    const data = await res.json().catch(() => null);
+    return data;
   };
 
-  const computeAutoAlloc = (lotStocks, qty) => {
-    let remaining = parseFloat(qty) || 0;
-    const selected = [];
-
-    for (const lot of (lotStocks || [])) {
-      if (remaining <= 0) break;
-      const avail = parseFloat(lot.availableQty) || 0;
-      if (avail <= 0) continue;
-
-      const take = Math.min(remaining, avail);
-      selected.push({
-        lotNumber: lot.lotNumber,
-        allocatedQty: take,
-        expDate: lot.expDate
-      });
-      remaining -= take;
-    }
-
-    return selected;
-  };
-
-  const selectRequest = async (request) => {
-    setSelectedRequest(request);
-    setFormData({
-      receiverName: request.createdByName || '',
-      departmentId: null,
-      issueDate: new Date().toISOString().split('T')[0],
-      issueReqHeaderId: request.id
-    });
-
-    setSchedule({ scheduledAt: '', location: 'Kho chính', note: '' });
-
-    const detailsWithStock = [];
-
-    for (const detail of request.details) {
-      try {
-        const checkData = await fetchJson(
-          `${API_URL}/issues/check-stock?materialId=${detail.materialId}&quantity=${detail.qtyRequested}`
-        );
-
-        const lotStocks = checkData?.lotStocks || [];
-        const qtyIssued = detail.qtyRequested;
-        const selectedLots = computeAutoAlloc(lotStocks, qtyIssued);
-
-        detailsWithStock.push({
-          ...detail,
-          qtyIssued,
-          availableStock: checkData.availableStock || 0,
-          sufficient: !!checkData.sufficient,
-          lotStocks,
-          lotMode: 'AUTO',           // AUTO | MANUAL
-          selectedLots,
-          manualAllocMap: {}         // { lotNumber: qty }
-        });
-      } catch (_) {
-        detailsWithStock.push({
-          ...detail,
-          qtyIssued: detail.qtyRequested,
-          availableStock: 0,
-          sufficient: false,
-          lotStocks: [],
-          lotMode: 'AUTO',
-          selectedLots: [],
-          manualAllocMap: {}
-        });
-      }
-    }
-
-    setIssueDetails(detailsWithStock);
-  };
-
-  const updateQtyIssued = (materialId, qty) => {
-    setIssueDetails(list =>
-      list.map(d => {
-        if (d.materialId !== materialId) return d;
-
-        const maxAllowed = Math.min(
-          parseFloat(d.qtyRequested) || 0,
-          parseFloat(d.availableStock) || 0
-        );
-        const newQty = Math.max(0, Math.min(parseFloat(qty) || 0, maxAllowed));
-
-        if (d.lotMode === 'AUTO') {
-          const selectedLots = computeAutoAlloc(d.lotStocks, newQty);
-          return { ...d, qtyIssued: newQty, selectedLots };
-        }
-
-        // MANUAL: chỉ cập nhật qtyIssued, allocations giữ nguyên (validate khi submit)
-        return { ...d, qtyIssued: newQty };
-      })
-    );
-  };
-
-  const setLotMode = (materialId, mode) => {
-    setIssueDetails(list =>
-      list.map(d => {
-        if (d.materialId !== materialId) return d;
-
-        if (mode === 'MANUAL') {
-          // init manualAllocMap từ auto allocation hiện tại để user sửa nhanh
-          const map = {};
-          for (const a of (d.selectedLots || [])) {
-            map[a.lotNumber] = a.allocatedQty;
-          }
-          return { ...d, lotMode: 'MANUAL', manualAllocMap: map };
-        }
-
-        // back to AUTO
-        const selectedLots = computeAutoAlloc(d.lotStocks, d.qtyIssued);
-        return { ...d, lotMode: 'AUTO', selectedLots, manualAllocMap: {} };
-      })
-    );
-  };
-
-  const updateManualAlloc = (materialId, lotNumber, value) => {
-    setIssueDetails(list =>
-      list.map(d => {
-        if (d.materialId !== materialId) return d;
-        const next = { ...(d.manualAllocMap || {}) };
-        const v = parseFloat(value);
-        next[lotNumber] = isNaN(v) ? 0 : Math.max(0, v);
-        return { ...d, manualAllocMap: next };
-      })
-    );
-  };
-
-  const fillManualByFEFO = (materialId) => {
-    setIssueDetails(list =>
-      list.map(d => {
-        if (d.materialId !== materialId) return d;
-        const selectedLots = computeAutoAlloc(d.lotStocks, d.qtyIssued);
-        const map = {};
-        for (const a of selectedLots) map[a.lotNumber] = a.allocatedQty;
-        return { ...d, manualAllocMap: map };
-      })
-    );
-  };
-
-  const validateForm = () => {
-    if (!selectedRequest) {
-      toast.error('Vui lòng chọn phiếu xin lĩnh đã duyệt');
-      return false;
-    }
-    if (!formData.receiverName.trim()) {
-      toast.error('Vui lòng nhập tên người nhận');
-      return false;
-    }
-
-    for (const d of issueDetails) {
-      if (!d.sufficient) {
-        toast.error(`Không đủ tồn kho cho ${d.materialName}`);
-        return false;
-      }
-
-      const qtyIssued = parseFloat(d.qtyIssued) || 0;
-      if (qtyIssued <= 0) {
-        toast.error(`Số lượng xuất phải lớn hơn 0 cho ${d.materialName}`);
-        return false;
-      }
-
-      if (qtyIssued > (parseFloat(d.qtyRequested) || 0)) {
-        toast.error(`SL xuất không được vượt SL yêu cầu (${d.qtyRequested}) cho ${d.materialName}`);
-        return false;
-      }
-
-      if (qtyIssued > (parseFloat(d.availableStock) || 0)) {
-        toast.error(`SL xuất vượt tồn kho cho ${d.materialName}`);
-        return false;
-      }
-
-      if (d.lotMode === 'MANUAL') {
-        const sum = sumObjectValues(d.manualAllocMap);
-        if (Math.abs(sum - qtyIssued) > 1e-6) {
-          toast.error(`Manual lot: Tổng phân bổ (${sum}) phải bằng SL xuất (${qtyIssued}) cho ${d.materialName}`);
-          return false;
-        }
-
-        // per-lot validation
-        for (const [lotNumber, q] of Object.entries(d.manualAllocMap || {})) {
-          const qty = parseFloat(q) || 0;
-          if (qty <= 0) continue;
-          const lot = (d.lotStocks || []).find(x => x.lotNumber === lotNumber);
-          const avail = parseFloat(lot?.availableQty) || 0;
-          if (qty > avail + 1e-6) {
-            toast.error(`Lô ${lotNumber} của ${d.materialName} chỉ còn ${avail}`);
-            return false;
-          }
-        }
-      }
-    }
-
-    return true;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    if (!currentUser.id || currentUser.roleCheck !== 2) {
-      toast.error('Chỉ thủ kho được xuất kho');
+  // ------------------ load list ------------------
+  const loadEligibleList = async () => {
+    if (!currentUser?.id) {
+      setListMsg({ type: "error", text: "Chưa xác định được tài khoản đang dùng." });
       return;
     }
+    setLoadingList(true);
+    setListMsg({ type: "", text: "" });
 
-    setIsLoading(true);
     try {
-      // IMPORTANT: flatten details when MANUAL (multi-lot)
-      const detailsPayload = [];
-      for (const d of issueDetails) {
-        if (d.lotMode === 'MANUAL') {
-          for (const [lotNumber, q] of Object.entries(d.manualAllocMap || {})) {
-            const qty = parseFloat(q) || 0;
-            if (qty <= 0) continue;
-            detailsPayload.push({
-              materialId: d.materialId,
-              qtyRequested: qty,
-              unitPrice: 0,
-              lotNumber
-            });
-          }
-        } else {
-          detailsPayload.push({
-            materialId: d.materialId,
-            qtyRequested: parseFloat(d.qtyIssued) || 0,
-            unitPrice: 0
-            // no lotNumber => backend auto FEFO
-          });
-        }
-      }
+      const params = new URLSearchParams();
+      if (departmentId.trim()) params.set("departmentId", departmentId.trim());
+      if (subDepartmentId.trim()) params.set("subDepartmentId", subDepartmentId.trim());
+      if (limit.trim()) params.set("limit", limit.trim());
 
-      const requestData = {
-        receiverName: formData.receiverName,
-        departmentId: formData.departmentId,
-        issueDate: formData.issueDate,
-        issueReqHeaderId: formData.issueReqHeaderId,
-        details: detailsPayload
-      };
+      const data = await fetchJson(
+        `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`,
+        { headers: authHeaders }
+      );
 
-      const data = await fetchJson(`${API_URL}/issues/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id.toString()
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (data?.success === false) {
-        toast.error(data?.message || 'Lỗi khi xuất kho');
+      if (!data?.success) {
+        setListMsg({ type: "error", text: data?.message || "Không thể tải danh sách." });
+        setEligible([]);
+        setIneligible([]);
+        setSummary(null);
         return;
       }
 
-      toast.success('Xuất kho thành công!');
+      setEligible(Array.isArray(data?.eligible) ? data.eligible : []);
+      setIneligible(Array.isArray(data?.ineligible) ? data.ineligible : []);
+      setSummary(data?.summary || null);
 
-      if (data.allocations && data.allocations.length > 0) {
-        const allocationMsg = data.allocations
-          .map(a => `${a.materialName}: ${a.allocatedQty} từ lô ${a.lotNumber}`)
-          .join('\n');
-        toast.success(`Phân bổ:\n${allocationMsg}`, { duration: 5000 });
+      // thông báo ngắn gọn
+      setListMsg({ type: "success", text: data?.message || "Đã tải danh sách." });
+
+      if (selected?.id) {
+        const still = (data.eligible || []).some((x) => x?.id === selected.id);
+        if (!still) {
+          setSelected(null);
+          setPreviewData(null);
+          setManualAlloc({});
+          setCreateMsg({ type: "", text: "" });
+          setIssueDetail(null);
+          setCreatedIssueId(null);
+        }
       }
-
-      setSelectedRequest(null);
-      setFormData({
-        receiverName: '',
-        departmentId: null,
-        issueDate: new Date().toISOString().split('T')[0],
-        issueReqHeaderId: null
-      });
-      setIssueDetails([]);
-      setSchedule({ scheduledAt: '', location: 'Kho chính', note: '' });
-
-      await fetchInitialData();
-      await notif.reload();
-      setActiveTab('history');
-
-    } catch (error) {
-      toast.error('Lỗi kết nối server: ' + error.message);
+    } catch {
+      setListMsg({ type: "error", text: "Lỗi khi tải danh sách." });
     } finally {
-      setIsLoading(false);
+      setLoadingList(false);
     }
   };
 
-  const submitSchedulePickup = async () => {
-    if (!selectedRequest?.id) {
-      toast.error('Chưa chọn phiếu xin lĩnh');
-      return;
-    }
-    if (!schedule.scheduledAt) {
-      toast.error('Vui lòng chọn thời gian hẹn');
-      return;
-    }
+  useEffect(() => {
+    if (currentUser?.id) loadEligibleList();
+    // eslint-disable-next-line
+  }, [currentUser?.id]);
+
+  // ------------------ select & preview ------------------
+  const loadPreview = async (req) => {
+    if (!req?.id) return;
+    if (!currentUser?.id) return;
+
+    setSelected(req);
+    setPreviewData(null);
+    setIssueDetail(null);
+    setCreatedIssueId(null);
+
+    setAutoAllocate(true);
+    setManualAlloc({});
+    setReceiverName("");
+    setIssueDate(todayISO());
+    setWarehouseName("Kho chính");
+
+    setLoadingPreview(true);
+    setPreviewMsg({ type: "", text: "" });
 
     try {
-      const payload = {
-        scheduledAt: toLocalDateTimeString(schedule.scheduledAt),
-        location: schedule.location || 'Kho chính',
-        note: schedule.note || '',
-        schedulerUserId: currentUser.id
-      };
+      const data = await fetchJson(
+        `${API_ENDPOINTS.ISSUES}/preview?issueReqId=${encodeURIComponent(req.id)}`,
+        { headers: authHeaders }
+      );
 
-      await fetchJson(`${API_URL}/notifications/schedule-pickup?issueReqId=${selectedRequest.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id.toString()
-        },
-        body: JSON.stringify(payload)
-      });
+      if (!data?.success) {
+        setPreviewMsg({ type: "error", text: data?.message || "Không thể xem trước phiếu xuất." });
+        return;
+      }
 
-      toast.success('Đã tạo lịch hẹn nhận hàng');
-      await notif.reload();
-    } catch (e) {
-      toast.error('Không tạo được lịch hẹn: ' + e.message);
+      setPreviewData(data);
+      setPreviewMsg({ type: "success", text: data?.message || "Đã xem trước phiếu xuất." });
+    } catch {
+      setPreviewMsg({ type: "error", text: "Lỗi khi xem trước phiếu." });
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
-  // close notif when click outside
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (!e.target.closest('.notif-wrap')) notif.setOpen(false);
-    };
-    document.addEventListener('click', onDocClick);
-    return () => document.removeEventListener('click', onDocClick);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const previewLines = useMemo(() => {
+    const lines = previewData?.lines || [];
+    return groupLinesByMaterial(lines);
+  }, [previewData]);
 
-  if (currentUser.roleCheck !== 2) {
+  const previewMissingMessages = useMemo(() => {
+    const s = previewData?.summary || {};
+    return Array.isArray(s?.missingMessages) ? s.missingMessages : [];
+  }, [previewData]);
+
+  const canCreateIssue = useMemo(() => {
+    if (!selected?.id) return false;
+    if (!previewData?.success) return false;
+    if (previewMissingMessages.length > 0) return false;
+    return true;
+  }, [selected, previewData, previewMissingMessages]);
+
+  // ------------------ manual modal ------------------
+  const openModalForLine = async (line) => {
+    if (!line?.materialId) return;
+
+    setModalOpen(true);
+    setModalLine(line);
+    setModalError("");
+    setModalLots([]);
+    setModalDraft({});
+    setModalLoading(true);
+
+    try {
+      const lots = await fetchJson(
+        `${API_ENDPOINTS.ISSUES}/materials/${line.materialId}/lots`,
+        { headers: authHeaders }
+      );
+
+      const arr = Array.isArray(lots) ? lots : [];
+      setModalLots(arr);
+
+      const saved = manualAlloc?.[line.materialId]?.lots || {};
+      const draft = {};
+      arr.forEach((l) => {
+        const lot = safeStr(l?.lotNumber).trim();
+        if (!lot) return;
+        draft[lot] = saved[lot] ?? 0;
+      });
+      setModalDraft(draft);
+    } catch {
+      setModalError("Không thể tải danh sách lô.");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalLine(null);
+    setModalError("");
+    setModalLots([]);
+    setModalDraft({});
+    setModalLoading(false);
+  };
+
+  const fillFEFOSuggestion = () => {
+    if (!modalLine?.materialId) return;
+    const sug = (previewLines || []).find((x) => x.materialId === modalLine.materialId);
+    if (!sug?.lots?.length) return;
+
+    const next = { ...(modalDraft || {}) };
+    Object.keys(next).forEach((k) => (next[k] = 0));
+
+    sug.lots.forEach((l) => {
+      const lot = safeStr(l?.lotNumber).trim();
+      const q = toNumber(l?.qtyOut);
+      if (!lot) return;
+      next[lot] = q;
+    });
+
+    setModalDraft(next);
+  };
+
+  const saveModalAllocation = () => {
+    if (!modalLine?.materialId) return;
+
+    const need = toNumber(modalLine.qtyToIssue ?? modalLine.qtyRequested);
+    const total = sumLotDraft(modalDraft);
+
+    if (need <= 0) {
+      setModalError("Số lượng cần xuất không hợp lệ.");
+      return;
+    }
+
+    const availMap = new Map();
+    modalLots.forEach((l) => availMap.set(safeStr(l?.lotNumber).trim(), toNumber(l?.availableStock)));
+
+    for (const [lot, q] of Object.entries(modalDraft || {})) {
+      const qty = toNumber(q);
+      if (qty < 0) {
+        setModalError("Số lượng xuất không được âm.");
+        return;
+      }
+      const avail = availMap.get(lot) ?? 0;
+      if (qty > avail + 1e-9) {
+        setModalError(`Lô ${lot} vượt tồn còn lại (còn ${qtyFmt.format(avail)}).`);
+        return;
+      }
+    }
+
+    if (Math.abs(total - need) > 1e-9) {
+      setModalError(`Tổng theo lô phải đúng bằng ${qtyFmt.format(need)} (hiện: ${qtyFmt.format(total)}).`);
+      return;
+    }
+
+    setManualAlloc((prev) => ({
+      ...prev,
+      [modalLine.materialId]: {
+        qtyIssued: need,
+        lots: { ...(modalDraft || {}) },
+      },
+    }));
+
+    closeModal();
+  };
+
+  // ------------------ build create payload ------------------
+  const validateManualBeforeCreate = () => {
+    for (const ln of previewLines) {
+      const materialId = ln.materialId;
+      const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
+      const saved = manualAlloc?.[materialId];
+
+      if (!saved) return `Chưa chọn lô cho: ${ln.code} - ${ln.name}`;
+      const total = sumLotDraft(saved.lots);
+      if (Math.abs(total - need) > 1e-9) return `Tổng theo lô không khớp cho: ${ln.code} - ${ln.name}`;
+    }
+    return "";
+  };
+
+  const buildCreatePayload = () => {
+    const payload = {
+      issueReqId: selected.id,
+      issueDate: issueDate || todayISO(),
+      warehouseName: warehouseName?.trim() ? warehouseName.trim() : "Kho chính",
+      receiverName: receiverName?.trim() ? receiverName.trim() : null,
+      autoAllocate: !!autoAllocate,
+      manualLines: null,
+    };
+
+    if (!autoAllocate) {
+      payload.manualLines = previewLines.map((ln) => {
+        const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
+        const saved = manualAlloc?.[ln.materialId] || { lots: {} };
+
+        const lots = Object.entries(saved.lots || {})
+          .map(([lotNumber, qtyOut]) => ({ lotNumber, qtyOut: toNumber(qtyOut) }))
+          .filter((x) => x.lotNumber && x.qtyOut > 0);
+
+        return { materialId: ln.materialId, qtyIssued: need, lots };
+      });
+    }
+
+    return payload;
+  };
+
+  // ------------------ create issue ------------------
+  const loadIssueDetail = async (issueId) => {
+    if (!issueId) return;
+    setLoadingDetail(true);
+    setIssueDetail(null);
+    try {
+      const data = await fetchJson(`${API_ENDPOINTS.ISSUES}/${issueId}/detail`, { headers: authHeaders });
+      if (!data?.success) {
+        setIssueDetail(null);
+        return;
+      }
+      setIssueDetail(data);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const createIssue = async () => {
+    if (!currentUser?.id) return;
+
+    if (!canCreateIssue) {
+      setCreateMsg({ type: "error", text: "Phiếu chưa đủ điều kiện để xuất kho." });
+      return;
+    }
+
+    if (!autoAllocate) {
+      const err = validateManualBeforeCreate();
+      if (err) {
+        setCreateMsg({ type: "error", text: err });
+        return;
+      }
+    }
+
+    setCreating(true);
+    setCreateMsg({ type: "", text: "" });
+
+    try {
+      const payload = buildCreatePayload();
+
+      const data = await fetchJson(`${API_ENDPOINTS.ISSUES}/create-from-issue-req`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify(payload),
+      });
+
+      if (!data?.success) {
+        setCreateMsg({ type: "error", text: data?.message || "Xuất kho thất bại." });
+        return;
+      }
+
+      const issueId = data?.header?.id || data?.data?.header?.id || null;
+      setCreatedIssueId(issueId);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Xuất kho thành công",
+        text: data?.message || "Phiếu xuất đã được lưu và cập nhật thẻ kho.",
+        confirmButtonText: "OK",
+      });
+
+      setCreateMsg({ type: "success", text: data?.message || "Xuất kho thành công." });
+
+      loadEligibleList();
+      if (issueId) await loadIssueDetail(issueId);
+    } catch {
+      setCreateMsg({ type: "error", text: "Lỗi khi tạo phiếu xuất." });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // ------------------ UI helpers ------------------
+  const filteredEligible = useMemo(() => {
+    const kw = search.trim().toLowerCase();
+    if (!kw) return eligible;
+
+    return (eligible || []).filter((r) => {
+      const id = safeStr(r?.id);
+      const sub = safeStr(r?.subDepartmentName);
+      const dep = safeStr(r?.departmentName);
+      const creator = safeStr(r?.createdByName);
+      const note = safeStr(r?.note);
+      return (
+        id.includes(kw) ||
+        sub.toLowerCase().includes(kw) ||
+        dep.toLowerCase().includes(kw) ||
+        creator.toLowerCase().includes(kw) ||
+        note.toLowerCase().includes(kw)
+      );
+    });
+  }, [eligible, search]);
+
+  const manualStatusForLine = (materialId) => {
+    const saved = manualAlloc?.[materialId];
+    if (!saved) return { ok: false, total: 0 };
+    const total = sumLotDraft(saved.lots);
+    return { ok: total > 0, total };
+  };
+
+  if (bootError) {
     return (
-      <div className="issue-container">
-        <div className="access-denied">
-          <h2>Truy cập bị từ chối</h2>
-          <p>Chỉ thủ kho được sử dụng tính năng xuất kho.</p>
-          <p>Role của bạn: {currentUser.roleName}</p>
-        </div>
+      <div className="issue-page">
+        <h1 className="page-title">Xuất kho</h1>
+        <div className="message error">{bootError}</div>
       </div>
     );
   }
 
   return (
-    <div className="issue-container">
-      <div className="issue-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <h1 style={{ margin: 0 }}>Quản lý xuất kho</h1>
+    <div className="issue-page">
+      <div className="page-head">
+        <h1 className="page-title">Xuất kho</h1>
+      </div>
 
-          {/* Notifications */}
-          <div className="notif-wrap" style={{ position: 'relative' }}>
-            <button
-              className="notif-bell"
-              onClick={(e) => { e.stopPropagation(); notif.setOpen(!notif.open); }}
-              title="Thông báo"
-            >
-              🔔
-              {notif.unread > 0 && <span className="notif-badge">{notif.unread}</span>}
+      {/* DANH SÁCH PHIẾU */}
+      <div className="card">
+        <div className="card-head">
+          <h2 className="card-title">Phiếu xin lĩnh đủ điều kiện xuất</h2>
+          <div className="card-actions">
+            <button className="btn btn-outline" onClick={loadEligibleList} disabled={loadingList}>
+              {loadingList ? "Đang tải..." : "Tải lại"}
             </button>
-
-            {notif.open && (
-              <div className="notif-panel" onClick={(e) => e.stopPropagation()}>
-                <div className="notif-title">
-                  <strong>Thông báo</strong>
-                  <button className="notif-refresh" onClick={notif.reload}>Tải lại</button>
-                </div>
-                <div className="notif-list">
-                  {notif.rows.length === 0 ? (
-                    <div className="notif-empty">Chưa có thông báo</div>
-                  ) : notif.rows.slice(0, 10).map(n => (
-                    <div
-                      key={n.id}
-                      className={`notif-item ${n.isRead ? '' : 'unread'}`}
-                      onClick={() => notif.markRead(n.id)}
-                      title="Bấm để đánh dấu đã đọc"
-                    >
-                      <div className="notif-item-title">{n.title || 'Thông báo'}</div>
-                      <div className="notif-item-content">{n.content || ''}</div>
-                      <div className="notif-item-time">
-                        {n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="issue-tabs">
-          <button className={`tab ${activeTab === 'create' ? 'active' : ''}`} onClick={() => setActiveTab('create')}>
-            Xuất kho
-          </button>
-          <button className={`tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-            Lịch sử xuất ({issues.length})
+        {listMsg.text ? (
+          <div className={`message ${listMsg.type === "error" ? "error" : "success"}`}>{listMsg.text}</div>
+        ) : null}
+
+        <div className="filters">
+          <div className="form-group">
+            <label className="form-label">Lọc theo Khoa (ID)</label>
+            <input
+              className="form-input"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              placeholder="Ví dụ: 1"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Lọc theo Bộ môn (ID)</label>
+            <input
+              className="form-input"
+              value={subDepartmentId}
+              onChange={(e) => setSubDepartmentId(e.target.value)}
+              placeholder="Ví dụ: 3"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Số phiếu hiển thị</label>
+            <input
+              className="form-input"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              placeholder="80"
+            />
+          </div>
+
+          <div className="form-group grow">
+            <label className="form-label">Tìm nhanh</label>
+            <input
+              className="form-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nhập ID / Khoa / Bộ môn / Người tạo / Ghi chú..."
+            />
+          </div>
+        </div>
+
+        {summary ? (
+          <div className="summary-strip">
+            <div className="summary-item">
+              <div className="summary-label">Đã kiểm tra</div>
+              <div className="summary-value">{summary.checked ?? "-"}</div>
+            </div>
+            <div className="summary-item">
+              <div className="summary-label">Đủ điều kiện</div>
+              <div className="summary-value ok">{summary.eligible ?? filteredEligible.length}</div>
+            </div>
+            <div className="summary-item">
+              <div className="summary-label">Không đủ điều kiện</div>
+              <div className="summary-value warn">{summary.ineligible ?? ineligible.length}</div>
+            </div>
+            <div className="summary-item">
+              <div className="summary-label">Thiếu tồn kho</div>
+              <div className="summary-value warn">{summary.rejectedNotEnoughStock ?? "-"}</div>
+            </div>
+            <div className="summary-item">
+              <div className="summary-label">Vật tư chưa có mã</div>
+              <div className="summary-value warn">{summary.rejectedHasUnmappedMaterial ?? "-"}</div>
+            </div>
+            <div className="summary-item">
+              <div className="summary-label">Đã xuất trước đó</div>
+              <div className="summary-value warn">{summary.rejectedAlreadyIssued ?? "-"}</div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="table-container">
+          <table className="issue-table">
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>Mã phiếu</th>
+                <th style={{ minWidth: 200 }}>Bộ môn / Đơn vị</th>
+                <th style={{ minWidth: 200 }}>Khoa / Phòng</th>
+                <th style={{ minWidth: 190 }}>Người tạo</th>
+                <th style={{ minWidth: 190 }}>Ngày gửi</th>
+                <th style={{ minWidth: 320 }}>Ghi chú</th>
+                <th style={{ width: 150 }} className="text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEligible?.length ? (
+                filteredEligible.map((r) => (
+                  <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
+                    <td className="mono">{r.id}</td>
+                    <td>{r.subDepartmentName || "-"}</td>
+                    <td>{r.departmentName || "-"}</td>
+                    <td>{r.createdByName || "-"}</td>
+                    <td className="mono">{fmtDateTime(r.requestedAt)}</td>
+                    <td className="muted">{r.note || ""}</td>
+                    <td className="text-right">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => loadPreview(r)}
+                        disabled={loadingPreview && selected?.id === r.id}
+                      >
+                        {loadingPreview && selected?.id === r.id ? "Đang tải..." : "Xem trước"}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="table-empty">
+                    Không có phiếu đủ điều kiện theo bộ lọc hiện tại.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* KHÔNG ĐỦ ĐIỀU KIỆN */}
+        <div className="ineligible-toggle">
+          <button className="btn btn-outline" onClick={() => setShowIneligible((p) => !p)}>
+            {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
           </button>
         </div>
+
+        {showIneligible ? (
+          <div className="ineligible-box">
+            <div className="ineligible-title">Phiếu không đủ điều kiện (kèm lý do)</div>
+            <div className="table-container">
+              <table className="issue-table small">
+                <thead>
+                  <tr>
+                    <th style={{ width: 90 }}>Mã phiếu</th>
+                    <th style={{ minWidth: 200 }}>Bộ môn</th>
+                    <th style={{ minWidth: 180 }}>Ngày gửi</th>
+                    <th style={{ minWidth: 220 }}>Lý do</th>
+                    <th style={{ minWidth: 320 }}>Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ineligible?.length ? (
+                    ineligible.map((x, idx) => {
+                      const reqId = x?.req?.id || x?.header?.id || "-";
+                      const reason = vnReason(x?.reasonCode);
+                      return (
+                        <tr key={`${reqId}-${idx}`}>
+                          <td className="mono">{reqId}</td>
+                          <td>{x?.req?.subDepartmentName || x?.header?.subDepartmentName || "-"}</td>
+                          <td className="mono">{fmtDateTime(x?.req?.requestedAt || x?.header?.requestedAt)}</td>
+                          <td>
+                            <span className={`badge ${reason.badge}`}>{reason.label}</span>
+                            {x?.reasonMessage ? <div className="muted">{x.reasonMessage}</div> : null}
+                          </td>
+                          <td className="muted">
+                            {Array.isArray(x?.unmappedItems) && x.unmappedItems.length ? (
+                              <div>
+                                <div className="muted-strong">Vật tư chưa có mã:</div>
+                                <ul className="mini-list">
+                                  {x.unmappedItems.slice(0, 8).map((t, i) => <li key={i}>{t}</li>)}
+                                </ul>
+                              </div>
+                            ) : null}
+
+                            {Array.isArray(x?.shortages) && x.shortages.length ? (
+                              <div style={{ marginTop: 8 }}>
+                                <div className="muted-strong">Thiếu tồn kho:</div>
+                                <ul className="mini-list">
+                                  {x.shortages.slice(0, 8).map((s, i) => (
+                                    <li key={i}>
+                                      {s.code} - {s.name}: cần {qtyFmt.format(toNumber(s.need))}, còn{" "}
+                                      {qtyFmt.format(toNumber(s.available))}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr><td colSpan={5} className="table-empty">Không có dữ liệu.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="issue-content">
-        {activeTab === 'create' ? (
-          <div className="create-issue">
-            <div className="form-section">
-              <h3>Chọn phiếu xin lĩnh đã duyệt (Đủ hàng)</h3>
-              {selectedRequest ? (
-                <div className="selected-request">
-                  <div className="request-info">
-                    <h4>Phiếu #{selectedRequest.id} - {selectedRequest.createdByName}</h4>
-                    <p><strong>Đơn vị:</strong> {selectedRequest.departmentName}</p>
-                    <p><strong>Ngày yêu cầu:</strong> {new Date(selectedRequest.requestedAt).toLocaleDateString('vi-VN')}</p>
-                    <p><strong>Số loại vật tư:</strong> {selectedRequest.details?.length || 0}</p>
+      {/* XEM TRƯỚC + TẠO PHIẾU XUẤT */}
+      <div className="card">
+        <div className="card-head">
+          <h2 className="card-title">Xem trước phiếu xuất</h2>
+          <div className="card-actions">
+            <span className="badge badge-ok">Tự động theo hạn dùng</span>
+            <span className="badge badge-info">Có thể chọn lô thủ công</span>
+          </div>
+        </div>
 
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button className="btn-change" onClick={() => { setSelectedRequest(null); setIssueDetails([]); }}>
-                        Chọn lại
-                      </button>
-                    </div>
-                  </div>
+        {!selected ? (
+          <div className="hint">Chọn một phiếu ở danh sách phía trên để xem trước và xuất kho.</div>
+        ) : (
+          <>
+            {previewMsg.text ? (
+              <div className={`message ${previewMsg.type === "error" ? "error" : "success"}`}>
+                {previewMsg.text}
+              </div>
+            ) : null}
+
+            <div className="req-info">
+              <div className="req-grid">
+                <div className="req-item">
+                  <div className="req-label">Phiếu xin lĩnh</div>
+                  <div className="req-value mono">#{selected.id}</div>
                 </div>
-              ) : (
-                <div className="requests-list">
-                  {isLoading ? (
-                    <div className="loading">Đang tải danh sách...</div>
-                  ) : approvedRequests.length === 0 ? (
-                    <div className="empty-state">
-                      <h4>Không có phiếu nào đã duyệt và đủ hàng chờ xuất</h4>
-                      <p>Vui lòng đợi lãnh đạo phê duyệt phiếu xin lĩnh và đảm bảo có đủ tồn kho</p>
-                    </div>
-                  ) : (
-                    approvedRequests.map(request => (
-                      <div key={request.id} className="request-card" onClick={() => selectRequest(request)}>
-                        <div className="request-info">
-                          <h4>Phiếu #{request.id}</h4>
-                          <p><strong>Người gửi:</strong> {request.createdByName}</p>
-                          <p><strong>Đơn vị:</strong> {request.departmentName}</p>
-                          <p><strong>Số vật tư:</strong> {request.details?.length || 0} loại</p>
-                          <p><strong>Trạng thái:</strong><span className="text-success"> Đủ hàng</span></p>
-                        </div>
-                        <div className="request-action">
-                          <button className="btn-select">Chọn xuất</button>
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div className="req-item">
+                  <div className="req-label">Bộ môn</div>
+                  <div className="req-value">{selected.subDepartmentName || "-"}</div>
                 </div>
-              )}
+                <div className="req-item">
+                  <div className="req-label">Khoa / Phòng</div>
+                  <div className="req-value">{selected.departmentName || "-"}</div>
+                </div>
+                <div className="req-item">
+                  <div className="req-label">Ngày gửi</div>
+                  <div className="req-value mono">{fmtDateTime(selected.requestedAt)}</div>
+                </div>
+              </div>
+              {selected.note ? <div className="req-note">{selected.note}</div> : null}
             </div>
 
-            {selectedRequest && (
-              <>
-                <div className="form-section">
-                  <h3>Thông tin xuất kho</h3>
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Người nhận *</label>
-                      <input
-                        type="text"
-                        value={formData.receiverName ?? ''}
-                        onChange={(e) => setFormData({ ...formData, receiverName: e.target.value })}
-                        placeholder="Nhập tên người nhận"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Ngày xuất</label>
-                      <input
-                        type="date"
-                        value={formData.issueDate ?? ''}
-                        onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
-                      />
-                    </div>
-                  </div>
+            {previewMissingMessages.length ? (
+              <div className="message error">
+                <div className="muted-strong">Không thể xuất kho vì:</div>
+                <ul className="mini-list">
+                  {previewMissingMessages.map((m, i) => <li key={i}>{m}</li>)}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* Thông tin phiếu xuất */}
+            <div className="config">
+              <div className="config-head">
+                <h3 className="config-title">Thông tin phiếu xuất</h3>
+              </div>
+
+              <div className="config-grid">
+                <div className="form-group">
+                  <label className="form-label">Ngày xuất</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={issueDate}
+                    onChange={(e) => setIssueDate(e.target.value)}
+                  />
                 </div>
 
-                {/* Schedule pickup */}
-                <div className="form-section">
-                  <h3>Lịch hẹn nhận hàng (tùy chọn)</h3>
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Thời gian hẹn *</label>
-                      <input
-                        type="datetime-local"
-                        value={schedule.scheduledAt ?? ''}
-                        onChange={(e) => setSchedule({ ...schedule, scheduledAt: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Địa điểm</label>
-                      <input
-                        type="text"
-                        value={schedule.location ?? ''}
-                        onChange={(e) => setSchedule({ ...schedule, location: e.target.value })}
-                        placeholder="Kho chính"
-                      />
-                    </div>
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                      <label>Ghi chú</label>
-                      <input
-                        type="text"
-                        value={schedule.note ?? ''}
-                        onChange={(e) => setSchedule({ ...schedule, note: e.target.value })}
-                        placeholder="VD: mang theo giấy tờ..."
-                      />
-                    </div>
-                  </div>
-
-                  <button className="btn-submit" onClick={submitSchedulePickup} disabled={isLoading}>
-                    Tạo lịch hẹn cho cán bộ
-                  </button>
+                <div className="form-group">
+                  <label className="form-label">Kho</label>
+                  <input
+                    className="form-input"
+                    value={warehouseName}
+                    onChange={(e) => setWarehouseName(e.target.value)}
+                    placeholder="Kho chính"
+                  />
                 </div>
 
-                {/* Details */}
-                <div className="form-section">
-                  <div className="section-header">
-                    <h3>Chi tiết xuất kho (AUTO FEFO / MANUAL theo lô)</h3>
-                    <div className="fefo-note">
-                      <span className="badge-info">Mặc định: AUTO FEFO. Nếu chọn MANUAL, bạn nhập SL theo từng lô.</span>
-                    </div>
-                  </div>
+                <div className="form-group grow">
+                  <label className="form-label">Người nhận (nếu cần)</label>
+                  <input
+                    className="form-input"
+                    value={receiverName}
+                    onChange={(e) => setReceiverName(e.target.value)}
+                    placeholder="Có thể để trống"
+                  />
+                </div>
 
-                  <div className="issue-details">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>STT</th>
-                          <th>Tên vật tư</th>
-                          <th>Đơn vị</th>
-                          <th>SL yêu cầu</th>
-                          <th>Tồn kho</th>
-                          <th>SL xuất</th>
-                          <th>Lô phân bổ / Chọn lô</th>
-                          <th>Trạng thái</th>
+                <div className="form-group">
+                  <label className="form-label">Cách chọn lô</label>
+                  <div className="segmented">
+                    <button
+                      className={`seg-btn ${autoAllocate ? "active" : ""}`}
+                      type="button"
+                      onClick={() => setAutoAllocate(true)}
+                    >
+                      Tự động
+                    </button>
+                    <button
+                      className={`seg-btn ${!autoAllocate ? "active" : ""}`}
+                      type="button"
+                      onClick={() => setAutoAllocate(false)}
+                    >
+                      Thủ công
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Danh sách vật tư */}
+            <div className="table-container">
+              <table className="issue-table">
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: 240 }}>Tên vật tư</th>
+                    <th style={{ minWidth: 140 }}>Mã</th>
+                    <th style={{ minWidth: 200 }}>Quy cách</th>
+                    <th style={{ minWidth: 90 }}>ĐVT</th>
+                    <th style={{ minWidth: 120 }} className="text-right">SL yêu cầu</th>
+                    <th style={{ minWidth: 120 }} className="text-right">SL xuất</th>
+                    <th style={{ minWidth: 320 }}>Gợi ý lô</th>
+                    <th style={{ width: 160 }} className="text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingPreview ? (
+                    <tr><td colSpan={8} className="table-empty">Đang tải...</td></tr>
+                  ) : previewLines.length ? (
+                    previewLines.map((ln) => {
+                      const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
+                      const status = manualStatusForLine(ln.materialId);
+
+                      return (
+                        <tr key={ln.materialId}>
+                          <td>
+                            <div className="cell-main">{ln.name}</div>
+                            <div className="cell-sub muted">{ln.spec}</div>
+                          </td>
+                          <td className="mono">{ln.code}</td>
+                          <td className="muted">{ln.spec}</td>
+                          <td>{ln.unitName || "-"}</td>
+                          <td className="text-right mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
+                          <td className="text-right mono">{qtyFmt.format(need)}</td>
+                          <td className="muted">
+                            {Array.isArray(ln.lots) && ln.lots.length ? (
+                              <div className="lot-list">
+                                {ln.lots.slice(0, 3).map((l, i) => (
+                                  <div className="lot-item" key={i}>
+                                    <span className="lot-pill">{l.lotNumber}</span>
+                                    <span className="lot-meta">
+                                      HSD: {l.expDate || "-"} | Tồn: {qtyFmt.format(toNumber(l.availableStock))} → Xuất:{" "}
+                                      <b>{qtyFmt.format(toNumber(l.qtyOut))}</b>
+                                    </span>
+                                  </div>
+                                ))}
+                                {ln.lots.length > 3 ? (
+                                  <div className="muted mini">+{ln.lots.length - 3} lô khác</div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="mini">Không có gợi ý</span>
+                            )}
+                          </td>
+                          <td className="text-right">
+                            {!autoAllocate ? (
+                              <button
+                                className={`btn ${status.ok ? "btn-outline" : "btn-primary"}`}
+                                type="button"
+                                onClick={() => openModalForLine(ln)}
+                              >
+                                {status.ok ? "Sửa lô" : "Chọn lô"}
+                              </button>
+                            ) : (
+                              <span className="badge badge-ok">Tự động</span>
+                            )}
+                          </td>
                         </tr>
-                      </thead>
+                      );
+                    })
+                  ) : (
+                    <tr><td colSpan={8} className="table-empty">Chưa có dữ liệu.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-                      <tbody>
-                        {issueDetails.map((d, index) => {
-                          const manualSum = sumObjectValues(d.manualAllocMap);
-                          const qtyIssued = parseFloat(d.qtyIssued) || 0;
+            {createMsg.text ? (
+              <div className={`message ${createMsg.type === "error" ? "error" : "success"}`}>{createMsg.text}</div>
+            ) : null}
+
+            <div className="actions">
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={() => {
+                  setSelected(null);
+                  setPreviewData(null);
+                  setManualAlloc({});
+                  setCreateMsg({ type: "", text: "" });
+                  setIssueDetail(null);
+                  setCreatedIssueId(null);
+                }}
+                disabled={creating}
+              >
+                Bỏ chọn
+              </button>
+
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={createIssue}
+                disabled={creating || !canCreateIssue}
+                title={!canCreateIssue ? "Phiếu chưa đủ điều kiện" : ""}
+              >
+                {creating ? "Đang tạo phiếu..." : "Tạo phiếu xuất kho"}
+              </button>
+            </div>
+
+            {/* Chi tiết phiếu xuất */}
+            {createdIssueId ? (
+              <div className="detail-card">
+                <div className="detail-head">
+                  <h3 className="detail-title">Chi tiết phiếu xuất</h3>
+                  <div className="detail-actions">
+                    <button
+                      className="btn btn-outline"
+                      type="button"
+                      onClick={() => loadIssueDetail(createdIssueId)}
+                      disabled={loadingDetail}
+                    >
+                      {loadingDetail ? "Đang tải..." : "Tải lại"}
+                    </button>
+                  </div>
+                </div>
+
+                {issueDetail?.success ? (
+                  <>
+                    <div className="detail-grid">
+                      <div className="req-item">
+                        <div className="req-label">Mã phiếu xuất</div>
+                        <div className="req-value mono">#{issueDetail?.header?.id}</div>
+                      </div>
+                      <div className="req-item">
+                        <div className="req-label">Ngày xuất</div>
+                        <div className="req-value mono">{issueDetail?.header?.issueDate}</div>
+                      </div>
+                      <div className="req-item">
+                        <div className="req-label">Người nhận</div>
+                        <div className="req-value">{issueDetail?.header?.receiverName || "-"}</div>
+                      </div>
+                      <div className="req-item">
+                        <div className="req-label">Tổng tiền</div>
+                        <div className="req-value mono">{moneyFmt.format(toNumber(issueDetail?.header?.totalAmount))}</div>
+                      </div>
+                    </div>
+
+                    <div className="table-container">
+                      <table className="issue-table small">
+                        <thead>
+                          <tr>
+                            <th>Tên vật tư</th>
+                            <th style={{ minWidth: 120 }}>Mã</th>
+                            <th style={{ minWidth: 90 }}>ĐVT</th>
+                            <th className="text-right" style={{ minWidth: 120 }}>SL xuất</th>
+                            <th className="text-right" style={{ minWidth: 140 }}>Đơn giá</th>
+                            <th className="text-right" style={{ minWidth: 140 }}>Thành tiền</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(issueDetail?.details || []).map((d) => (
+                            <tr key={d.id}>
+                              <td>{d.name}</td>
+                              <td className="mono">{d.code}</td>
+                              <td>{d.unitName || "-"}</td>
+                              <td className="text-right mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
+                              <td className="text-right mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
+                              <td className="text-right mono">{moneyFmt.format(toNumber(d.total))}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="hint">Chưa có dữ liệu chi tiết.</div>
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {/* MODAL CHỌN LÔ */}
+      {modalOpen && modalLine
+        ? createPortal(
+            <div className="modal-backdrop" onMouseDown={closeModal}>
+              <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="modal-head">
+                  <div>
+                    <div className="modal-title">Chọn lô (thủ công)</div>
+                    <div className="modal-subtitle">
+                      {modalLine.code} - {modalLine.name}
+                    </div>
+                  </div>
+                  <button className="modal-x" onClick={closeModal} aria-label="close">×</button>
+                </div>
+
+                {modalError ? <div className="message error">{modalError}</div> : null}
+
+                <div className="modal-tools">
+                  <div className="mini muted">
+                    SL cần xuất: <b className="mono">{qtyFmt.format(toNumber(modalLine.qtyToIssue ?? modalLine.qtyRequested))}</b>
+                    {"  "} | Đã chọn:{" "}
+                    <b className="mono">{qtyFmt.format(sumLotDraft(modalDraft))}</b>
+                  </div>
+                  <div className="modal-btns">
+                    <button className="btn btn-outline" type="button" onClick={fillFEFOSuggestion}>
+                      Tự điền theo gợi ý
+                    </button>
+                    <button
+                      className="btn btn-outline"
+                      type="button"
+                      onClick={() => {
+                        const next = { ...(modalDraft || {}) };
+                        Object.keys(next).forEach((k) => (next[k] = 0));
+                        setModalDraft(next);
+                      }}
+                    >
+                      Xoá chọn
+                    </button>
+                  </div>
+                </div>
+
+                <div className="table-container modal-table">
+                  <table className="issue-table">
+                    <thead>
+                      <tr>
+                        <th style={{ minWidth: 160 }}>Số lô</th>
+                        <th style={{ minWidth: 140 }}>Hạn dùng</th>
+                        <th style={{ minWidth: 140 }} className="text-right">Tồn còn lại</th>
+                        <th style={{ minWidth: 160 }} className="text-right">Số lượng xuất</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalLoading ? (
+                        <tr><td colSpan={4} className="table-empty">Đang tải...</td></tr>
+                      ) : modalLots.length ? (
+                        modalLots.map((l) => {
+                          const lot = safeStr(l?.lotNumber).trim();
+                          const avail = toNumber(l?.availableStock);
+                          const val = modalDraft?.[lot] ?? 0;
 
                           return (
-                            <tr key={d.materialId}>
-                              <td className="text-center">{index + 1}</td>
-
-                              <td>
-                                <div>
-                                  <div><strong>{d.materialName}</strong></div>
-                                  <div className="text-muted">{d.materialCode}</div>
-                                </div>
-                              </td>
-
-                              <td>{d.unitName}</td>
-
-                              <td className="text-center">
-                                <span className="qty-requested">{d.qtyRequested}</span>
-                              </td>
-
-                              <td className="text-center">
-                                <span className={`stock-badge ${d.sufficient ? 'sufficient' : 'insufficient'}`}>
-                                  {d.availableStock}
-                                </span>
-                              </td>
-
-                              <td>
+                            <tr key={lot}>
+                              <td className="mono">{lot}</td>
+                              <td className="mono">{l?.expDate || "-"}</td>
+                              <td className="text-right mono">{qtyFmt.format(avail)}</td>
+                              <td className="text-right">
                                 <input
-                                  type="number"
-                                  value={d.qtyIssued ?? ''}
-                                  onChange={(e) => updateQtyIssued(d.materialId, e.target.value)}
-                                  min="0"
-                                  max={Math.min(parseFloat(d.qtyRequested) || 0, parseFloat(d.availableStock) || 0)}
-                                  step="0.001"
-                                  disabled={!d.sufficient}
+                                  className="table-input number-input"
+                                  value={val}
+                                  onChange={(e) => {
+                                    const next = { ...(modalDraft || {}) };
+                                    next[lot] = e.target.value;
+                                    setModalDraft(next);
+                                  }}
+                                  placeholder="0"
                                 />
-                              </td>
-
-                              <td>
-                                <div className="lot-mode-toggle">
-                                  <button
-                                    className={`lot-mode-btn ${d.lotMode === 'AUTO' ? 'active' : ''}`}
-                                    onClick={() => setLotMode(d.materialId, 'AUTO')}
-                                    type="button"
-                                  >
-                                    AUTO FEFO
-                                  </button>
-                                  <button
-                                    className={`lot-mode-btn ${d.lotMode === 'MANUAL' ? 'active' : ''}`}
-                                    onClick={() => setLotMode(d.materialId, 'MANUAL')}
-                                    type="button"
-                                  >
-                                    MANUAL
-                                  </button>
-                                </div>
-
-                                {d.lotMode === 'AUTO' ? (
-                                  d.selectedLots && d.selectedLots.length > 0 ? (
-                                    <div className="lot-allocation">
-                                      {d.selectedLots.map((lot, idx2) => (
-                                      <div key={`${d.materialId}-${lot.lotNumber ?? 'LOT'}-${idx2}`} className="lot-item">
-                                          <span className="lot-number">Lô {lot.lotNumber}</span>
-                                          <span className="lot-qty">{lot.allocatedQty}</span>
-                                          <span className="lot-exp">
-                                            {lot.expDate ? new Date(lot.expDate).toLocaleDateString('vi-VN') : 'Không HSD'}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted">Chưa phân bổ</span>
-                                  )
-                                ) : (
-                                  <div className="manual-lot-box">
-                                    <div className="manual-lot-head">
-                                      <span>Chọn lô + nhập SL</span>
-                                      <button
-                                        type="button"
-                                        className="manual-fill"
-                                        onClick={() => fillManualByFEFO(d.materialId)}
-                                        title="Gợi ý phân bổ theo FEFO cho nhanh"
-                                      >
-                                        Gợi ý FEFO
-                                      </button>
-                                    </div>
-
-                                    {(d.lotStocks || []).length === 0 ? (
-                                      <div className="text-muted">Không có dữ liệu lô</div>
-                                    ) : (
-                                      <div className="manual-lot-list">
-                                        {d.lotStocks.map((lot, i3) => (
-                                          <div key={`${d.materialId}-${lot.lotNumber ?? i3}`} className="manual-lot-row">
-                                            <div className="manual-lot-left">
-                                              <div><strong>Lô {lot.lotNumber}</strong></div>
-                                              <div className="text-muted">
-                                                HSD: {lot.expDate ? new Date(lot.expDate).toLocaleDateString('vi-VN') : 'Không'}
-                                                {' '}| Tồn: {lot.availableQty}
-                                              </div>
-                                            </div>
-
-                                            <div className="manual-lot-right">
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                step="0.001"
-                                                max={parseFloat(lot.availableQty) || 0}
-                                                value={d.manualAllocMap?.[lot.lotNumber] ?? 0}
-                                                onChange={(e) => updateManualAlloc(d.materialId, lot.lotNumber, e.target.value)}
-                                              />
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    <div className="manual-lot-foot">
-                                      <span>Tổng phân bổ:</span>
-                                      <strong className={Math.abs(manualSum - qtyIssued) <= 1e-6 ? 'ok' : 'bad'}>
-                                        {manualSum}
-                                      </strong>
-                                      <span style={{ marginLeft: 8 }}>(phải bằng SL xuất: {qtyIssued})</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-
-                              <td>
-                                {d.sufficient ? (
-                                  <span className="text-success">
-                                    <span className="status-dot green"></span>
-                                    Đủ hàng
-                                  </span>
-                                ) : (
-                                  <span className="text-danger">
-                                    <span className="status-dot red"></span>
-                                    Thiếu hàng
-                                  </span>
-                                )}
                               </td>
                             </tr>
                           );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                        })
+                      ) : (
+                        <tr><td colSpan={4} className="table-empty">Không có lô còn tồn.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
-                <div className="summary-section">
-                  <button
-                    className="btn-submit"
-                    onClick={handleSubmit}
-                    disabled={isLoading || issueDetails.some(d => !d.sufficient)}
-                  >
-                    {isLoading ? 'Đang xử lý...' : 'Xác nhận xuất kho'}
+                <div className="modal-actions">
+                  <button className="btn btn-outline" type="button" onClick={closeModal}>
+                    Đóng
+                  </button>
+                  <button className="btn btn-primary" type="button" onClick={saveModalAllocation}>
+                    Lưu
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="issue-history">
-            {isLoading ? (
-              <div className="loading">Đang tải dữ liệu...</div>
-            ) : issues.length === 0 ? (
-              <div className="empty-state">
-                <h3>Chưa có phiếu xuất nào</h3>
-                <p>Hãy tạo phiếu xuất đầu tiên bằng cách chuyển sang tab "Xuất kho"</p>
               </div>
-            ) : (
-              <div className="issues-list">
-                {issues.map(issue => (
-                  <div key={issue.id} className="issue-card">
-                    <div className="issue-header">
-                      <div className="issue-info">
-                        <h3>Phiếu xuất #{issue.id}</h3>
-                        <p><strong>Người nhận:</strong> {issue.receiverName}</p>
-                        <p><strong>Ngày xuất:</strong> {new Date(issue.issueDate).toLocaleDateString('vi-VN')}</p>
-                        <p><strong>Tổng tiền:</strong> {issue.totalAmount?.toLocaleString('vi-VN')} đ</p>
-                        <p><strong>Người xuất:</strong> {issue.createdByName}</p>
-                      </div>
-                      <div className="issue-actions">
-                        <button className="btn-view" onClick={() => toast.success('Chi tiết phiếu xuất #' + issue.id)}>
-                          Xem chi tiết
-                        </button>
-                      </div>
-                    </div>
-                    {issue.issueReqHeaderId && (
-                      <div className="issue-ref">
-                        <strong>Từ phiếu xin lĩnh:</strong> #{issue.issueReqHeaderId}
-                      </div>
-                    )}
-                    {issue.details && (
-                      <div className="issue-items-summary">
-                        <strong>Số loại vật tư:</strong> {issue.details.length}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
