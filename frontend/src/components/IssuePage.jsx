@@ -65,18 +65,17 @@ function groupLinesByMaterial(lines) {
   return Array.from(map.values());
 }
 
-// Hiển thị lý do bị loại bằng tiếng Việt
 function vnReason(reasonCode) {
   const code = safeStr(reasonCode).toUpperCase();
   switch (code) {
     case "ALREADY_ISSUED":
-      return { label: "Đã xuất kho trước đó", badge: "badge-warn" };
+      return "Phiếu này đã được xuất kho trước đó";
     case "HAS_UNMAPPED_MATERIAL":
-      return { label: "Có vật tư chưa có mã (chưa map)", badge: "badge-warn" };
+      return "Có vật tư chưa map mã vật tư (thiếu material_id / code)";
     case "NOT_ENOUGH_STOCK":
-      return { label: "Không đủ tồn kho", badge: "badge-warn" };
+      return "Không đủ tồn kho theo thẻ kho";
     default:
-      return { label: "Không đủ điều kiện", badge: "badge-warn" };
+      return "Không đủ điều kiện";
   }
 }
 
@@ -85,11 +84,10 @@ export default function IssuePage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [bootError, setBootError] = useState("");
 
-  // -------- Filters ----------
+  // -------- Filters  ----------
   const [departmentId, setDepartmentId] = useState("");
   const [subDepartmentId, setSubDepartmentId] = useState("");
   const [limit, setLimit] = useState("80");
-  const [search, setSearch] = useState("");
 
   // -------- List eligible/ineligible ----------
   const [loadingList, setLoadingList] = useState(false);
@@ -97,6 +95,8 @@ export default function IssuePage() {
   const [eligible, setEligible] = useState([]);
   const [ineligible, setIneligible] = useState([]);
   const [summary, setSummary] = useState(null);
+
+  // Ẩn mặc định để UI không “quá nhiều”
   const [showIneligible, setShowIneligible] = useState(false);
 
   // -------- Selected request & preview ----------
@@ -172,6 +172,7 @@ export default function IssuePage() {
       setListMsg({ type: "error", text: "Chưa xác định được tài khoản đang dùng." });
       return;
     }
+
     setLoadingList(true);
     setListMsg({ type: "", text: "" });
 
@@ -179,7 +180,11 @@ export default function IssuePage() {
       const params = new URLSearchParams();
       if (departmentId.trim()) params.set("departmentId", departmentId.trim());
       if (subDepartmentId.trim()) params.set("subDepartmentId", subDepartmentId.trim());
-      if (limit.trim()) params.set("limit", limit.trim());
+
+      // GIỮ LIMIT
+      const lim = Number(limit);
+      if (Number.isFinite(lim) && lim > 0) params.set("limit", String(lim));
+      else params.set("limit", "80");
 
       const data = await fetchJson(
         `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`,
@@ -198,9 +203,9 @@ export default function IssuePage() {
       setIneligible(Array.isArray(data?.ineligible) ? data.ineligible : []);
       setSummary(data?.summary || null);
 
-      // thông báo ngắn gọn
       setListMsg({ type: "success", text: data?.message || "Đã tải danh sách." });
 
+      // Nếu selected không còn trong eligible thì reset preview
       if (selected?.id) {
         const still = (data.eligible || []).some((x) => x?.id === selected.id);
         if (!still) {
@@ -221,7 +226,7 @@ export default function IssuePage() {
 
   useEffect(() => {
     if (currentUser?.id) loadEligibleList();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
   // ------------------ select & preview ------------------
@@ -292,10 +297,9 @@ export default function IssuePage() {
     setModalLoading(true);
 
     try {
-      const lots = await fetchJson(
-        `${API_ENDPOINTS.ISSUES}/materials/${line.materialId}/lots`,
-        { headers: authHeaders }
-      );
+      const lots = await fetchJson(`${API_ENDPOINTS.ISSUES}/materials/${line.materialId}/lots`, {
+        headers: authHeaders,
+      });
 
       const arr = Array.isArray(lots) ? lots : [];
       setModalLots(arr);
@@ -385,7 +389,6 @@ export default function IssuePage() {
     closeModal();
   };
 
-  // ------------------ build create payload ------------------
   const validateManualBeforeCreate = () => {
     for (const ln of previewLines) {
       const materialId = ln.materialId;
@@ -425,7 +428,6 @@ export default function IssuePage() {
     return payload;
   };
 
-  // ------------------ create issue ------------------
   const loadIssueDetail = async (issueId) => {
     if (!issueId) return;
     setLoadingDetail(true);
@@ -487,7 +489,7 @@ export default function IssuePage() {
 
       setCreateMsg({ type: "success", text: data?.message || "Xuất kho thành công." });
 
-      loadEligibleList();
+      await loadEligibleList();
       if (issueId) await loadIssueDetail(issueId);
     } catch {
       setCreateMsg({ type: "error", text: "Lỗi khi tạo phiếu xuất." });
@@ -495,27 +497,6 @@ export default function IssuePage() {
       setCreating(false);
     }
   };
-
-  // ------------------ UI helpers ------------------
-  const filteredEligible = useMemo(() => {
-    const kw = search.trim().toLowerCase();
-    if (!kw) return eligible;
-
-    return (eligible || []).filter((r) => {
-      const id = safeStr(r?.id);
-      const sub = safeStr(r?.subDepartmentName);
-      const dep = safeStr(r?.departmentName);
-      const creator = safeStr(r?.createdByName);
-      const note = safeStr(r?.note);
-      return (
-        id.includes(kw) ||
-        sub.toLowerCase().includes(kw) ||
-        dep.toLowerCase().includes(kw) ||
-        creator.toLowerCase().includes(kw) ||
-        note.toLowerCase().includes(kw)
-      );
-    });
-  }, [eligible, search]);
 
   const manualStatusForLine = (materialId) => {
     const saved = manualAlloc?.[materialId];
@@ -539,7 +520,7 @@ export default function IssuePage() {
         <h1 className="page-title">Xuất kho</h1>
       </div>
 
-      {/* DANH SÁCH PHIẾU */}
+      {/* DANH SÁCH PHIẾU ĐỦ ĐIỀU KIỆN */}
       <div className="card">
         <div className="card-head">
           <h2 className="card-title">Phiếu xin lĩnh đủ điều kiện xuất</h2>
@@ -554,6 +535,7 @@ export default function IssuePage() {
           <div className={`message ${listMsg.type === "error" ? "error" : "success"}`}>{listMsg.text}</div>
         ) : null}
 
+        {/* Bộ lọc: GIỮ limit, BỎ tìm nhanh */}
         <div className="filters">
           <div className="form-group">
             <label className="form-label">Lọc theo Khoa (ID)</label>
@@ -584,18 +566,9 @@ export default function IssuePage() {
               placeholder="80"
             />
           </div>
-
-          <div className="form-group grow">
-            <label className="form-label">Tìm nhanh</label>
-            <input
-              className="form-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Nhập ID / Khoa / Bộ môn / Người tạo / Ghi chú..."
-            />
-          </div>
         </div>
 
+        {/* Summary gọn */}
         {summary ? (
           <div className="summary-strip">
             <div className="summary-item">
@@ -604,23 +577,11 @@ export default function IssuePage() {
             </div>
             <div className="summary-item">
               <div className="summary-label">Đủ điều kiện</div>
-              <div className="summary-value ok">{summary.eligible ?? filteredEligible.length}</div>
+              <div className="summary-value ok">{summary.eligible ?? eligible.length}</div>
             </div>
             <div className="summary-item">
               <div className="summary-label">Không đủ điều kiện</div>
               <div className="summary-value warn">{summary.ineligible ?? ineligible.length}</div>
-            </div>
-            <div className="summary-item">
-              <div className="summary-label">Thiếu tồn kho</div>
-              <div className="summary-value warn">{summary.rejectedNotEnoughStock ?? "-"}</div>
-            </div>
-            <div className="summary-item">
-              <div className="summary-label">Vật tư chưa có mã</div>
-              <div className="summary-value warn">{summary.rejectedHasUnmappedMaterial ?? "-"}</div>
-            </div>
-            <div className="summary-item">
-              <div className="summary-label">Đã xuất trước đó</div>
-              <div className="summary-value warn">{summary.rejectedAlreadyIssued ?? "-"}</div>
             </div>
           </div>
         ) : null}
@@ -630,17 +591,19 @@ export default function IssuePage() {
             <thead>
               <tr>
                 <th style={{ width: 90 }}>Mã phiếu</th>
-                <th style={{ minWidth: 200 }}>Bộ môn / Đơn vị</th>
-                <th style={{ minWidth: 200 }}>Khoa / Phòng</th>
+                <th style={{ minWidth: 220 }}>Bộ môn / Đơn vị</th>
+                <th style={{ minWidth: 220 }}>Khoa / Phòng</th>
                 <th style={{ minWidth: 190 }}>Người tạo</th>
                 <th style={{ minWidth: 190 }}>Ngày gửi</th>
                 <th style={{ minWidth: 320 }}>Ghi chú</th>
-                <th style={{ width: 150 }} className="text-right">Thao tác</th>
+                <th style={{ width: 150 }} className="text-right">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredEligible?.length ? (
-                filteredEligible.map((r) => (
+              {eligible?.length ? (
+                eligible.map((r) => (
                   <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
                     <td className="mono">{r.id}</td>
                     <td>{r.subDepartmentName || "-"}</td>
@@ -670,7 +633,7 @@ export default function IssuePage() {
           </table>
         </div>
 
-        {/* KHÔNG ĐỦ ĐIỀU KIỆN */}
+        {/* Không đủ điều kiện - ẩn mặc định, hiển thị gọn */}
         <div className="ineligible-toggle">
           <button className="btn btn-outline" onClick={() => setShowIneligible((p) => !p)}>
             {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
@@ -679,61 +642,43 @@ export default function IssuePage() {
 
         {showIneligible ? (
           <div className="ineligible-box">
-            <div className="ineligible-title">Phiếu không đủ điều kiện (kèm lý do)</div>
+            <div className="ineligible-title">Phiếu không đủ điều kiện (tóm tắt lý do)</div>
             <div className="table-container">
               <table className="issue-table small">
                 <thead>
                   <tr>
                     <th style={{ width: 90 }}>Mã phiếu</th>
-                    <th style={{ minWidth: 200 }}>Bộ môn</th>
-                    <th style={{ minWidth: 180 }}>Ngày gửi</th>
-                    <th style={{ minWidth: 220 }}>Lý do</th>
-                    <th style={{ minWidth: 320 }}>Chi tiết</th>
+                    <th style={{ minWidth: 220 }}>Bộ môn</th>
+                    <th style={{ minWidth: 190 }}>Ngày gửi</th>
+                    <th style={{ minWidth: 420 }}>Lý do</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ineligible?.length ? (
                     ineligible.map((x, idx) => {
                       const reqId = x?.req?.id || x?.header?.id || "-";
-                      const reason = vnReason(x?.reasonCode);
+                      const subName = x?.req?.subDepartmentName || x?.header?.subDepartmentName || "-";
+                      const requestedAt = x?.req?.requestedAt || x?.header?.requestedAt;
+                      const reasonText = vnReason(x?.reasonCode);
+
                       return (
                         <tr key={`${reqId}-${idx}`}>
                           <td className="mono">{reqId}</td>
-                          <td>{x?.req?.subDepartmentName || x?.header?.subDepartmentName || "-"}</td>
-                          <td className="mono">{fmtDateTime(x?.req?.requestedAt || x?.header?.requestedAt)}</td>
-                          <td>
-                            <span className={`badge ${reason.badge}`}>{reason.label}</span>
-                            {x?.reasonMessage ? <div className="muted">{x.reasonMessage}</div> : null}
-                          </td>
+                          <td>{subName}</td>
+                          <td className="mono">{fmtDateTime(requestedAt)}</td>
                           <td className="muted">
-                            {Array.isArray(x?.unmappedItems) && x.unmappedItems.length ? (
-                              <div>
-                                <div className="muted-strong">Vật tư chưa có mã:</div>
-                                <ul className="mini-list">
-                                  {x.unmappedItems.slice(0, 8).map((t, i) => <li key={i}>{t}</li>)}
-                                </ul>
-                              </div>
-                            ) : null}
-
-                            {Array.isArray(x?.shortages) && x.shortages.length ? (
-                              <div style={{ marginTop: 8 }}>
-                                <div className="muted-strong">Thiếu tồn kho:</div>
-                                <ul className="mini-list">
-                                  {x.shortages.slice(0, 8).map((s, i) => (
-                                    <li key={i}>
-                                      {s.code} - {s.name}: cần {qtyFmt.format(toNumber(s.need))}, còn{" "}
-                                      {qtyFmt.format(toNumber(s.available))}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ) : null}
+                            {reasonText}
+                            {x?.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
                           </td>
                         </tr>
                       );
                     })
                   ) : (
-                    <tr><td colSpan={5} className="table-empty">Không có dữ liệu.</td></tr>
+                    <tr>
+                      <td colSpan={4} className="table-empty">
+                        Không có dữ liệu.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -745,11 +690,7 @@ export default function IssuePage() {
       {/* XEM TRƯỚC + TẠO PHIẾU XUẤT */}
       <div className="card">
         <div className="card-head">
-          <h2 className="card-title">Xem trước phiếu xuất</h2>
-          <div className="card-actions">
-            <span className="badge badge-ok">Tự động theo hạn dùng</span>
-            <span className="badge badge-info">Có thể chọn lô thủ công</span>
-          </div>
+          <h2 className="card-title">Xem trước và xuất kho</h2>
         </div>
 
         {!selected ? (
@@ -788,7 +729,9 @@ export default function IssuePage() {
               <div className="message error">
                 <div className="muted-strong">Không thể xuất kho vì:</div>
                 <ul className="mini-list">
-                  {previewMissingMessages.map((m, i) => <li key={i}>{m}</li>)}
+                  {previewMissingMessages.map((m, i) => (
+                    <li key={i}>{m}</li>
+                  ))}
                 </ul>
               </div>
             ) : null}
@@ -838,7 +781,7 @@ export default function IssuePage() {
                       type="button"
                       onClick={() => setAutoAllocate(true)}
                     >
-                      Tự động
+                      Tự động (FEFO)
                     </button>
                     <button
                       className={`seg-btn ${!autoAllocate ? "active" : ""}`}
@@ -852,7 +795,7 @@ export default function IssuePage() {
               </div>
             </div>
 
-            {/* Danh sách vật tư */}
+            {/* Danh sách vật tư và gợi ý lô */}
             <div className="table-container">
               <table className="issue-table">
                 <thead>
@@ -861,15 +804,25 @@ export default function IssuePage() {
                     <th style={{ minWidth: 140 }}>Mã</th>
                     <th style={{ minWidth: 200 }}>Quy cách</th>
                     <th style={{ minWidth: 90 }}>ĐVT</th>
-                    <th style={{ minWidth: 120 }} className="text-right">SL yêu cầu</th>
-                    <th style={{ minWidth: 120 }} className="text-right">SL xuất</th>
-                    <th style={{ minWidth: 320 }}>Gợi ý lô</th>
-                    <th style={{ width: 160 }} className="text-right">Thao tác</th>
+                    <th style={{ minWidth: 120 }} className="text-right">
+                      SL yêu cầu
+                    </th>
+                    <th style={{ minWidth: 120 }} className="text-right">
+                      SL xuất
+                    </th>
+                    <th style={{ minWidth: 320 }}>Gợi ý lô theo hạn dùng</th>
+                    <th style={{ width: 160 }} className="text-right">
+                      Thao tác
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingPreview ? (
-                    <tr><td colSpan={8} className="table-empty">Đang tải...</td></tr>
+                    <tr>
+                      <td colSpan={8} className="table-empty">
+                        Đang tải...
+                      </td>
+                    </tr>
                   ) : previewLines.length ? (
                     previewLines.map((ln) => {
                       const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
@@ -879,7 +832,6 @@ export default function IssuePage() {
                         <tr key={ln.materialId}>
                           <td>
                             <div className="cell-main">{ln.name}</div>
-                            <div className="cell-sub muted">{ln.spec}</div>
                           </td>
                           <td className="mono">{ln.code}</td>
                           <td className="muted">{ln.spec}</td>
@@ -923,14 +875,20 @@ export default function IssuePage() {
                       );
                     })
                   ) : (
-                    <tr><td colSpan={8} className="table-empty">Chưa có dữ liệu.</td></tr>
+                    <tr>
+                      <td colSpan={8} className="table-empty">
+                        Chưa có dữ liệu.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
 
             {createMsg.text ? (
-              <div className={`message ${createMsg.type === "error" ? "error" : "success"}`}>{createMsg.text}</div>
+              <div className={`message ${createMsg.type === "error" ? "error" : "success"}`}>
+                {createMsg.text}
+              </div>
             ) : null}
 
             <div className="actions">
@@ -1006,9 +964,15 @@ export default function IssuePage() {
                             <th>Tên vật tư</th>
                             <th style={{ minWidth: 120 }}>Mã</th>
                             <th style={{ minWidth: 90 }}>ĐVT</th>
-                            <th className="text-right" style={{ minWidth: 120 }}>SL xuất</th>
-                            <th className="text-right" style={{ minWidth: 140 }}>Đơn giá</th>
-                            <th className="text-right" style={{ minWidth: 140 }}>Thành tiền</th>
+                            <th className="text-right" style={{ minWidth: 120 }}>
+                              SL xuất
+                            </th>
+                            <th className="text-right" style={{ minWidth: 140 }}>
+                              Đơn giá
+                            </th>
+                            <th className="text-right" style={{ minWidth: 140 }}>
+                              Thành tiền
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1047,16 +1011,18 @@ export default function IssuePage() {
                       {modalLine.code} - {modalLine.name}
                     </div>
                   </div>
-                  <button className="modal-x" onClick={closeModal} aria-label="close">×</button>
+                  <button className="modal-x" onClick={closeModal} aria-label="close">
+                    ×
+                  </button>
                 </div>
 
                 {modalError ? <div className="message error">{modalError}</div> : null}
 
                 <div className="modal-tools">
                   <div className="mini muted">
-                    SL cần xuất: <b className="mono">{qtyFmt.format(toNumber(modalLine.qtyToIssue ?? modalLine.qtyRequested))}</b>
-                    {"  "} | Đã chọn:{" "}
-                    <b className="mono">{qtyFmt.format(sumLotDraft(modalDraft))}</b>
+                    SL cần xuất:{" "}
+                    <b className="mono">{qtyFmt.format(toNumber(modalLine.qtyToIssue ?? modalLine.qtyRequested))}</b>
+                    {"  "} | Đã chọn: <b className="mono">{qtyFmt.format(sumLotDraft(modalDraft))}</b>
                   </div>
                   <div className="modal-btns">
                     <button className="btn btn-outline" type="button" onClick={fillFEFOSuggestion}>
@@ -1082,13 +1048,21 @@ export default function IssuePage() {
                       <tr>
                         <th style={{ minWidth: 160 }}>Số lô</th>
                         <th style={{ minWidth: 140 }}>Hạn dùng</th>
-                        <th style={{ minWidth: 140 }} className="text-right">Tồn còn lại</th>
-                        <th style={{ minWidth: 160 }} className="text-right">Số lượng xuất</th>
+                        <th style={{ minWidth: 140 }} className="text-right">
+                          Tồn còn lại
+                        </th>
+                        <th style={{ minWidth: 160 }} className="text-right">
+                          Số lượng xuất
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {modalLoading ? (
-                        <tr><td colSpan={4} className="table-empty">Đang tải...</td></tr>
+                        <tr>
+                          <td colSpan={4} className="table-empty">
+                            Đang tải...
+                          </td>
+                        </tr>
                       ) : modalLots.length ? (
                         modalLots.map((l) => {
                           const lot = safeStr(l?.lotNumber).trim();
@@ -1116,7 +1090,11 @@ export default function IssuePage() {
                           );
                         })
                       ) : (
-                        <tr><td colSpan={4} className="table-empty">Không có lô còn tồn.</td></tr>
+                        <tr>
+                          <td colSpan={4} className="table-empty">
+                            Không có lô còn tồn.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
