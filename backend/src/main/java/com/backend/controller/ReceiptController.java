@@ -1,6 +1,7 @@
 package com.backend.controller;
 
 import com.backend.dto.CreateReceiptDTO;
+import com.backend.dto.ReceiptFeedResponseDTO;
 import com.backend.dto.ReceiptResponseDTO;
 import com.backend.service.ReceiptService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,18 @@ public class ReceiptController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.ok(ReceiptResponseDTO.error("Không thể tải phiếu nhập"));
+        }
+    }
+
+    @GetMapping("/feed")
+    public ResponseEntity<ReceiptFeedResponseDTO> feed(
+            @RequestParam(value = "afterId", required = false) Long afterId,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestHeader("X-User-Id") Long userId) {
+        try {
+            return ResponseEntity.ok(receiptService.feedReceipts(afterId, limit, userId));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ReceiptFeedResponseDTO.error("Không thể lấy feed: " + e.getMessage()));
         }
     }
 }

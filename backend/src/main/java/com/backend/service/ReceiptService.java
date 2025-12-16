@@ -6,7 +6,7 @@ import com.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.data.domain.PageRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -73,9 +73,6 @@ public class ReceiptService {
 
             header.setTotalAmount(totalAmount);
             header = receiptHeaderRepository.save(header);
-
-            // Notify (console)
-            notificationService.notifyNewReceipt(header);
 
             ReceiptHeaderDTO headerDTO = convertHeaderToDTO(header);
             Map<String, Object> summary = createSummary(header);
@@ -327,5 +324,48 @@ public class ReceiptService {
 
     private static String safeTrim(String s) {
         return s == null ? "" : s.trim();
+    }
+    public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+            if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
+
+            // Bạn có 2 lựa chọn:
+            // (A) Cho tất cả user approved nhận feed (khuyến nghị cho mục tiêu “thông báo”)
+            // (B) Chỉ thuKho/lanhDao/BGH (giống getReceiptDetail)
+            // Mình mặc định (A). Nếu muốn (B) thì bật check dưới đây.
+        /*
+        if (!(user.isThuKho() || user.isLanhDao() || user.isBanGiamHieu())) {
+            throw new RuntimeException("Bạn không có quyền xem feed phiếu nhập");
+        }
+        */
+
+            long aid = (afterId == null || afterId < 0) ? 0 : afterId;
+            int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);
+
+            List<ReceiptHeader> headers = receiptHeaderRepository
+                    .findByIdGreaterThanOrderByIdAsc(aid, PageRequest.of(0, size));
+
+            List<ReceiptFeedItemDTO> items = headers.stream().map(h -> {
+                ReceiptFeedItemDTO x = new ReceiptFeedItemDTO();
+                x.setId(h.getId());
+                x.setReceiptDate(h.getReceiptDate());
+                x.setReceivedFrom(h.getReceivedFrom());
+                x.setTotalAmount(h.getTotalAmount());
+                return x;
+            }).toList();
+
+            Long maxId = items.isEmpty() ? aid : items.get(items.size() - 1).getId();
+
+            return ReceiptFeedResponseDTO.success(
+                    items.isEmpty() ? "Không có phiếu nhập mới" : "Có phiếu nhập mới",
+                    items,
+                    Map.of("afterId", aid, "maxId", maxId, "count", items.size())
+            );
+
+        } catch (Exception e) {
+            return ReceiptFeedResponseDTO.error("Không thể lấy feed phiếu nhập: " + e.getMessage());
+        }
     }
 }

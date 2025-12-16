@@ -16,8 +16,7 @@ import com.backend.dto.MaterialDTO;
 import com.backend.service.MaterialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
-
+import com.backend.dto.MaterialFeedResponseDTO;
 
 @RestController
 @RequestMapping("/api/materials")
@@ -64,6 +63,19 @@ public class MaterialController {
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/feed")
+    public ResponseEntity<MaterialFeedResponseDTO> feed(
+            @RequestParam(value = "afterId", required = false) Long afterId,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestHeader("X-User-Id") Long userId
+    ) {
+        try {
+            return ResponseEntity.ok(materialService.getMaterialFeed(userId, afterId, limit));
+        } catch (Exception e) {
+            return ResponseEntity.ok(MaterialFeedResponseDTO.error("Không thể lấy feed hàng hóa"));
         }
     }
 }

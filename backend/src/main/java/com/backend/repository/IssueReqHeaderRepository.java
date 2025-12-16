@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 
 public interface IssueReqHeaderRepository extends JpaRepository<IssueReqHeader, Long> {
 
@@ -43,4 +44,24 @@ public interface IssueReqHeaderRepository extends JpaRepository<IssueReqHeader, 
     Long countByStatus(Integer status);
 
     List<IssueReqHeader> findByCreatedByIdOrderByRequestedAtDesc(Long createdById);
+
+    List<IssueReqHeader> findByStatusOrderByRequestedAtAsc(Integer status);
+
+    IssueReqHeader findTopByDepartmentIdOrderByRequestedAtDesc(Long departmentId);
+    IssueReqHeader findTopByDepartmentIdAndSubDepartmentIdOrderByRequestedAtDesc(Long departmentId, Long subDepartmentId);
+
+    List<IssueReqHeader> findByStatusOrderByRequestedAtAsc(Integer status, Pageable pageable);
+
+    List<IssueReqHeader> findByDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Integer status);
+    List<IssueReqHeader> findByDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Integer status, Pageable pageable);
+
+    List<IssueReqHeader> findByDepartmentIdAndSubDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Long subDepartmentId, Integer status);
+    List<IssueReqHeader> findByDepartmentIdAndSubDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Long subDepartmentId, Integer status, Pageable pageable);
+
+    @Query(value = """
+        SELECT * FROM issue_req_header
+        WHERE id = :id
+        FOR UPDATE
+        """, nativeQuery = true)
+    IssueReqHeader lockByIdForUpdate(@Param("id") Long id);
 }

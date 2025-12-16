@@ -263,7 +263,8 @@ public class IssueReqService {
             // Tạo details - VẬT TƯ MỚI SẼ ĐƯỢC TẠO MATERIAL MỚI
             List<IssueReqDetail> details = createDetails(header, request.getDetails());
             header.setDetails(details);
-
+            // GỬI THÔNG BÁO CHO LÃNH ĐẠO
+            notificationService.notifyLeadersForApproval(header);
             IssueReqHeaderDTO headerDTO = convertToDTO(header);
             Map<String, Object> summary = createSummary(header);
 
@@ -335,15 +336,10 @@ public class IssueReqService {
     }
 
     private boolean hasPermissionToView(IssueReqHeader header, User user) {
-        if (header.getCreatedBy().getId().equals(user.getId())) {
-            return true;
-        }
-        if (user.isLanhDao()) {
-            return true;
-        }
-        if (user.isBanGiamHieu()) {
-            return true;
-        }
+        if (header.getCreatedBy().getId().equals(user.getId())) return true;
+        if (user.isThuKho()) return true;
+        if (user.isLanhDao()) return true;
+        if (user.isBanGiamHieu()) return true;
         return false;
     }
 
@@ -544,5 +540,37 @@ public class IssueReqService {
         }
 
         return dto;
+    }
+
+    public IssueReqDetailResponseDTO loadPreviousRequestTemplate(Long canBoId, Long subDepartmentId) {
+        try {
+            User canBo = userRepository.findById(canBoId)
+                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+            if (!canBo.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
+            if (!canBo.isCanBo()) throw new RuntimeException("Chỉ cán bộ dùng chức năng này");
+            if (canBo.getDepartment() == null) throw new RuntimeException("Cán bộ phải thuộc một khoa/phòng");
+
+            IssueReqHeader prev;
+            Long deptId = canBo.getDepartment().getId();
+
+            if (subDepartmentId != null) {
+                prev = headerRepository.findTopByDepartmentIdAndSubDepartmentIdOrderByRequestedAtDesc(deptId, subDepartmentId);
+            } else {
+                prev = headerRepository.findTopByDepartmentIdOrderByRequestedAtDesc(deptId);
+            }
+
+            if (prev == null) {
+                return IssueReqDetailResponseDTO.error("Chưa có phiếu xin lĩnh kỳ trước để load");
+            }
+
+            IssueReqHeaderDTO headerDTO = convertToDTO(prev);
+            Map<String, Object> summary = createSummary(prev);
+
+            return IssueReqDetailResponseDTO.success("Load danh sách kỳ trước thành công", headerDTO, headerDTO.getDetails(), summary);
+
+        } catch (Exception e) {
+            return IssueReqDetailResponseDTO.error("Không thể load kỳ trước: " + e.getMessage());
+        }
     }
 }
