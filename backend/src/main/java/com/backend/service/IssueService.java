@@ -686,8 +686,8 @@ public class IssueService {
             summary.put("skippedNotEnoughStock", notEnoughStock);
 
             String msg = eligible.isEmpty()
-                    ? "Không có phiếu nào đủ hàng để xuất"
-                    : "Lấy danh sách phiếu đủ hàng để xuất thành công";
+                    ? "Không có phiếu nào đủ điều kiện để xuất"
+                    : "Lấy danh sách phiếu đủ điều kiện để xuất thành công";
 
             return EligibleIssueReqListResponseDTO.success(msg, eligible, summary);
 
@@ -906,7 +906,7 @@ public class IssueService {
             summary.put("rejectedNotEnoughStock", rejectedNotEnough);
 
             String msg = eligible.isEmpty()
-                    ? "Không có phiếu nào đủ hàng để xuất"
+                    ? "Không có phiếu nào đủ điều kiện để xuất"
                     : "Lấy danh sách eligible + lý do bị loại thành công";
 
             return EligibleIssueReqResponseDTO.success(msg, eligible, ineligible, summary);
