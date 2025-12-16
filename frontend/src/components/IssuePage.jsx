@@ -9,6 +9,12 @@ const API_ENDPOINTS = {
   ISSUES: `${API_URL}/issues`,
 };
 
+// điều kiện đạt:
+//Phiếu đã duyệt
+//Phiếu chưa từng xuất
+//Mỗi vật tư đều map được material
+//Tổng tồn (theo FEFO) ≥ số lượng xin lĩnh
+
 const moneyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 const qtyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
