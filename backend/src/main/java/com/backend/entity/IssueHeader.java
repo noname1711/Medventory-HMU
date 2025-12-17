@@ -37,4 +37,26 @@ public class IssueHeader {
 
     @OneToMany(mappedBy = "header", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<IssueDetail> details = new ArrayList<>();
+
+    // ====== Helpers để Hibernate không lỗi orphanRemoval ======
+
+    public void addDetail(IssueDetail d) {
+        if (d == null) return;
+        this.details.add(d);
+        d.setHeader(this);
+    }
+
+    public void removeDetail(IssueDetail d) {
+        if (d == null) return;
+        this.details.remove(d);
+        d.setHeader(null);
+    }
+
+    public void clearDetails() {
+        // giữ nguyên reference list, chỉ clear nội dung
+        for (int i = this.details.size() - 1; i >= 0; i--) {
+            IssueDetail d = this.details.get(i);
+            removeDetail(d);
+        }
+    }
 }

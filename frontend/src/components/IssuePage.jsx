@@ -29,7 +29,9 @@ function toNumber(v) {
 
 function fmtDateTime(v) {
   if (!v) return "";
-  return String(v).replace("T", " ");
+  return String(v)
+    .replace("T", " ")
+    .substring(0, 16);
 }
 
 function safeStr(s) {
@@ -77,6 +79,48 @@ function vnReason(reasonCode) {
     default:
       return "Không đủ điều kiện";
   }
+}
+
+/**
+ * Chuẩn hoá dữ liệu "ineligible" để luôn có:
+ * - reqId
+ * - subDepartmentName
+ * - requestedAt
+ * - reasonCode, reasonMessage
+ */
+function normalizeIneligibleRow(x) {
+  const base = x?.req || x?.header || x?.request || x?.data || x || {};
+
+  const reqId =
+    base?.id ??
+    x?.reqId ??
+    x?.issueReqId ??
+    x?.id ??
+    "-";
+
+  const subDepartmentName =
+    base?.subDepartmentName ??
+    base?.subDepartment ??
+    base?.subDeptName ??
+    "-";
+
+  const requestedAt =
+    base?.requestedAt ??
+    base?.createdAt ??
+    base?.requestTime ??
+    x?.requestedAt ??
+    null;
+
+  const reasonCode = x?.reasonCode ?? x?.code ?? x?.reason ?? "";
+  const reasonMessage = x?.reasonMessage ?? x?.message ?? x?.reasonDetail ?? "";
+
+  return {
+    reqId,
+    subDepartmentName,
+    requestedAt,
+    reasonCode,
+    reasonMessage,
+  };
 }
 
 export default function IssuePage() {
@@ -166,11 +210,20 @@ export default function IssuePage() {
 
   // ------------------ normalize response ------------------
   const normalizeEligibleResponse = (payload) => {
-    // Case A: /eligible-requests-with-reasons -> { eligible, ineligible, summary }
+    // Case A1: /eligible-requests-with-reasons -> { eligible, ineligible, summary }
     if (payload && Array.isArray(payload.eligible)) {
       return {
         eligible: payload.eligible,
         ineligible: Array.isArray(payload.ineligible) ? payload.ineligible : [],
+        summary: payload.summary || null,
+      };
+    }
+
+    // Case A2 (phòng hờ): backend trả { eligibleRequests, ineligibleRequests, summary }
+    if (payload && (Array.isArray(payload.eligibleRequests) || Array.isArray(payload.ineligibleRequests))) {
+      return {
+        eligible: Array.isArray(payload.eligibleRequests) ? payload.eligibleRequests : [],
+        ineligible: Array.isArray(payload.ineligibleRequests) ? payload.ineligibleRequests : [],
         summary: payload.summary || null,
       };
     }
@@ -208,7 +261,7 @@ export default function IssuePage() {
 
       // ưu tiên endpoint có reasons
       const url = `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`;
-      const { ok, status, data } = await fetchJson(url, { headers: authHeaders });
+      const { data } = await fetchJson(url, { headers: authHeaders });
 
       if (!data || data.success !== true) {
         setListMsg({ type: "error", text: data?.message || "Không thể tải danh sách." });
@@ -218,11 +271,19 @@ export default function IssuePage() {
         return;
       }
 
-      setEligible(Array.isArray(data.eligibleRequests) ? data.eligibleRequests : []);
-      setIneligible(Array.isArray(data.ineligibleRequests) ? data.ineligibleRequests : []);
-      setSummary(data.summary || null);
+      const norm = normalizeEligibleResponse(data);
 
-      setListMsg({ type: "success", text: data.message || "Đã tải danh sách." });
+      setEligible(norm.eligible);
+      setIneligible(norm.ineligible);
+      setSummary(norm.summary);
+
+      setListMsg({
+        type: "success",
+        text:
+          norm.eligible.length === 0
+            ? (data.message || "Không có phiếu nào đủ điều kiện để xuất")
+            : (data.message || "Đã tải danh sách."),
+      });
 
       // Nếu selected không còn trong eligible thì reset preview
       if (selected?.id) {
@@ -238,6 +299,9 @@ export default function IssuePage() {
       }
     } catch (e) {
       setListMsg({ type: "error", text: "Lỗi khi tải danh sách." });
+      setEligible([]);
+      setIneligible([]);
+      setSummary(null);
     } finally {
       setLoadingList(false);
     }
@@ -664,27 +728,22 @@ export default function IssuePage() {
                 <thead>
                   <tr>
                     <th style={{ width: 90 }}>Mã phiếu</th>
-                    <th style={{ minWidth: 220 }}>Bộ môn</th>
                     <th style={{ minWidth: 190 }}>Ngày gửi</th>
                     <th style={{ minWidth: 420 }}>Lý do</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ineligible?.length ? (
-                    ineligible.map((x, idx) => {
-                      const reqId = x?.req?.id || x?.header?.id || "-";
-                      const subName = x?.req?.subDepartmentName || x?.header?.subDepartmentName || "-";
-                      const requestedAt = x?.req?.requestedAt || x?.header?.requestedAt;
-                      const reasonText = vnReason(x?.reasonCode);
-
+                    ineligible.map((raw, idx) => {
+                      const x = normalizeIneligibleRow(raw);
+                      const reasonText = vnReason(x.reasonCode);
                       return (
-                        <tr key={`${reqId}-${idx}`}>
-                          <td className="mono">{reqId}</td>
-                          <td>{subName}</td>
-                          <td className="mono">{fmtDateTime(requestedAt)}</td>
+                        <tr key={`${x.reqId}-${idx}`}>
+                          <td className="mono">{x.reqId}</td>
+                          <td className="mono">{fmtDateTime(x.requestedAt)}</td>
                           <td className="muted">
                             {reasonText}
-                            {x?.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
+                            {x.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
                           </td>
                         </tr>
                       );
