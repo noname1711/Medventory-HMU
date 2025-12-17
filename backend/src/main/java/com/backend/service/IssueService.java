@@ -7,8 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.backend.dto.EligibleIssueReqListResponseDTO;
-import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -33,7 +32,7 @@ public class IssueService {
 
     public IssuePreviewResponseDTO previewIssueFromApprovedRequest(Long issueReqId, Long thuKhoId) {
         try {
-            User thuKho = validateThuKho(thuKhoId);
+            validateThuKho(thuKhoId);
 
             IssueReqHeader req = issueReqHeaderRepository.findById(issueReqId)
                     .orElseThrow(() -> new RuntimeException("Phiếu xin lĩnh không tồn tại"));
@@ -106,9 +105,9 @@ public class IssueService {
     public IssueResponseDTO createIssueFromApprovedRequest(CreateIssueFromReqDTO request, Long thuKhoId) {
         try {
             User thuKho = validateThuKho(thuKhoId);
-
             validateCreateIssueRequest(request);
 
+            // lock request để tránh double issue trong cùng thời điểm
             IssueReqHeader req = issueReqHeaderRepository.lockByIdForUpdate(request.getIssueReqId());
             if (req == null) throw new RuntimeException("Phiếu xin lĩnh không tồn tại");
 
@@ -122,28 +121,26 @@ public class IssueService {
             String warehouseName = safeTrim(request.getWarehouseName());
             if (warehouseName.isEmpty()) warehouseName = "Kho chính";
 
-            boolean auto = request.getAutoAllocate() == null || request.getAutoAllocate();
+            boolean auto = (request.getAutoAllocate() == null) || request.getAutoAllocate();
 
-            // 1) Create issue_header
+            // 1) create issue header
             IssueHeader header = new IssueHeader();
             header.setCreatedBy(thuKho);
             header.setIssueDate(issueDate);
             header.setDepartment(req.getDepartment());
 
-            String defaultReceiver = buildDefaultReceiverName(req);
             String receiver = safeTrim(request.getReceiverName());
-            if (receiver.isEmpty()) receiver = defaultReceiver;
+            if (receiver.isEmpty()) receiver = buildDefaultReceiverName(req);
 
             // Marker để chống xuất trùng (không đổi DB)
             receiver = receiver + " (IssueReq#" + req.getId() + ")";
             header.setReceiverName(receiver);
             header.setTotalAmount(BigDecimal.ZERO);
 
+            // save header trước để có ID (optional nhưng an toàn khi log/audit)
             header = issueHeaderRepository.save(header);
 
-            // 2) Create issue_detail + inventory_card out per lot (FEFO hoặc manual)
-            List<IssueDetail> details = new ArrayList<>();
-
+            // 2) create details + write inventory out per lot
             Map<Long, BigDecimal> reqQtyByMaterial = req.getDetails().stream()
                     .filter(d -> d.getMaterial() != null)
                     .collect(Collectors.toMap(
@@ -160,25 +157,23 @@ public class IssueService {
 
                     Material m = d.getMaterial();
                     BigDecimal need = nvl(d.getQtyRequested());
+                    if (need.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-                    // allocate FEFO
                     List<InventoryCard> availableLots = inventoryCardRepository.findAvailableLotsLatestByMaterial(m.getId());
                     Map<String, BigDecimal> allocation = allocateFEFO(availableLots, need);
 
-                    // persist out movements
                     writeInventoryOutMovements(req, m, allocation, issueDate, warehouseName);
 
                     IssueDetail det = buildIssueDetailLine(header, m, need, need);
-                    details.add(det);
+                    header.addDetail(det); // IMPORTANT: không replace list
                 }
             } else {
-                // manual lines required
                 Map<Long, ManualIssueLineDTO> manualMap = mapManualLines(request.getManualLines());
 
-                // must cover all materials in request
                 for (Map.Entry<Long, BigDecimal> e : reqQtyByMaterial.entrySet()) {
                     Long materialId = e.getKey();
                     BigDecimal need = e.getValue();
+                    if (need.compareTo(BigDecimal.ZERO) <= 0) continue;
 
                     ManualIssueLineDTO manualLine = manualMap.get(materialId);
                     if (manualLine == null) {
@@ -200,25 +195,30 @@ public class IssueService {
                     writeInventoryOutMovements(req, m, allocation, issueDate, warehouseName);
 
                     IssueDetail det = buildIssueDetailLine(header, m, need, qtyIssued);
-                    details.add(det);
+                    header.addDetail(det); // IMPORTANT
                 }
             }
 
-            details = issueDetailRepository.saveAll(details);
-            header.setDetails(details);
-
-            // 3) Recalc totals
-            BigDecimal totalAmount = details.stream()
+            // 3) calc totals from header.details
+            BigDecimal totalAmount = header.getDetails().stream()
                     .map(IssueDetail::getTotal)
                     .map(IssueService::nvl)
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
                     .setScale(2, RoundingMode.HALF_UP);
 
             header.setTotalAmount(totalAmount);
+
+            // save header once more - cascade will persist details
             header = issueHeaderRepository.save(header);
 
+            // build response
+            List<IssueDetail> persistedDetails = issueDetailRepository.findByHeaderId(header.getId());
             IssueHeaderDTO headerDTO = toIssueHeaderDTO(header);
-            Map<String, Object> summary = buildIssueSummary(details);
+
+            // override DTO details theo list query cho chắc chắn đúng DB
+            headerDTO.setDetails(persistedDetails.stream().map(this::toIssueDetailDTO).collect(Collectors.toList()));
+
+            Map<String, Object> summary = buildIssueSummary(persistedDetails);
 
             return IssueResponseDTO.success("Xuất kho thành công", headerDTO, headerDTO.getDetails(), summary);
 
@@ -243,10 +243,12 @@ public class IssueService {
                 throw new RuntimeException("Bạn không có quyền xem phiếu xuất");
             }
 
+            // IMPORTANT: không setDetails vào entity (tránh orphanRemoval issues)
             List<IssueDetail> details = issueDetailRepository.findByHeaderId(issueId);
-            header.setDetails(details);
 
             IssueHeaderDTO headerDTO = toIssueHeaderDTO(header);
+            headerDTO.setDetails(details.stream().map(this::toIssueDetailDTO).collect(Collectors.toList()));
+
             Map<String, Object> summary = buildIssueSummary(details);
 
             return IssueResponseDTO.success("Lấy chi tiết phiếu xuất thành công", headerDTO, headerDTO.getDetails(), summary);
@@ -257,7 +259,6 @@ public class IssueService {
     }
 
     public List<LotStockDTO> getAvailableLotsForMaterial(Long materialId, Long thuKhoId) {
-        // helper cho UI chọn lô thủ công
         validateThuKho(thuKhoId);
         List<InventoryCard> lots = inventoryCardRepository.findAvailableLotsLatestByMaterial(materialId);
         return lots.stream().map(ic -> {
@@ -319,7 +320,6 @@ public class IssueService {
             if (lot.isEmpty()) throw new RuntimeException("LotNumber không hợp lệ");
             if (qtyOut.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-            // lock latest card for this lot
             InventoryCard latest = inventoryCardRepository
                     .lockLatestByMaterialAndLot(material.getId(), lot)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy thẻ kho cho lô " + lot));
@@ -346,7 +346,6 @@ public class IssueService {
             out.setMfgDate(latest.getMfgDate());
             out.setExpDate(latest.getExpDate());
 
-            // gắn nguồn nhu cầu để trace (không đổi schema)
             out.setSubDepartment(req.getSubDepartment());
 
             inventoryCardRepository.save(out);
@@ -378,7 +377,6 @@ public class IssueService {
     }
 
     private BigDecimal findLatestUnitPrice(Long materialId) {
-        // lấy giá nhập gần nhất (tham khảo), nếu chưa có thì 0
         return receiptDetailRepository.findLatestByMaterialId(materialId, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
@@ -432,9 +430,8 @@ public class IssueService {
         dto.setIssueDate(header.getIssueDate());
         dto.setTotalAmount(header.getTotalAmount());
 
-        List<IssueDetail> details = header.getDetails() != null ? header.getDetails()
-                : issueDetailRepository.findByHeaderId(header.getId());
-
+        // Không rely vào header.getDetails() (có thể lazy / hoặc chưa load)
+        List<IssueDetail> details = issueDetailRepository.findByHeaderId(header.getId());
         dto.setDetails(details.stream().map(this::toIssueDetailDTO).collect(Collectors.toList()));
         return dto;
     }
@@ -461,7 +458,6 @@ public class IssueService {
     }
 
     private IssueReqHeaderDTO toIssueReqDTO(IssueReqHeader header) {
-        // mapper tối thiểu đủ cho preview UI
         IssueReqHeaderDTO dto = new IssueReqHeaderDTO();
         dto.setId(header.getId());
 
@@ -549,6 +545,8 @@ public class IssueService {
 
     private Map<Long, ManualIssueLineDTO> mapManualLines(List<ManualIssueLineDTO> lines) {
         Map<Long, ManualIssueLineDTO> map = new HashMap<>();
+        if (lines == null) return map;
+
         for (ManualIssueLineDTO l : lines) {
             if (l.getMaterialId() == null) throw new RuntimeException("manualLines thiếu materialId");
             map.put(l.getMaterialId(), l);
@@ -616,6 +614,8 @@ public class IssueService {
         return s == null ? "" : s.trim();
     }
 
+    // ------------------------- ELIGIBLE LIST -------------------------
+
     public EligibleIssueReqListResponseDTO getEligibleApprovedRequests(Long thuKhoId,
                                                                        Long departmentId,
                                                                        Long subDepartmentId,
@@ -641,40 +641,31 @@ public class IssueService {
                         .findByStatusOrderByRequestedAtAsc(1, PageRequest.of(0, size));
             }
 
-            // Virtual stock cache: materialId -> list lot state (FEFO order)
             Map<Long, List<LotState>> lotCache = new HashMap<>();
-
             List<IssueReqHeaderDTO> eligible = new ArrayList<>();
 
-            int checked = 0;
-            int alreadyIssued = 0;
-            int hasUnmappedMaterial = 0;
-            int notEnoughStock = 0;
+            int checked = 0, alreadyIssued = 0, hasUnmappedMaterial = 0, notEnoughStock = 0;
 
             for (IssueReqHeader req : approved) {
                 checked++;
 
-                // đã xuất trước đó? (marker receiver_name)
                 if (isAlreadyIssued(req)) {
                     alreadyIssued++;
                     continue;
                 }
 
-                // Nếu có dòng material == null -> không thể xuất
                 boolean anyNullMaterial = req.getDetails().stream().anyMatch(d -> d.getMaterial() == null);
                 if (anyNullMaterial) {
                     hasUnmappedMaterial++;
                     continue;
                 }
 
-                // thử allocate toàn bộ request với virtual stock (FEFO)
                 AllocationAttempt attempt = tryAllocateWholeRequest(req, lotCache);
                 if (!attempt.success) {
                     notEnoughStock++;
                     continue;
                 }
 
-                // commit allocation (đã commit ngay trong tryAllocateWholeRequest)
                 eligible.add(toIssueReqDTO(req));
             }
 
@@ -696,8 +687,6 @@ public class IssueService {
         }
     }
 
-// ------------------- helpers for eligible -------------------
-
     private boolean isAlreadyIssued(IssueReqHeader req) {
         String marker = "IssueReq#" + req.getId();
         return issueHeaderRepository.existsByReceiverMarker(marker);
@@ -706,7 +695,6 @@ public class IssueService {
     private AllocationAttempt tryAllocateWholeRequest(IssueReqHeader req,
                                                       Map<Long, List<LotState>> lotCache) {
 
-        // Track deductions to rollback if fail
         List<Deduction> deductions = new ArrayList<>();
 
         for (IssueReqDetail d : req.getDetails()) {
@@ -747,7 +735,6 @@ public class IssueService {
             }
 
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-                // rollback
                 rollbackDeductions(lotCache, deductions);
                 return AllocationAttempt.fail();
             }
@@ -768,10 +755,10 @@ public class IssueService {
     private static class LotState {
         String lotNumber;
         BigDecimal remaining;
-        java.time.LocalDate expDate;
-        java.time.LocalDate mfgDate;
+        LocalDate expDate;
+        LocalDate mfgDate;
 
-        LotState(String lotNumber, BigDecimal remaining, java.time.LocalDate expDate, java.time.LocalDate mfgDate) {
+        LotState(String lotNumber, BigDecimal remaining, LocalDate expDate, LocalDate mfgDate) {
             this.lotNumber = lotNumber;
             this.remaining = remaining;
             this.expDate = expDate;
@@ -807,6 +794,8 @@ public class IssueService {
         }
     }
 
+    // ------------------------- ELIGIBLE + REASONS -------------------------
+
     public EligibleIssueReqResponseDTO getEligibleApprovedRequestsWithReasons(Long thuKhoId,
                                                                               Long departmentId,
                                                                               Long subDepartmentId,
@@ -832,23 +821,18 @@ public class IssueService {
                         .findByStatusOrderByRequestedAtAsc(1, PageRequest.of(0, size));
             }
 
-            // Virtual stock cache: materialId -> lots remaining (FEFO order)
             Map<Long, List<LotState>> lotCache = new HashMap<>();
 
             List<IssueReqHeaderDTO> eligible = new ArrayList<>();
             List<IneligibleIssueReqDTO> ineligible = new ArrayList<>();
 
-            int checked = 0;
-            int rejectedAlreadyIssued = 0;
-            int rejectedUnmapped = 0;
-            int rejectedNotEnough = 0;
+            int checked = 0, rejectedAlreadyIssued = 0, rejectedUnmapped = 0, rejectedNotEnough = 0;
 
             for (IssueReqHeader req : approved) {
                 checked++;
 
                 IssueReqHeaderDTO reqDTO = toIssueReqDTO(req);
 
-                // 1) already issued?
                 if (isAlreadyIssued(req)) {
                     rejectedAlreadyIssued++;
                     ineligible.add(IneligibleIssueReqDTO.of(
@@ -861,7 +845,6 @@ public class IssueService {
                     continue;
                 }
 
-                // 2) unmapped/new material lines?
                 List<String> unmappedItems = collectUnmappedItems(req);
                 if (!unmappedItems.isEmpty()) {
                     rejectedUnmapped++;
@@ -875,7 +858,6 @@ public class IssueService {
                     continue;
                 }
 
-                // 3) compute shortages using CURRENT virtual stock (after previous eligible deductions)
                 Map<Long, MaterialNeed> needs = buildNeedByMaterial(req);
                 List<StockShortageDTO> shortages = computeShortages(needs, lotCache);
 
@@ -884,16 +866,14 @@ public class IssueService {
                     ineligible.add(IneligibleIssueReqDTO.of(
                             reqDTO,
                             "NOT_ENOUGH_STOCK",
-                            "Không đủ tồn kho để đáp ứng phiếu theo thứ tự ưu tiên (requested_at tăng dần).",
+                            "Không đủ tồn kho để đáp ứng phiếu theo thứ tự ưu tiên.",
                             shortages,
                             null
                     ));
                     continue;
                 }
 
-                // 4) commit deduction (reserve stock virtually for later requests)
                 deductForRequest(needs, lotCache);
-
                 eligible.add(reqDTO);
             }
 
@@ -915,8 +895,6 @@ public class IssueService {
             return EligibleIssueReqResponseDTO.error("Không thể lấy eligible: " + e.getMessage());
         }
     }
-
-// ------------------- helpers for eligible-with-reasons -------------------
 
     private Map<Long, MaterialNeed> buildNeedByMaterial(IssueReqHeader req) {
         Map<Long, MaterialNeed> map = new LinkedHashMap<>();
@@ -946,8 +924,8 @@ public class IssueService {
 
             if (available.compareTo(mn.need) < 0) {
                 BigDecimal missing = mn.need.subtract(available);
-
                 String unitName = (mn.material.getUnit() != null) ? mn.material.getUnit().getName() : null;
+
                 shortages.add(StockShortageDTO.of(
                         materialId,
                         mn.material.getCode(),
