@@ -1,9 +1,14 @@
 package com.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "notifications")
@@ -14,34 +19,40 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Người nhận
+    // entity_type_id -> notification_entities
     @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id")
-    private User user;
-
-    // 0 = issue_req, 1 = supp_forecast
-    @Column(name = "entity_type", nullable = false)
-    private Integer entityType;
+    @JoinColumn(name = "entity_type_id", nullable = false)
+    private NotificationEntity entityType;
 
     @Column(name = "entity_id", nullable = false)
     private Long entityId;
 
-    // 0 pending, 1 approved, 2 rejected, 3 scheduled
-    @Column(name = "event_type", nullable = false)
-    private Integer eventType;
+    // event_type_id -> notification_events
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "event_type_id", nullable = false)
+    private NotificationEvent eventType;
 
-    @Column(name = "title")
+    @Column(name = "title", length = 255)
     private String title;
 
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
-    @Column(name = "is_read", nullable = false)
-    private Boolean isRead = false;
-
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
-    @Column(name = "read_at")
-    private LocalDateTime readAt;
+    @ManyToOne
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @OneToMany(mappedBy = "notification", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<NotificationRecipient> recipients = new HashSet<>();
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 }
