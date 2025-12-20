@@ -2,23 +2,29 @@ package com.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
 @Data
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "full_name", nullable = false, length = 100)
+    // DB: VARCHAR(150)
+    @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
-    @Column(unique = true, nullable = false, length = 100)
+    // DB: VARCHAR(120)
+    @Column(nullable = false, unique = true, length = 120)
     private String email;
 
-    @Column(nullable = false, length = 100)
+    // DB: VARCHAR(200)
+    @Column(nullable = false, length = 200)
     private String password;
 
     @Column(name = "date_of_birth")
@@ -28,57 +34,68 @@ public class User {
     @JoinColumn(name = "department_id")
     private Department department;
 
-    @Column(name = "role_check", nullable = false)
-    private Integer roleCheck = 3; // 0 = Ban Giám Hiệu, 1 = Lãnh đạo, 2 = Thủ kho, 3 = Cán bộ
+    // NEW: role_id -> roles
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
 
-    @Column(name = "role", length = 100)
-    private String role; // Tên chức vụ thực tế
+    // DB: job_title
+    @Column(name = "job_title", length = 150)
+    private String jobTitle;
 
-    @Column(name = "status", nullable = false)
-    private Integer status = 0; // 0 = pending, 1 = approved
+    // NEW: status_id -> user_status
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "status_id", nullable = false)
+    private UserStatus status;
 
-    // Helper methods
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (updatedAt == null) updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    // ===== Backward-compatible helpers (không còn roleCheck/status int trong DB) =====
+
     public boolean isBanGiamHieu() {
-        return roleCheck != null && roleCheck == 0;
+        return role != null && "BGH".equalsIgnoreCase(role.getCode());
     }
 
     public boolean isLanhDao() {
-        return roleCheck != null && roleCheck == 1;
+        return role != null && "LANH_DAO".equalsIgnoreCase(role.getCode());
     }
 
     public boolean isThuKho() {
-        return roleCheck != null && roleCheck == 2;
+        return role != null && "THU_KHO".equalsIgnoreCase(role.getCode());
     }
 
     public boolean isCanBo() {
-        return roleCheck != null && roleCheck == 3;
+        return role != null && "CAN_BO".equalsIgnoreCase(role.getCode());
     }
 
     public boolean isApproved() {
-        return status != null && status == 1;
+        return status != null && "APPROVED".equalsIgnoreCase(status.getCode());
     }
 
     public boolean isPending() {
-        return status != null && status == 0;
+        return status != null && "PENDING".equalsIgnoreCase(status.getCode());
     }
 
     public String getRoleName() {
-        if (roleCheck == null) return "Không xác định";
-        switch (roleCheck) {
-            case 0: return "Ban Giám Hiệu";
-            case 1: return "Lãnh đạo";
-            case 2: return "Thủ kho";
-            case 3: return "Cán bộ";
-            default: return "Không xác định";
-        }
+        return role != null ? role.getName() : "Không xác định";
     }
 
     public String getStatusName() {
-        if (status == null) return "Không xác định";
-        switch (status) {
-            case 0: return "Chờ duyệt";
-            case 1: return "Đã duyệt";
-            default: return "Không xác định";
-        }
+        return status != null ? status.getName() : "Không xác định";
     }
 }

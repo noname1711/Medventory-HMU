@@ -2,12 +2,17 @@ package com.backend.service;
 
 import com.backend.dto.RegisterRequest;
 import com.backend.dto.UserDTO;
-import com.backend.entity.User;
 import com.backend.entity.Department;
-import com.backend.repository.UserRepository;
+import com.backend.entity.Role;
+import com.backend.entity.User;
+import com.backend.entity.UserStatus;
 import com.backend.repository.DepartmentRepository;
+import com.backend.repository.RoleRepository;
+import com.backend.repository.UserRepository;
+import com.backend.repository.UserStatusRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -15,32 +20,43 @@ import java.util.stream.Collectors;
 @Service
 public class UserService {
 
+    private static final String ROLE_BGH = "BGH";
+    private static final String ROLE_LANH_DAO = "LANH_DAO";
+    private static final String ROLE_THU_KHO = "THU_KHO";
+    private static final String ROLE_CAN_BO = "CAN_BO";
+
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_REJECTED = "REJECTED"; // nếu DB có
+
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
     private DepartmentRepository departmentRepository;
 
-    public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElse(null);
-    }
+    @Autowired
+    private RoleRepository roleRepository;
 
-    // Map role từ tiếng Việt sang roleCheck
-    private Integer mapRoleToRoleCheck(String role) {
-        switch (role) {
-            case "Lãnh đạo": return 1;
-            case "Thủ kho": return 2;
-            case "Cán bộ": return 3;
-            default: return 3; // Mặc định là Cán bộ
-        }
+    @Autowired
+    private UserStatusRepository userStatusRepository;
+
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email).orElse(null);
     }
 
     public User registerUser(RegisterRequest request) {
         try {
-            // CHỈ CHO PHÉP ĐĂNG KÝ VỚI KHOA ĐÃ CÓ TRONG DB
             Department department = departmentRepository.findByName(request.getDepartment())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy khoa: " + request.getDepartment() + ". Vui lòng chọn khoa có sẵn trong hệ thống."));
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy khoa: " + request.getDepartment()
+                            + ". Vui lòng chọn khoa có sẵn trong hệ thống."));
+
+            String roleCode = mapRoleToCode(request.getRole());
+            Role role = roleRepository.findByCode(roleCode)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy role code=" + roleCode));
+
+            UserStatus pending = userStatusRepository.findByCode(STATUS_PENDING)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy user_status code=" + STATUS_PENDING));
 
             User user = new User();
             user.setFullName(request.getFullName());
@@ -49,15 +65,11 @@ public class UserService {
             user.setDateOfBirth(request.getDateOfBirth());
             user.setDepartment(department);
 
-            // Xử lý role theo database schema mới
-            String roleStr = request.getRole();
-            Integer roleCheck = mapRoleToRoleCheck(roleStr);
-            user.setRoleCheck(roleCheck);
-            user.setRole(roleStr); // Lưu tên role thực tế
-
-            user.setStatus(0); // 0 = pending
+            user.setRole(role);
+            user.setStatus(pending);
 
             return userRepository.save(user);
+
         } catch (Exception e) {
             throw new RuntimeException("Lỗi đăng ký: " + e.getMessage(), e);
         }
@@ -67,10 +79,8 @@ public class UserService {
         Optional<User> userOpt = userRepository.findByEmailAndPassword(email, password);
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            // Cho phép đăng nhập nếu:
-            // - Là Ban Giám Hiệu (roleCheck = 0) - LUÔN được đăng nhập
-            // - Hoặc là user thường VÀ đã được approved (status = 1)
-            if (user.isBanGiamHieu() || user.getStatus() == 1) {
+            // giữ logic tương thích cũ: BGH được vào luôn; còn lại phải APPROVED
+            if (user.isBanGiamHieu() || user.isApproved()) {
                 return user;
             }
         }
@@ -78,8 +88,9 @@ public class UserService {
     }
 
     public List<UserDTO> getPendingUsers() {
-        return userRepository.findByStatus(0) // 0 = pending
+        return userRepository.findAll()
                 .stream()
+                .filter(User::isPending)
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -91,12 +102,14 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    // controller cũ gọi updateUserStatus(userId, "approved"/"pending")
     public boolean updateUserStatus(Long userId, String status) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    // Chuyển đổi status từ string sang integer
-                    int statusValue = "approved".equals(status) ? 1 : 0;
-                    user.setStatus(statusValue);
+                    String code = mapStatusToCode(status);
+                    UserStatus st = userStatusRepository.findByCode(code)
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy user_status code=" + code));
+                    user.setStatus(st);
                     userRepository.save(user);
                     return true;
                 })
@@ -110,31 +123,26 @@ public class UserService {
         dto.setEmail(user.getEmail());
         dto.setDateOfBirth(user.getDateOfBirth());
 
-        // DEPARTMENT INFO
         if (user.getDepartment() != null) {
             dto.setDepartment(user.getDepartment().getName());
             dto.setDepartmentId(user.getDepartment().getId());
             dto.setDepartmentName(user.getDepartment().getName());
         } else {
-            // Nếu user không có department
             dto.setDepartment(null);
             dto.setDepartmentId(null);
             dto.setDepartmentName(null);
         }
 
-        // Sử dụng helper methods từ User entity
+        // DTO role là String
         dto.setRole(user.getRoleName());
 
-        // Nếu là Ban Giám Hiệu, sử dụng role thực tế từ database
-        if (user.isBanGiamHieu() && user.getRole() != null && !user.getRole().isEmpty()) {
-            dto.setRole(user.getRole()); // Hiển thị "Hiệu trưởng", "Phó Hiệu trưởng"
-        } else {
-            dto.setRole(user.getRoleName()); // Hiển thị "Ban Giám Hiệu", "Lãnh đạo"
-        }
-
+        // DTO status là String
         dto.setStatus(user.getStatusName());
-        dto.setRoleCheck(user.getRoleCheck());
-        dto.setStatusValue(user.getStatus());
+
+        // Backward-compatible fields cho FE cũ
+        dto.setRoleCheck(roleCodeToRoleCheck(user.getRole() != null ? user.getRole().getCode() : null));
+        dto.setStatusValue(statusCodeToInt(user.getStatus() != null ? user.getStatus().getCode() : null));
+
         dto.setIsApproved(user.isApproved());
         dto.setIsBanGiamHieu(user.isBanGiamHieu());
         dto.setIsLanhDao(user.isLanhDao());
@@ -144,19 +152,15 @@ public class UserService {
         return dto;
     }
 
-    // Lấy thông tin user đầy đủ theo email
     public UserDTO getUserInfoByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-
         return convertToDTO(user);
     }
 
-    // Lấy thông tin user đầy đủ theo ID
     public UserDTO getUserInfoById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
-
         return convertToDTO(user);
     }
 
@@ -165,19 +169,19 @@ public class UserService {
     }
 
     public boolean deleteUser(Long userId) {
-        if (!userRepository.existsById(userId)) {
-            return false;
-        }
+        if (!userRepository.existsById(userId)) return false;
         userRepository.deleteById(userId);
         return true;
     }
 
+    // controller cũ gọi updateUserRole(userId, "Thủ kho"/"Cán bộ"/...)
     public boolean updateUserRole(Long userId, String newRole) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    Integer roleCheck = mapRoleToRoleCheck(newRole);
-                    user.setRoleCheck(roleCheck);
-                    user.setRole(newRole);
+                    String roleCode = mapRoleToCode(newRole);
+                    Role role = roleRepository.findByCode(roleCode)
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy role code=" + roleCode));
+                    user.setRole(role);
                     userRepository.save(user);
                     return true;
                 })
@@ -196,5 +200,46 @@ public class UserService {
 
     public List<Department> getAllDepartments() {
         return departmentRepository.findAll();
+    }
+
+    // ================= helpers =================
+
+    private String mapRoleToCode(String roleStr) {
+        String s = roleStr == null ? "" : roleStr.trim();
+        String u = s.toUpperCase();
+
+        // cho phép FE gửi luôn code
+        if (ROLE_BGH.equals(u) || ROLE_LANH_DAO.equals(u) || ROLE_THU_KHO.equals(u) || ROLE_CAN_BO.equals(u)) {
+            return u;
+        }
+
+        // map theo tiếng Việt / cách ghi khác
+        String lower = s.toLowerCase();
+        if (lower.contains("ban giám hiệu") || lower.contains("ban giam hieu") || lower.equals("bgh")) return ROLE_BGH;
+        if (lower.contains("lãnh đạo") || lower.contains("lanh dao")) return ROLE_LANH_DAO;
+        if (lower.contains("thủ kho") || lower.contains("thu kho")) return ROLE_THU_KHO;
+
+        return ROLE_CAN_BO;
+    }
+
+    private String mapStatusToCode(String statusStr) {
+        String s = statusStr == null ? "" : statusStr.trim().toLowerCase();
+        if (s.equals("approved") || s.equals("1") || s.contains("duyệt") || s.contains("approved")) return STATUS_APPROVED;
+        if (s.equals("rejected") || s.equals("2") || s.contains("từ chối") || s.contains("reject")) return STATUS_REJECTED;
+        return STATUS_PENDING;
+    }
+
+    private int roleCodeToRoleCheck(String roleCode) {
+        if (roleCode == null) return 3;
+        String c = roleCode.trim().toUpperCase();
+        if (ROLE_BGH.equals(c)) return 0;
+        if (ROLE_LANH_DAO.equals(c)) return 1;
+        if (ROLE_THU_KHO.equals(c)) return 2;
+        return 3;
+    }
+
+    private int statusCodeToInt(String statusCode) {
+        if (statusCode == null) return 0;
+        return STATUS_APPROVED.equalsIgnoreCase(statusCode.trim()) ? 1 : 0;
     }
 }

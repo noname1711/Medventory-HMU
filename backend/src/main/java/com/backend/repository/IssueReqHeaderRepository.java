@@ -1,63 +1,73 @@
 package com.backend.repository;
 
 import com.backend.entity.IssueReqHeader;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 import java.util.List;
-import org.springframework.data.domain.Pageable;
 
 public interface IssueReqHeaderRepository extends JpaRepository<IssueReqHeader, Long> {
 
-    // Lấy phiếu theo trạng thái
-    List<IssueReqHeader> findByStatus(Integer status);
+    // ===== Theo status code =====
+    List<IssueReqHeader> findByStatus_Code(String statusCode);
 
-    // Lấy phiếu của một user cụ thể
+    List<IssueReqHeader> findByStatus_CodeOrderByRequestedAtDesc(String statusCode);
+
+    List<IssueReqHeader> findByStatus_CodeInOrderByRequestedAtDesc(List<String> statusCodes);
+
+    Long countByStatus_Code(String statusCode);
+
+    // ===== Theo user / dept =====
     List<IssueReqHeader> findByCreatedById(Long userId);
-
-    // Lấy phiếu theo department
-    List<IssueReqHeader> findByDepartmentId(Long departmentId);
-
-    // Lấy phiếu chờ phê duyệt cho department
-    @Query("SELECT ir FROM IssueReqHeader ir WHERE ir.status = 0 AND ir.department.id = :departmentId ORDER BY ir.requestedAt DESC")
-    List<IssueReqHeader> findPendingByDepartmentId(@Param("departmentId") Long departmentId);
-
-    // Lấy phiếu đã xử lý cho department
-    @Query("SELECT ir FROM IssueReqHeader ir WHERE ir.status != 0 AND ir.department.id = :departmentId ORDER BY ir.approvalAt DESC")
-    List<IssueReqHeader> findProcessedByDepartmentId(@Param("departmentId") Long departmentId);
-
-    // Lấy phiếu theo department và status
-    List<IssueReqHeader> findByDepartmentIdAndStatus(Long departmentId, Integer status);
-
-    // Lấy lịch sử phê duyệt của lãnh đạo
-    @Query("SELECT ir FROM IssueReqHeader ir WHERE ir.approvalBy.id = :approverId ORDER BY ir.approvalAt DESC")
-    List<IssueReqHeader> findByApproverId(@Param("approverId") Long approverId);
-
-    // Đếm phiếu theo trạng thái và department
-    long countByDepartmentIdAndStatus(Long departmentId, Integer status);
-
-    // Đếm phiếu của user theo trạng thái
-    long countByCreatedByIdAndStatus(Long userId, Integer status);
-
-    List<IssueReqHeader> findByStatusOrderByRequestedAtDesc(Integer status);
-    List<IssueReqHeader> findByStatusInOrderByRequestedAtDesc(List<Integer> statuses);
-    Long countByStatus(Integer status);
 
     List<IssueReqHeader> findByCreatedByIdOrderByRequestedAtDesc(Long createdById);
 
-    List<IssueReqHeader> findByStatusOrderByRequestedAtAsc(Integer status);
+    List<IssueReqHeader> findByDepartmentId(Long departmentId);
 
+    List<IssueReqHeader> findByDepartmentIdAndStatus_Code(Long departmentId, String statusCode);
+
+    // ===== Pending / Processed cho department =====
+    @Query("""
+        SELECT ir FROM IssueReqHeader ir
+        WHERE ir.status.code = 'PENDING' AND ir.department.id = :departmentId
+        ORDER BY ir.requestedAt DESC
+    """)
+    List<IssueReqHeader> findPendingByDepartmentId(@Param("departmentId") Long departmentId);
+
+    @Query("""
+        SELECT ir FROM IssueReqHeader ir
+        WHERE ir.status.code <> 'PENDING' AND ir.department.id = :departmentId
+        ORDER BY ir.approvalAt DESC
+    """)
+    List<IssueReqHeader> findProcessedByDepartmentId(@Param("departmentId") Long departmentId);
+
+    // ===== Lịch sử phê duyệt =====
+    @Query("SELECT ir FROM IssueReqHeader ir WHERE ir.approvalBy.id = :approverId ORDER BY ir.approvalAt DESC")
+    List<IssueReqHeader> findByApproverId(@Param("approverId") Long approverId);
+
+    long countByDepartmentIdAndStatus_Code(Long departmentId, String statusCode);
+
+    long countByCreatedByIdAndStatus_Code(Long userId, String statusCode);
+
+    // ===== Top latest =====
     IssueReqHeader findTopByDepartmentIdOrderByRequestedAtDesc(Long departmentId);
+
     IssueReqHeader findTopByDepartmentIdAndSubDepartmentIdOrderByRequestedAtDesc(Long departmentId, Long subDepartmentId);
 
-    List<IssueReqHeader> findByStatusOrderByRequestedAtAsc(Integer status, Pageable pageable);
+    // ===== Pageable variants (giữ pattern như bạn đang dùng) =====
+    List<IssueReqHeader> findByStatus_CodeOrderByRequestedAtAsc(String statusCode, Pageable pageable);
 
-    List<IssueReqHeader> findByDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Integer status);
-    List<IssueReqHeader> findByDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Integer status, Pageable pageable);
+    List<IssueReqHeader> findByDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(Long departmentId, String statusCode);
 
-    List<IssueReqHeader> findByDepartmentIdAndSubDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Long subDepartmentId, Integer status);
-    List<IssueReqHeader> findByDepartmentIdAndSubDepartmentIdAndStatusOrderByRequestedAtAsc(Long departmentId, Long subDepartmentId, Integer status, Pageable pageable);
+    List<IssueReqHeader> findByDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(Long departmentId, String statusCode, Pageable pageable);
 
+    List<IssueReqHeader> findByDepartmentIdAndSubDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(Long departmentId, Long subDepartmentId, String statusCode);
+
+    List<IssueReqHeader> findByDepartmentIdAndSubDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(Long departmentId, Long subDepartmentId, String statusCode, Pageable pageable);
+
+    // ===== Concurrency =====
     @Query(value = """
         SELECT * FROM issue_req_header
         WHERE id = :id

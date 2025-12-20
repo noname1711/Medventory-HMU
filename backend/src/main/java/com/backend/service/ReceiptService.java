@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -32,12 +33,8 @@ public class ReceiptService {
             User creator = userRepository.findById(creatorId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-            if (!creator.isApproved()) {
-                throw new RuntimeException("Tài khoản chưa được kích hoạt");
-            }
-            if (!creator.isThuKho()) {
-                throw new RuntimeException("Chỉ thủ kho được tạo phiếu nhập");
-            }
+            if (!creator.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
+            if (!creator.isThuKho()) throw new RuntimeException("Chỉ thủ kho được tạo phiếu nhập");
 
             validateCreateReceipt(request);
 
@@ -49,7 +46,6 @@ public class ReceiptService {
             String receivedFrom = safeTrim(request.getReceivedFrom());
             String deliveryPerson = safeTrim(request.getDeliveryPerson());
 
-            // DB không có cột người giao -> gộp vào received_from theo format rõ ràng
             if (!deliveryPerson.isEmpty()) {
                 receivedFrom = receivedFrom + " - Người giao: " + deliveryPerson;
             }
@@ -59,13 +55,11 @@ public class ReceiptService {
             header.setReason(reason.isEmpty() ? "Nhu cầu từ đơn vị" : reason);
 
             header.setTotalAmount(BigDecimal.ZERO);
-
             header = receiptHeaderRepository.save(header);
 
             List<ReceiptDetail> details = createDetailsAndInventory(header, request);
             header.setDetails(details);
 
-            // Recalc total_amount chuẩn theo DB logic
             BigDecimal totalAmount = details.stream()
                     .map(d -> nvl(d.getTotal()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -77,9 +71,7 @@ public class ReceiptService {
             ReceiptHeaderDTO headerDTO = convertHeaderToDTO(header);
             Map<String, Object> summary = createSummary(header);
 
-            List<ReceiptDetailDTO> detailDTOs = headerDTO.getDetails();
-
-            return ReceiptResponseDTO.success("Tạo phiếu nhập kho thành công", headerDTO, detailDTOs, summary);
+            return ReceiptResponseDTO.success("Tạo phiếu nhập kho thành công", headerDTO, headerDTO.getDetails(), summary);
 
         } catch (Exception e) {
             return ReceiptResponseDTO.error("Lỗi khi tạo phiếu nhập: " + e.getMessage());
@@ -91,14 +83,11 @@ public class ReceiptService {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-            if (!user.isApproved()) {
-                throw new RuntimeException("Tài khoản chưa được kích hoạt");
-            }
+            if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
 
             ReceiptHeader header = receiptHeaderRepository.findById(receiptId)
                     .orElseThrow(() -> new RuntimeException("Phiếu nhập không tồn tại"));
 
-            // Quyền xem: thủ kho hoặc lãnh đạo/BGH (giống pattern IssueReq)
             if (!(user.isThuKho() || user.isLanhDao() || user.isBanGiamHieu())) {
                 throw new RuntimeException("Bạn không có quyền xem phiếu nhập");
             }
@@ -109,15 +98,12 @@ public class ReceiptService {
             ReceiptHeaderDTO headerDTO = convertHeaderToDTO(header);
             Map<String, Object> summary = createSummary(header);
 
-            return ReceiptResponseDTO.success("Lấy chi tiết phiếu nhập thành công",
-                    headerDTO, headerDTO.getDetails(), summary);
+            return ReceiptResponseDTO.success("Lấy chi tiết phiếu nhập thành công", headerDTO, headerDTO.getDetails(), summary);
 
         } catch (Exception e) {
             return ReceiptResponseDTO.error("Không thể tải chi tiết phiếu nhập: " + e.getMessage());
         }
     }
-
-    // -------------------- Helpers --------------------
 
     private void validateCreateReceipt(CreateReceiptDTO request) {
         if (request == null) throw new RuntimeException("Request không hợp lệ");
@@ -168,7 +154,6 @@ public class ReceiptService {
             detail.setHeader(header);
             detail.setMaterial(material);
 
-            // snapshot từ materials
             detail.setName(material.getName());
             detail.setSpec(material.getSpec());
             detail.setCode(material.getCode());
@@ -189,7 +174,6 @@ public class ReceiptService {
 
             details.add(detail);
 
-            // Tạo inventory_card theo (material, lot)
             createInventoryCardForReceiptLine(material, detail, header, warehouseName);
         }
 
@@ -202,7 +186,8 @@ public class ReceiptService {
         String lot = detail.getLotNumber();
 
         BigDecimal opening = inventoryCardRepository
-                .findTopByMaterialIdAndLotNumberOrderByRecordDateDescIdDesc(material.getId(), lot)
+                // CHỖ SỬA: theo schema mới (material là entity)
+                .findTopByMaterial_IdAndLotNumberOrderByRecordDateDescIdDesc(material.getId(), lot)
                 .map(InventoryCard::getClosingStock)
                 .orElse(BigDecimal.ZERO);
 
@@ -221,7 +206,6 @@ public class ReceiptService {
         card.setMfgDate(detail.getMfgDate());
         card.setExpDate(detail.getExpDate());
 
-        // sub_department_id: nhập kho không gắn trực tiếp đơn vị -> để null
         card.setSubDepartment(null);
 
         inventoryCardRepository.save(card);
@@ -325,21 +309,12 @@ public class ReceiptService {
     private static String safeTrim(String s) {
         return s == null ? "" : s.trim();
     }
+
     public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
             if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-
-            // Bạn có 2 lựa chọn:
-            // (A) Cho tất cả user approved nhận feed (khuyến nghị cho mục tiêu “thông báo”)
-            // (B) Chỉ thuKho/lanhDao/BGH (giống getReceiptDetail)
-            // Mình mặc định (A). Nếu muốn (B) thì bật check dưới đây.
-        /*
-        if (!(user.isThuKho() || user.isLanhDao() || user.isBanGiamHieu())) {
-            throw new RuntimeException("Bạn không có quyền xem feed phiếu nhập");
-        }
-        */
 
             long aid = (afterId == null || afterId < 0) ? 0 : afterId;
             int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);

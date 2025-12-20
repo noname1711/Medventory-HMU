@@ -2,17 +2,19 @@ package com.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "issue_req_detail")
 @Data
 public class IssueReqDetail {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(optional = false)
     @JoinColumn(name = "header_id", nullable = false)
     private IssueReqHeader header;
 
@@ -20,9 +22,10 @@ public class IssueReqDetail {
     @JoinColumn(name = "material_id")
     private Material material;
 
-    @Column(name = "material_name")
+    @Column(name = "material_name", length = 255)
     private String materialName;
 
+    @Column(name = "spec", length = 255)
     private String spec;
 
     @ManyToOne
@@ -32,16 +35,16 @@ public class IssueReqDetail {
     @Column(name = "qty_requested", nullable = false, precision = 18, scale = 3)
     private BigDecimal qtyRequested;
 
-    @Column(name = "proposed_code")
+    @Column(name = "proposed_code", length = 100)
     private String proposedCode;
 
-    @Column(name = "proposed_manufacturer")
+    @Column(name = "proposed_manufacturer", length = 255)
     private String proposedManufacturer;
 
-    @Column(name = "material_category")
-    private Character materialCategory;
+    @Column(name = "material_category", length = 1)
+    private String materialCategory; // "A"/"B"/"C"/"D"
 
-    // Helper methods
+    // ===== Helpers =====
     public String getDisplayMaterialName() {
         return material != null ? material.getName() : materialName;
     }
@@ -51,13 +54,13 @@ public class IssueReqDetail {
     }
 
     public String getDisplayUnit() {
-        return unit != null ? unit.getName() :
-                material != null && material.getUnit() != null ? material.getUnit().getName() : "";
+        if (unit != null) return unit.getName();
+        if (material != null && material.getUnit() != null) return material.getUnit().getName();
+        return "";
     }
 
-    public Character getMaterialCategory() {
-        // Ưu tiên lấy category từ material, nếu không thì lấy từ materialCategory
-        return material != null ? material.getCategory() :
-                (materialCategory != null ? materialCategory : 'D');
+    public String getMaterialCategorySafe() {
+        if (material != null) return material.getCategorySafe();
+        return (materialCategory == null || materialCategory.isBlank()) ? "D" : materialCategory;
     }
 }

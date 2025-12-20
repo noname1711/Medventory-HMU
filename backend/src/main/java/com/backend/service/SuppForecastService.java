@@ -4,25 +4,15 @@ import com.backend.dto.SuppForecastApprovalDTO;
 import com.backend.dto.SuppForecastDetailDTO;
 import com.backend.dto.SuppForecastPreviousDTO;
 import com.backend.dto.SuppForecastRequestDTO;
-import com.backend.entity.Material;
-import com.backend.entity.SuppForecastDetail;
-import com.backend.entity.SuppForecastHeader;
-import com.backend.entity.User;
-import com.backend.repository.MaterialRepository;
-import com.backend.repository.SuppForecastDetailRepository;
-import com.backend.repository.SuppForecastHeaderRepository;
-import com.backend.repository.UserRepository;
+import com.backend.entity.*;
+import com.backend.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,12 +20,20 @@ import java.util.stream.Collectors;
 @Transactional
 public class SuppForecastService {
 
+    private static final String DOC_PENDING  = "PENDING";
+    private static final String DOC_APPROVED = "APPROVED";
+    private static final String DOC_REJECTED = "REJECTED";
+
     private final SuppForecastHeaderRepository headerRepository;
+    private final SuppForecastDetailRepository detailRepository;
+
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
+    private final MaterialRepository materialRepository;
+    private final DocStatusRepository docStatusRepository;
 
     public ResponseEntity<?> getPendingForecasts(Long bghId) {
         try {
-            // Kiểm tra user tồn tại và là Ban Giám Hiệu
             User bgh = userRepository.findById(bghId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
@@ -43,10 +41,8 @@ public class SuppForecastService {
                 return ResponseEntity.badRequest().body(Map.of("error", "Chỉ Ban Giám Hiệu được xem dự trù"));
             }
 
-            // Lấy dữ liệu từ repository
-            List<SuppForecastHeader> forecasts = headerRepository.findByStatusOrderByCreatedAtDesc(0);
+            List<SuppForecastHeader> forecasts = headerRepository.findByStatus_CodeOrderByCreatedAtDesc(DOC_PENDING);
 
-            // CHUYỂN ĐỔI sang DTO để tránh circular references
             List<Map<String, Object>> forecastDTOs = forecasts.stream()
                     .map(this::convertToForecastDTO)
                     .collect(Collectors.toList());
@@ -67,9 +63,9 @@ public class SuppForecastService {
                 return ResponseEntity.badRequest().body(Map.of("error", "Chỉ Ban Giám Hiệu được xem lịch sử"));
             }
 
-            List<SuppForecastHeader> forecasts = headerRepository.findByStatusInOrderByCreatedAtDesc(List.of(1, 2));
+            List<SuppForecastHeader> forecasts =
+                    headerRepository.findByStatus_CodeInOrderByCreatedAtDesc(List.of(DOC_APPROVED, DOC_REJECTED));
 
-            // CHUYỂN ĐỔI sang DTO
             List<Map<String, Object>> forecastDTOs = forecasts.stream()
                     .map(this::convertToForecastDTO)
                     .collect(Collectors.toList());
@@ -81,17 +77,15 @@ public class SuppForecastService {
         }
     }
 
-    // PHƯƠNG THỨC CHUYỂN ĐỔI ENTITY -> DTO
     private Map<String, Object> convertToForecastDTO(SuppForecastHeader forecast) {
         Map<String, Object> dto = new HashMap<>();
         dto.put("id", forecast.getId());
         dto.put("academicYear", forecast.getAcademicYear());
-        dto.put("status", forecast.getStatus());
+        dto.put("status", forecast.getStatus() != null ? forecast.getStatus().getCode() : null);
         dto.put("createdAt", forecast.getCreatedAt());
         dto.put("approvalNote", forecast.getApprovalNote());
         dto.put("approvalAt", forecast.getApprovalAt());
 
-        // Department info
         if (forecast.getDepartment() != null) {
             Map<String, Object> deptDTO = new HashMap<>();
             deptDTO.put("id", forecast.getDepartment().getId());
@@ -99,7 +93,6 @@ public class SuppForecastService {
             dto.put("department", deptDTO);
         }
 
-        // Created by info
         if (forecast.getCreatedBy() != null) {
             Map<String, Object> userDTO = new HashMap<>();
             userDTO.put("id", forecast.getCreatedBy().getId());
@@ -108,7 +101,6 @@ public class SuppForecastService {
             dto.put("createdBy", userDTO);
         }
 
-        // Approval by info
         if (forecast.getApprovalBy() != null) {
             Map<String, Object> approverDTO = new HashMap<>();
             approverDTO.put("id", forecast.getApprovalBy().getId());
@@ -116,20 +108,18 @@ public class SuppForecastService {
             dto.put("approvalBy", approverDTO);
         }
 
-        // Details info
         if (forecast.getDetails() != null) {
             List<Map<String, Object>> detailDTOs = forecast.getDetails().stream()
                     .map(detail -> {
-                        Map<String, Object> detailDTO = new HashMap<>();
-                        detailDTO.put("id", detail.getId());
-                        detailDTO.put("currentStock", detail.getCurrentStock());
-                        detailDTO.put("prevYearQty", detail.getPrevYearQty());
-                        detailDTO.put("thisYearQty", detail.getThisYearQty());
-                        detailDTO.put("justification", detail.getJustification());
-                        detailDTO.put("proposedCode", detail.getProposedCode());
-                        detailDTO.put("proposedManufacturer", detail.getProposedManufacturer());
+                        Map<String, Object> x = new HashMap<>();
+                        x.put("id", detail.getId());
+                        x.put("currentStock", detail.getCurrentStock());
+                        x.put("prevYearQty", detail.getPrevYearQty());
+                        x.put("thisYearQty", detail.getThisYearQty());
+                        x.put("justification", detail.getJustification());
+                        x.put("proposedCode", detail.getProposedCode());
+                        x.put("proposedManufacturer", detail.getProposedManufacturer());
 
-                        // Material info
                         if (detail.getMaterial() != null) {
                             Map<String, Object> materialDTO = new HashMap<>();
                             materialDTO.put("id", detail.getMaterial().getId());
@@ -137,10 +127,10 @@ public class SuppForecastService {
                             materialDTO.put("spec", detail.getMaterial().getSpec());
                             materialDTO.put("code", detail.getMaterial().getCode());
                             materialDTO.put("category", detail.getMaterial().getCategory());
-                            detailDTO.put("material", materialDTO);
+                            x.put("material", materialDTO);
                         }
 
-                        return detailDTO;
+                        return x;
                     })
                     .collect(Collectors.toList());
             dto.put("details", detailDTOs);
@@ -161,22 +151,27 @@ public class SuppForecastService {
                 return ResponseEntity.badRequest().body(Map.of("error", "Chỉ Ban Giám Hiệu được phê duyệt"));
             }
 
-            if (header.getStatus() != 0) {
+            if (header.getStatus() == null || header.getStatus().getCode() == null
+                    || !DOC_PENDING.equalsIgnoreCase(header.getStatus().getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Dự trù đã được xử lý"));
             }
 
-            // Cập nhật thông tin phê duyệt
             header.setApprovalBy(approver);
             header.setApprovalAt(LocalDateTime.now());
             header.setApprovalNote(request.getNote());
-            header.setStatus(request.getAction()); // 1 = approve, 2 = reject
+
+            if (request.getAction() == 1) {
+                header.setStatus(requireDocStatus(DOC_APPROVED));
+            } else {
+                header.setStatus(requireDocStatus(DOC_REJECTED));
+            }
 
             headerRepository.save(header);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", request.getAction() == 1 ? "Đã phê duyệt dự trù" : "Đã từ chối dự trù");
-            response.put("success", true);
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(Map.of(
+                    "message", request.getAction() == 1 ? "Đã phê duyệt dự trù" : "Đã từ chối dự trù",
+                    "success", true
+            ));
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Lỗi server: " + e.getMessage()));
@@ -192,39 +187,35 @@ public class SuppForecastService {
                 return ResponseEntity.badRequest().body(Map.of("error", "Chỉ Ban Giám Hiệu được xem thống kê"));
             }
 
-            long pending = headerRepository.countByStatus(0);
-            long approved = headerRepository.countByStatus(1);
-            long rejected = headerRepository.countByStatus(2);
+            long pending = headerRepository.countByStatus_Code(DOC_PENDING);
+            long approved = headerRepository.countByStatus_Code(DOC_APPROVED);
+            long rejected = headerRepository.countByStatus_Code(DOC_REJECTED);
 
-            Map<String, Object> stats = new HashMap<>();
-            stats.put("pending", pending);
-            stats.put("approved", approved);
-            stats.put("rejected", rejected);
-            stats.put("total", pending + approved + rejected);
-
-            return ResponseEntity.ok(stats);
+            return ResponseEntity.ok(Map.of(
+                    "pending", pending,
+                    "approved", approved,
+                    "rejected", rejected,
+                    "total", pending + approved + rejected
+            ));
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Lỗi server: " + e.getMessage()));
         }
     }
 
-    @Autowired
-    private MaterialRepository materialRepository;
-
-    @Autowired
-    private SuppForecastDetailRepository detailRepository;
-
     @Transactional
     public SuppForecastHeader createForecast(SuppForecastRequestDTO dto) {
         SuppForecastHeader header = new SuppForecastHeader();
         header.setAcademicYear(dto.getAcademicYear());
-        header.setDepartmentId(dto.getDepartmentId());
-        header.setStatus(0);
+
+        Department dept = departmentRepository.findById(dto.getDepartmentId())
+                .orElseThrow(() -> new RuntimeException("Department không tồn tại"));
+        header.setDepartment(dept);
+
+        header.setStatus(requireDocStatus(DOC_PENDING));
 
         if (dto.getCreatedByEmail() != null && !dto.getCreatedByEmail().isBlank()) {
-            Optional<User> uOpt = userRepository.findByEmail(dto.getCreatedByEmail());
-            uOpt.ifPresent(header::setCreatedBy);
+            userRepository.findByEmail(dto.getCreatedByEmail()).ifPresent(header::setCreatedBy);
         }
 
         if (dto.getItems() != null) {
@@ -233,8 +224,7 @@ public class SuppForecastService {
                 detail.setHeader(header);
 
                 if (itemDto.getMaterialId() != null) {
-                    Optional<Material> mOpt = materialRepository.findById(itemDto.getMaterialId());
-                    mOpt.ifPresent(detail::setMaterial);
+                    materialRepository.findById(itemDto.getMaterialId()).ifPresent(detail::setMaterial);
                 }
 
                 if (itemDto.getCurrentStock() != null) detail.setCurrentStock(itemDto.getCurrentStock());
@@ -256,39 +246,43 @@ public class SuppForecastService {
         String previousYear = "2025-2026"; // TODO: bạn có thể tự động tính theo năm hiện tại
 
         List<SuppForecastHeader> headers;
-
         if (departmentId != null) {
             headers = headerRepository.findByAcademicYearAndDepartmentId(previousYear, departmentId);
         } else {
             headers = headerRepository.findByAcademicYear(previousYear);
         }
 
-        List<SuppForecastPreviousDTO> result = new java.util.ArrayList<>();
+        List<SuppForecastPreviousDTO> result = new ArrayList<>();
 
         for (SuppForecastHeader h : headers) {
             for (SuppForecastDetail d : h.getDetails()) {
+                SuppForecastPreviousDTO x = new SuppForecastPreviousDTO();
 
-                SuppForecastPreviousDTO dto = new SuppForecastPreviousDTO();
-                dto.setMaterialId(d.getMaterial() != null ? d.getMaterial().getId() : null);
-                dto.setMaterialName(d.getMaterial() != null ? d.getMaterial().getName() : null);
-                dto.setSpecification(d.getMaterial() != null ? d.getMaterial().getSpec() : null);
-                dto.setUnitId(d.getMaterial() != null ? d.getMaterial().getUnitId() : null);
-                dto.setMaterialCode(d.getMaterial() != null ? d.getMaterial().getCode() : null);
-                dto.setManufacturer(d.getMaterial() != null ? d.getMaterial().getManufacturer() : null);
+                x.setMaterialId(d.getMaterial() != null ? d.getMaterial().getId() : null);
+                x.setMaterialName(d.getMaterial() != null ? d.getMaterial().getName() : null);
+                x.setSpecification(d.getMaterial() != null ? d.getMaterial().getSpec() : null);
+                x.setUnitId(d.getMaterial() != null && d.getMaterial().getUnit() != null ? d.getMaterial().getUnit().getId() : null);
+                x.setMaterialCode(d.getMaterial() != null ? d.getMaterial().getCode() : null);
+                x.setManufacturer(d.getMaterial() != null ? d.getMaterial().getManufacturer() : null);
 
-                dto.setCurrentStock(d.getCurrentStock());
-                dto.setPrevYearQty(d.getPrevYearQty());
-                dto.setThisYearQty(d.getThisYearQty());
+                x.setCurrentStock(d.getCurrentStock());
+                x.setPrevYearQty(d.getPrevYearQty());
+                x.setThisYearQty(d.getThisYearQty());
 
-                dto.setJustification("Tự động tạo dự trù"); // AUTO FILL
-                dto.setProposedCode(d.getProposedCode());
-                dto.setProposedManufacturer(d.getProposedManufacturer());
-                dto.setAcademicYear(h.getAcademicYear());
+                x.setJustification("Tự động tạo dự trù");
+                x.setProposedCode(d.getProposedCode());
+                x.setProposedManufacturer(d.getProposedManufacturer());
+                x.setAcademicYear(h.getAcademicYear());
 
-                result.add(dto);
+                result.add(x);
             }
         }
 
         return result;
+    }
+
+    private DocStatus requireDocStatus(String code) {
+        return docStatusRepository.findByCode(code)
+                .orElseThrow(() -> new RuntimeException("Thiếu doc_status code=" + code));
     }
 }

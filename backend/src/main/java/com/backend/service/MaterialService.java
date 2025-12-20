@@ -31,7 +31,7 @@ public class MaterialService {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
-    // Polling theo afterId
+
     public MaterialFeedResponseDTO getMaterialFeed(Long userId, Long afterId, Integer limit) {
         try {
             User u = userRepository.findById(userId)
@@ -72,9 +72,12 @@ public class MaterialService {
         dto.setSpec(material.getSpec());
         dto.setCode(material.getCode());
         dto.setManufacturer(material.getManufacturer());
-        dto.setCategory(material.getCategory() != null ? material.getCategory().toString() : "");
 
-        dto.setUnitId(material.getUnitId());
+        // category là String (A/B/C/D)
+        dto.setCategory(material.getCategory() != null ? material.getCategory() : "");
+
+        Long unitId = (material.getUnit() != null) ? material.getUnit().getId() : null;
+        dto.setUnitId(unitId);
         dto.setUnitName(material.getUnit() != null ? material.getUnit().getName() : null);
 
         return dto;
@@ -85,10 +88,12 @@ public class MaterialService {
         dto.setMaterialId(material.getId());
         dto.setMaterialName(material.getName());
         dto.setSpecification(material.getSpec());
-        dto.setUnitId(material.getUnitId());
         dto.setManufacturer(material.getManufacturer());
         dto.setMaterialCode(material.getCode());
-        dto.setCategory(material.getCategory() != null ? material.getCategory().toString() : "");
+
+        dto.setCategory(material.getCategory() != null ? material.getCategory() : "");
+        dto.setUnitId(material.getUnit() != null ? material.getUnit().getId() : null);
+
         return dto;
     }
 }

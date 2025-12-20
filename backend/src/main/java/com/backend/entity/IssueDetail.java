@@ -15,7 +15,7 @@ public class IssueDetail {
     private Long id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "header_id")
+    @JoinColumn(name = "header_id", nullable = false)
     private IssueHeader header;
 
     @ManyToOne
@@ -23,8 +23,13 @@ public class IssueDetail {
     private Material material;
 
     // snapshot fields
+    @Column(name = "name", length = 255)
     private String name;
+
+    @Column(name = "spec", length = 255)
     private String spec;
+
+    @Column(name = "code", length = 100)
     private String code;
 
     @ManyToOne
@@ -40,6 +45,6 @@ public class IssueDetail {
     @Column(name = "qty_issued", precision = 18, scale = 3)
     private BigDecimal qtyIssued;
 
-    @Column(precision = 18, scale = 2)
+    @Column(name = "total", precision = 18, scale = 2)
     private BigDecimal total;
 }

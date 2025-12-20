@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class IssueService {
 
+    private static final String DOC_APPROVED = "APPROVED";
+
     private final IssueHeaderRepository issueHeaderRepository;
     private final IssueDetailRepository issueDetailRepository;
 
@@ -37,7 +39,7 @@ public class IssueService {
             IssueReqHeader req = issueReqHeaderRepository.findById(issueReqId)
                     .orElseThrow(() -> new RuntimeException("Phiếu xin lĩnh không tồn tại"));
 
-            if (!req.isApproved()) {
+            if (!isApproved(req)) {
                 throw new RuntimeException("Chỉ cho phép xuất kho với phiếu xin lĩnh đã phê duyệt");
             }
 
@@ -107,11 +109,10 @@ public class IssueService {
             User thuKho = validateThuKho(thuKhoId);
             validateCreateIssueRequest(request);
 
-            // lock request để tránh double issue trong cùng thời điểm
             IssueReqHeader req = issueReqHeaderRepository.lockByIdForUpdate(request.getIssueReqId());
             if (req == null) throw new RuntimeException("Phiếu xin lĩnh không tồn tại");
 
-            if (!req.isApproved()) {
+            if (!isApproved(req)) {
                 throw new RuntimeException("Chỉ cho phép xuất kho với phiếu xin lĩnh đã phê duyệt");
             }
 
@@ -123,7 +124,6 @@ public class IssueService {
 
             boolean auto = (request.getAutoAllocate() == null) || request.getAutoAllocate();
 
-            // 1) create issue header
             IssueHeader header = new IssueHeader();
             header.setCreatedBy(thuKho);
             header.setIssueDate(issueDate);
@@ -132,15 +132,12 @@ public class IssueService {
             String receiver = safeTrim(request.getReceiverName());
             if (receiver.isEmpty()) receiver = buildDefaultReceiverName(req);
 
-            // Marker để chống xuất trùng (không đổi DB)
             receiver = receiver + " (IssueReq#" + req.getId() + ")";
             header.setReceiverName(receiver);
             header.setTotalAmount(BigDecimal.ZERO);
 
-            // save header trước để có ID (optional nhưng an toàn khi log/audit)
             header = issueHeaderRepository.save(header);
 
-            // 2) create details + write inventory out per lot
             Map<Long, BigDecimal> reqQtyByMaterial = req.getDetails().stream()
                     .filter(d -> d.getMaterial() != null)
                     .collect(Collectors.toMap(
@@ -165,7 +162,7 @@ public class IssueService {
                     writeInventoryOutMovements(req, m, allocation, issueDate, warehouseName);
 
                     IssueDetail det = buildIssueDetailLine(header, m, need, need);
-                    header.addDetail(det); // IMPORTANT: không replace list
+                    header.addDetail(det);
                 }
             } else {
                 Map<Long, ManualIssueLineDTO> manualMap = mapManualLines(request.getManualLines());
@@ -195,11 +192,10 @@ public class IssueService {
                     writeInventoryOutMovements(req, m, allocation, issueDate, warehouseName);
 
                     IssueDetail det = buildIssueDetailLine(header, m, need, qtyIssued);
-                    header.addDetail(det); // IMPORTANT
+                    header.addDetail(det);
                 }
             }
 
-            // 3) calc totals from header.details
             BigDecimal totalAmount = header.getDetails().stream()
                     .map(IssueDetail::getTotal)
                     .map(IssueService::nvl)
@@ -207,15 +203,10 @@ public class IssueService {
                     .setScale(2, RoundingMode.HALF_UP);
 
             header.setTotalAmount(totalAmount);
-
-            // save header once more - cascade will persist details
             header = issueHeaderRepository.save(header);
 
-            // build response
             List<IssueDetail> persistedDetails = issueDetailRepository.findByHeaderId(header.getId());
             IssueHeaderDTO headerDTO = toIssueHeaderDTO(header);
-
-            // override DTO details theo list query cho chắc chắn đúng DB
             headerDTO.setDetails(persistedDetails.stream().map(this::toIssueDetailDTO).collect(Collectors.toList()));
 
             Map<String, Object> summary = buildIssueSummary(persistedDetails);
@@ -243,7 +234,6 @@ public class IssueService {
                 throw new RuntimeException("Bạn không có quyền xem phiếu xuất");
             }
 
-            // IMPORTANT: không setDetails vào entity (tránh orphanRemoval issues)
             List<IssueDetail> details = issueDetailRepository.findByHeaderId(issueId);
 
             IssueHeaderDTO headerDTO = toIssueHeaderDTO(header);
@@ -273,6 +263,13 @@ public class IssueService {
     }
 
     // ------------------------- CORE LOGIC -------------------------
+
+    private boolean isApproved(IssueReqHeader req) {
+        return req != null
+                && req.getStatus() != null
+                && req.getStatus().getCode() != null
+                && DOC_APPROVED.equalsIgnoreCase(req.getStatus().getCode());
+    }
 
     private void ensureNotIssuedYet(IssueReqHeader req) {
         String marker = "IssueReq#" + req.getId();
@@ -430,7 +427,6 @@ public class IssueService {
         dto.setIssueDate(header.getIssueDate());
         dto.setTotalAmount(header.getTotalAmount());
 
-        // Không rely vào header.getDetails() (có thể lazy / hoặc chưa load)
         List<IssueDetail> details = issueDetailRepository.findByHeaderId(header.getId());
         dto.setDetails(details.stream().map(this::toIssueDetailDTO).collect(Collectors.toList()));
         return dto;
@@ -478,9 +474,12 @@ public class IssueService {
         }
 
         dto.setRequestedAt(header.getRequestedAt());
-        dto.setStatus(header.getStatus());
-        dto.setStatusName(header.getStatusName());
-        dto.setStatusBadge(header.getStatusBadge());
+
+        // vẫn trả int cho FE
+        String st = (header.getStatus() != null) ? header.getStatus().getCode() : null;
+        dto.setStatus("APPROVED".equalsIgnoreCase(st) ? 1 : ("REJECTED".equalsIgnoreCase(st) ? 2 : 0));
+        dto.setStatusName(dto.getStatus() == 1 ? "Đã phê duyệt" : (dto.getStatus() == 2 ? "Bị từ chối" : "Chờ phê duyệt"));
+        dto.setStatusBadge(dto.getStatus() == 1 ? "approved" : (dto.getStatus() == 2 ? "rejected" : "pending"));
 
         if (header.getApprovalBy() != null) {
             dto.setApprovalById(header.getApprovalBy().getId());
@@ -495,7 +494,7 @@ public class IssueService {
             IssueReqDetailDTO x = new IssueReqDetailDTO();
             x.setId(d.getId());
             x.setQtyRequested(d.getQtyRequested());
-            x.setCategory(d.getMaterialCategory());
+            x.setCategory(toCategoryChar(d.getMaterialCategory()));
             x.setIsNewMaterial(d.getMaterial() == null);
 
             if (d.getMaterial() != null) {
@@ -519,6 +518,13 @@ public class IssueService {
 
         dto.setDetails(detailDTOs);
         return dto;
+    }
+
+    private static Character toCategoryChar(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.isEmpty()) return null;
+        return Character.toUpperCase(t.charAt(0));
     }
 
     // ------------------------- VALIDATIONS & HELPERS -------------------------
@@ -628,17 +634,17 @@ public class IssueService {
             List<IssueReqHeader> approved;
             if (departmentId != null && subDepartmentId != null) {
                 approved = issueReqHeaderRepository
-                        .findByDepartmentIdAndSubDepartmentIdAndStatusOrderByRequestedAtAsc(
-                                departmentId, subDepartmentId, 1, PageRequest.of(0, size)
+                        .findByDepartmentIdAndSubDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(
+                                departmentId, subDepartmentId, DOC_APPROVED, PageRequest.of(0, size)
                         );
             } else if (departmentId != null) {
                 approved = issueReqHeaderRepository
-                        .findByDepartmentIdAndStatusOrderByRequestedAtAsc(
-                                departmentId, 1, PageRequest.of(0, size)
+                        .findByDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(
+                                departmentId, DOC_APPROVED, PageRequest.of(0, size)
                         );
             } else {
                 approved = issueReqHeaderRepository
-                        .findByStatusOrderByRequestedAtAsc(1, PageRequest.of(0, size));
+                        .findByStatus_CodeOrderByRequestedAtAsc(DOC_APPROVED, PageRequest.of(0, size));
             }
 
             Map<Long, List<LotState>> lotCache = new HashMap<>();
@@ -808,17 +814,17 @@ public class IssueService {
             List<IssueReqHeader> approved;
             if (departmentId != null && subDepartmentId != null) {
                 approved = issueReqHeaderRepository
-                        .findByDepartmentIdAndSubDepartmentIdAndStatusOrderByRequestedAtAsc(
-                                departmentId, subDepartmentId, 1, PageRequest.of(0, size)
+                        .findByDepartmentIdAndSubDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(
+                                departmentId, subDepartmentId, DOC_APPROVED, PageRequest.of(0, size)
                         );
             } else if (departmentId != null) {
                 approved = issueReqHeaderRepository
-                        .findByDepartmentIdAndStatusOrderByRequestedAtAsc(
-                                departmentId, 1, PageRequest.of(0, size)
+                        .findByDepartmentIdAndStatus_CodeOrderByRequestedAtAsc(
+                                departmentId, DOC_APPROVED, PageRequest.of(0, size)
                         );
             } else {
                 approved = issueReqHeaderRepository
-                        .findByStatusOrderByRequestedAtAsc(1, PageRequest.of(0, size));
+                        .findByStatus_CodeOrderByRequestedAtAsc(DOC_APPROVED, PageRequest.of(0, size));
             }
 
             Map<Long, List<LotState>> lotCache = new HashMap<>();
