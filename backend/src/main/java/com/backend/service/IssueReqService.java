@@ -6,7 +6,7 @@ import com.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -21,6 +21,11 @@ public class IssueReqService {
     private static final String DOC_APPROVED = "APPROVED";
     private static final String DOC_REJECTED = "REJECTED";
 
+    private static final String RES_ACTIVE    = "ACTIVE";
+    private static final String RES_CANCELLED = "CANCELLED";
+
+    private static final String AUTO_APPROVAL_NOTE = "Hệ thống tự động phê duyệt (đủ tồn, đã giữ chỗ)";
+
     private final IssueReqHeaderRepository headerRepository;
     private final IssueReqDetailRepository detailRepository;
 
@@ -30,8 +35,13 @@ public class IssueReqService {
     private final MaterialRepository materialRepository;
     private final UnitRepository unitRepository;
 
+    private final InventoryCardRepository inventoryCardRepository;
+
     private final DocStatusRepository docStatusRepository;
     private final NotificationService notificationService;
+
+    private final IssueReservationRepository issueReservationRepository;
+    private final ReservationStatusRepository reservationStatusRepository;
 
     // ==================== DANH SÁCH PHIẾU CHO LÃNH ĐẠO ====================
 
@@ -136,10 +146,15 @@ public class IssueReqService {
 
     public IssueReqDetailResponseDTO processApproval(ApprovalActionDTO request) {
         try {
-            IssueReqHeader header = headerRepository.findById(request.getIssueReqId())
-                    .orElseThrow(() -> new RuntimeException("Phiếu xin lĩnh không tồn tại"));
+            if (request == null || request.getIssueReqId() == null) {
+                throw new RuntimeException("Thiếu issueReqId");
+            }
 
             User approver = getLeaderUser(request.getApproverId(), "Chỉ lãnh đạo được phê duyệt phiếu");
+
+            // Lock header để tránh 2 lãnh đạo bấm cùng lúc / auto-approve chen ngang
+            IssueReqHeader header = headerRepository.lockByIdForUpdate(request.getIssueReqId());
+            if (header == null) throw new RuntimeException("Phiếu xin lĩnh không tồn tại");
 
             if (!isDocStatus(header, DOC_PENDING)) {
                 throw new RuntimeException("Phiếu này đã được xử lý");
@@ -150,21 +165,37 @@ public class IssueReqService {
             header.setApprovalNote(request.getNote());
 
             switch (request.getAction()) {
-                case ApprovalActionDTO.ACTION_APPROVE:
-                    header.setStatus(requireDocStatus(DOC_APPROVED));
+                case ApprovalActionDTO.ACTION_APPROVE: {
+                    // 1) Nếu có vật tư mới nhưng proposedCode hợp lệ => tạo material để map trước
                     createNewMaterialsForApprovedRequest(header);
+
+                    // 2) Sau khi map xong: bắt buộc phải map hết để giữ đúng invariant (APPROVED => đã giữ chỗ đủ)
+                    if (hasAnyUnmappedMaterial(header)) {
+                        throw new RuntimeException("Có vật tư chưa map material_id. Không thể phê duyệt.");
+                    }
+
+                    // 3) Reserve đủ toàn phiếu (FEFO, trừ reservation phiếu khác)
+                    reserveStockForWholeRequestOrThrow(header, approver, "MANUAL_APPROVE");
+
+                    // 4) APPROVED
+                    header.setStatus(requireDocStatus(DOC_APPROVED));
+
                     notificationService.notifyApprovalResult(header, true, request.getNote());
                     break;
+                }
 
-                case ApprovalActionDTO.ACTION_REJECT:
+                case ApprovalActionDTO.ACTION_REJECT: {
+                    cancelActiveReservationsRejected(header, approver, request.getNote());
                     header.setStatus(requireDocStatus(DOC_REJECTED));
                     notificationService.notifyApprovalResult(header, false, request.getNote());
                     break;
+                }
 
-                case ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT:
+                case ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT: {
                     // schema không có trạng thái riêng: giữ PENDING, chỉ gửi thông báo
                     notificationService.notifyAdjustmentRequest(header, request.getNote());
                     break;
+                }
 
                 default:
                     throw new RuntimeException("Hành động không hợp lệ");
@@ -184,11 +215,18 @@ public class IssueReqService {
             );
 
         } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return IssueReqDetailResponseDTO.error("Lỗi khi xử lý phê duyệt: " + e.getMessage());
         }
     }
 
+    /**
+     * Tạo mới material cho dòng vật tư (nếu material=null và proposedCode!=null).
+     * Lưu ý: method này chỉ phục vụ map material_id để có thể kiểm tra tồn/giữ chỗ/xuất.
+     */
     private void createNewMaterialsForApprovedRequest(IssueReqHeader header) {
+        if (header == null || header.getDetails() == null) return;
+
         for (IssueReqDetail detail : header.getDetails()) {
             if (detail.getMaterial() == null && detail.getProposedCode() != null) {
 
@@ -261,10 +299,41 @@ public class IssueReqService {
             List<IssueReqDetail> details = createDetails(header, request.getDetails());
             header.setDetails(details);
 
-            notificationService.notifyLeadersForApproval(header);
+            // ===== AUTO APPROVE nếu đủ tồn (đã giữ chỗ) =====
+            boolean autoApproved = false;
+            String autoFail = null;
 
-            IssueReqHeaderDTO headerDTO = convertToDTO(header);
-            Map<String, Object> summary = createSummary(header);
+            try {
+                autoApproved = tryAutoApproveAndReserve(header.getId(), creator);
+            } catch (Exception ex) {
+                autoApproved = false;
+                autoFail = ex.getMessage();
+            }
+
+            // Response
+            IssueReqHeader fresh = headerRepository.findById(header.getId())
+                    .orElseThrow(() -> new RuntimeException("Phiếu xin lĩnh không tồn tại"));
+
+            IssueReqHeaderDTO headerDTO = convertToDTO(fresh);
+            Map<String, Object> summary = createSummary(fresh);
+
+            if (autoApproved) {
+                notificationService.notifyApprovalResult(fresh, true, AUTO_APPROVAL_NOTE);
+
+                return IssueReqDetailResponseDTO.success(
+                        "Tạo phiếu xin lĩnh thành công. Hệ thống đã tự động phê duyệt do đủ tồn kho (đã giữ chỗ).",
+                        headerDTO,
+                        headerDTO.getDetails(),
+                        summary
+                );
+            }
+
+            // Không auto => gửi lãnh đạo
+            notificationService.notifyLeadersForApproval(fresh);
+
+            if (autoFail != null && !autoFail.trim().isEmpty()) {
+                summary.put("autoApprovalFailReason", autoFail);
+            }
 
             return IssueReqDetailResponseDTO.success(
                     "Tạo phiếu xin lĩnh thành công và đã gửi cho lãnh đạo phê duyệt",
@@ -274,6 +343,7 @@ public class IssueReqService {
             );
 
         } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return IssueReqDetailResponseDTO.error("Lỗi khi tạo phiếu xin lĩnh: " + e.getMessage());
         }
     }
@@ -315,13 +385,44 @@ public class IssueReqService {
         }
     }
 
-    // ==================== HELPER METHODS ====================
+    public IssueReqDetailResponseDTO loadPreviousRequestTemplate(Long canBoId, Long subDepartmentId) {
+        try {
+            User canBo = userRepository.findById(canBoId)
+                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+            if (!canBo.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
+            if (!canBo.isCanBo()) throw new RuntimeException("Chỉ cán bộ dùng chức năng này");
+            if (canBo.getDepartment() == null) throw new RuntimeException("Cán bộ phải thuộc một khoa/phòng");
+
+            IssueReqHeader prev;
+            Long deptId = canBo.getDepartment().getId();
+
+            if (subDepartmentId != null) {
+                prev = headerRepository.findTopByDepartmentIdAndSubDepartmentIdOrderByRequestedAtDesc(deptId, subDepartmentId);
+            } else {
+                prev = headerRepository.findTopByDepartmentIdOrderByRequestedAtDesc(deptId);
+            }
+
+            if (prev == null) {
+                return IssueReqDetailResponseDTO.error("Chưa có phiếu xin lĩnh kỳ trước để load");
+            }
+
+            IssueReqHeaderDTO headerDTO = convertToDTO(prev);
+            Map<String, Object> summary = createSummary(prev);
+
+            return IssueReqDetailResponseDTO.success("Load danh sách kỳ trước thành công", headerDTO, headerDTO.getDetails(), summary);
+
+        } catch (Exception e) {
+            return IssueReqDetailResponseDTO.error("Không thể load kỳ trước: " + e.getMessage());
+        }
+    }
+
+    // ==================== VALIDATIONS & BASIC HELPERS ====================
 
     private User getLeaderUser(Long userId, String errorMessage) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        // Giữ đúng logic cũ: leader mới được thao tác duyệt
         if (!user.isLanhDao()) throw new RuntimeException(errorMessage);
         if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
 
@@ -337,6 +438,7 @@ public class IssueReqService {
     }
 
     private void validateCreateRequest(CreateIssueReqDTO request) {
+        if (request == null) throw new RuntimeException("Request không hợp lệ");
         if (request.getDetails() == null || request.getDetails().isEmpty()) {
             throw new RuntimeException("Phiếu xin lĩnh phải có ít nhất 1 vật tư");
         }
@@ -419,6 +521,13 @@ public class IssueReqService {
 
         return detailRepository.saveAll(details);
     }
+
+    private boolean hasAnyUnmappedMaterial(IssueReqHeader header) {
+        if (header == null || header.getDetails() == null) return false;
+        return header.getDetails().stream().anyMatch(d -> d.getMaterial() == null);
+    }
+
+    // ==================== SUMMARY / DTO ====================
 
     private Map<String, Object> createSummary(IssueReqHeader header) {
         Map<String, Object> summary = new HashMap<>();
@@ -529,39 +638,7 @@ public class IssueReqService {
         return Character.toUpperCase(t.charAt(0));
     }
 
-    public IssueReqDetailResponseDTO loadPreviousRequestTemplate(Long canBoId, Long subDepartmentId) {
-        try {
-            User canBo = userRepository.findById(canBoId)
-                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
-
-            if (!canBo.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-            if (!canBo.isCanBo()) throw new RuntimeException("Chỉ cán bộ dùng chức năng này");
-            if (canBo.getDepartment() == null) throw new RuntimeException("Cán bộ phải thuộc một khoa/phòng");
-
-            IssueReqHeader prev;
-            Long deptId = canBo.getDepartment().getId();
-
-            if (subDepartmentId != null) {
-                prev = headerRepository.findTopByDepartmentIdAndSubDepartmentIdOrderByRequestedAtDesc(deptId, subDepartmentId);
-            } else {
-                prev = headerRepository.findTopByDepartmentIdOrderByRequestedAtDesc(deptId);
-            }
-
-            if (prev == null) {
-                return IssueReqDetailResponseDTO.error("Chưa có phiếu xin lĩnh kỳ trước để load");
-            }
-
-            IssueReqHeaderDTO headerDTO = convertToDTO(prev);
-            Map<String, Object> summary = createSummary(prev);
-
-            return IssueReqDetailResponseDTO.success("Load danh sách kỳ trước thành công", headerDTO, headerDTO.getDetails(), summary);
-
-        } catch (Exception e) {
-            return IssueReqDetailResponseDTO.error("Không thể load kỳ trước: " + e.getMessage());
-        }
-    }
-
-    // -------------------- DocStatus helpers --------------------
+    // ==================== DocStatus helpers ====================
 
     private DocStatus requireDocStatus(String code) {
         return docStatusRepository.findByCode(code)
@@ -603,5 +680,225 @@ public class IssueReqService {
 
     private static String safeTrim(String s) {
         return s == null ? "" : s.trim();
+    }
+
+    private static BigDecimal nvl(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    // ==================== RESERVATION (GIỮ CHỖ) ====================
+
+    private ReservationStatus requireReservationStatus(String code) {
+        return reservationStatusRepository.findByCode(code)
+                .orElseThrow(() -> new RuntimeException("Thiếu reservation_status code=" + code));
+    }
+
+    /**
+     * Auto-approve chỉ khi: phiếu đang PENDING + tất cả dòng đã map material_id + reserve đủ.
+     */
+    private boolean tryAutoApproveAndReserve(Long issueReqId, User creator) {
+        if (issueReqId == null) return false;
+
+        IssueReqHeader header = headerRepository.lockByIdForUpdate(issueReqId);
+        if (header == null) return false;
+
+        if (!isDocStatus(header, DOC_PENDING)) return false;
+
+        // Auto chỉ cho phiếu đã map đầy đủ (tránh approve "ảo")
+        if (hasAnyUnmappedMaterial(header)) return false;
+
+        // Reserve đủ tồn (FEFO, trừ giữ chỗ phiếu khác)
+        reserveStockForWholeRequestOrThrow(header, creator, "AUTO_APPROVE");
+
+        header.setStatus(requireDocStatus(DOC_APPROVED));
+        header.setApprovalBy(null);
+        header.setApprovalAt(LocalDateTime.now());
+        header.setApprovalNote(AUTO_APPROVAL_NOTE);
+
+        headerRepository.save(header);
+        return true;
+    }
+
+    /**
+     * Reserve đủ cho toàn phiếu theo FEFO.
+     * - Trước khi reserve: huỷ reservation ACTIVE cũ của chính phiếu (nếu có) để tránh kẹt.
+     * - Trong khi reserve: lock inventory_card latest theo từng lot (FOR UPDATE) để tránh oversubscribe.
+     */
+    private void reserveStockForWholeRequestOrThrow(IssueReqHeader header, User actor, String reason) {
+        if (header == null || header.getId() == null) throw new RuntimeException("Phiếu không hợp lệ");
+
+        // Huỷ ACTIVE cũ (nếu approve lại / retry)
+        cancelActiveReservationsWithReason(header, actor, "RESET_BEFORE_RESERVE: " + safeTrim(reason));
+
+        Map<Long, BigDecimal> needByMaterial = buildNeedByMaterial(header);
+
+        if (needByMaterial.isEmpty()) {
+            // Không có material để reserve (trường hợp đặc biệt)
+            return;
+        }
+
+        // Cache reserved ACTIVE theo (material|lot) để giảm query và cập nhật nội bộ trong transaction
+        Map<String, BigDecimal> reservedCache = new HashMap<>();
+
+        // Build list reservations trước; chỉ save khi OK toàn bộ
+        List<IssueReservation> toSave = new ArrayList<>();
+
+        // Duyệt material theo thứ tự tăng để giảm nguy cơ deadlock
+        List<Long> materialIds = new ArrayList<>(needByMaterial.keySet());
+        materialIds.sort(Long::compareTo);
+
+        // Map material object từ details để tránh findById lặp
+        Map<Long, Material> materialMap = buildMaterialMapFromDetails(header);
+
+        for (Long materialId : materialIds) {
+            BigDecimal remaining = nvl(needByMaterial.get(materialId));
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            Material material = materialMap.get(materialId);
+            if (material == null) {
+                throw new RuntimeException("Không tìm thấy materialId=" + materialId + " trong details");
+            }
+
+            List<InventoryCard> lots = inventoryCardRepository.findAvailableLotsLatestByMaterial(materialId);
+
+            for (InventoryCard ic : lots) {
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+
+                String lot = safeTrim(ic.getLotNumber());
+                if (lot.isEmpty()) continue;
+
+                // Lock lot latest để serialize reserve theo lot
+                InventoryCard latest = inventoryCardRepository.lockLatestByMaterialAndLot(materialId, lot)
+                        .orElse(null);
+                if (latest == null) continue;
+
+                BigDecimal closing = nvl(latest.getClosingStock());
+                if (closing.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+                BigDecimal reserved = getActiveReservedSum(materialId, lot, reservedCache);
+                BigDecimal net = closing.subtract(reserved);
+                if (net.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+                BigDecimal take = net.min(remaining);
+                if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+                IssueReservation r = new IssueReservation();
+                r.setIssueReqHeader(header);
+                r.setIssueReqDetail(null); // gom theo material; nếu cần trace theo dòng có thể nâng cấp sau
+                r.setMaterial(material);
+                r.setLotNumber(lot);
+                r.setQtyReserved(take);
+                r.setStatus(requireReservationStatus(RES_ACTIVE));
+                r.setCreatedBy(actor);
+                r.setNote(buildReserveNote(reason, actor));
+
+                toSave.add(r);
+
+                // update cache để những dòng sau trừ đúng phần vừa reserve trong transaction này
+                String key = materialId + "|" + lot;
+                reservedCache.put(key, reserved.add(take));
+
+                remaining = remaining.subtract(take);
+            }
+
+            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal availableNet = estimateNetAvailable(materialId, reservedCache);
+                throw new RuntimeException("Không đủ tồn để phê duyệt (đã trừ giữ chỗ): "
+                        + material.getCode() + " - " + material.getName()
+                        + " (cần " + needByMaterial.get(materialId) + ", còn " + availableNet + ")");
+            }
+        }
+
+        issueReservationRepository.saveAll(toSave);
+    }
+
+    private Map<Long, BigDecimal> buildNeedByMaterial(IssueReqHeader header) {
+        Map<Long, BigDecimal> needByMaterial = new LinkedHashMap<>();
+        if (header.getDetails() == null) return needByMaterial;
+
+        for (IssueReqDetail d : header.getDetails()) {
+            if (d.getMaterial() == null) continue;
+            BigDecimal qty = nvl(d.getQtyRequested());
+            if (qty.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            Long mid = d.getMaterial().getId();
+            needByMaterial.merge(mid, qty, BigDecimal::add);
+        }
+        return needByMaterial;
+    }
+
+    private Map<Long, Material> buildMaterialMapFromDetails(IssueReqHeader header) {
+        Map<Long, Material> map = new HashMap<>();
+        if (header.getDetails() == null) return map;
+
+        for (IssueReqDetail d : header.getDetails()) {
+            if (d.getMaterial() == null) continue;
+            map.putIfAbsent(d.getMaterial().getId(), d.getMaterial());
+        }
+        return map;
+    }
+
+    private BigDecimal getActiveReservedSum(Long materialId, String lotNumber, Map<String, BigDecimal> cache) {
+        String lot = safeTrim(lotNumber);
+        String key = materialId + "|" + lot;
+        return cache.computeIfAbsent(key, k -> {
+            BigDecimal v = issueReservationRepository.sumActiveReservedByMaterialAndLot(materialId, lot);
+            return v == null ? BigDecimal.ZERO : v;
+        });
+    }
+
+    private BigDecimal estimateNetAvailable(Long materialId, Map<String, BigDecimal> reservedCache) {
+        List<InventoryCard> lots = inventoryCardRepository.findAvailableLotsLatestByMaterial(materialId);
+        BigDecimal sum = BigDecimal.ZERO;
+
+        for (InventoryCard ic : lots) {
+            String lot = safeTrim(ic.getLotNumber());
+            BigDecimal closing = nvl(ic.getClosingStock());
+            BigDecimal reserved = getActiveReservedSum(materialId, lot, reservedCache);
+            BigDecimal net = closing.subtract(reserved);
+            if (net.compareTo(BigDecimal.ZERO) > 0) sum = sum.add(net);
+        }
+        return sum;
+    }
+
+    private String buildReserveNote(String reason, User actor) {
+        String n = safeTrim(reason);
+        String who = (actor != null) ? safeTrim(actor.getFullName()) : "";
+        if (!who.isEmpty()) {
+            if (!n.isEmpty()) n = n + " | ";
+            n = n + "by " + who;
+        }
+        return n;
+    }
+
+    private void cancelActiveReservationsWithReason(IssueReqHeader header, User by, String reason) {
+        if (header == null || header.getId() == null) return;
+
+        List<IssueReservation> actives =
+                issueReservationRepository.findByIssueReqHeader_IdAndStatus_Code(header.getId(), RES_ACTIVE);
+
+        if (actives == null || actives.isEmpty()) return;
+
+        ReservationStatus cancelled = requireReservationStatus(RES_CANCELLED);
+
+        String note = safeTrim(reason);
+        if (by != null && by.getFullName() != null) {
+            if (!note.isEmpty()) note = note + " | ";
+            note = note + "by " + by.getFullName();
+        }
+
+        for (IssueReservation r : actives) {
+            r.setStatus(cancelled);
+            r.setNote(note);
+        }
+
+        issueReservationRepository.saveAll(actives);
+    }
+
+    private void cancelActiveReservationsRejected(IssueReqHeader header, User by, String note) {
+        String reason = "Cancelled do phiếu bị từ chối"
+                + (by != null ? (" bởi " + by.getFullName()) : "")
+                + (note != null && !note.trim().isEmpty() ? (". Note: " + note.trim()) : "");
+        cancelActiveReservationsWithReason(header, by, reason);
     }
 }
