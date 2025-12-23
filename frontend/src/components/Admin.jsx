@@ -11,12 +11,13 @@ export default function Admin() {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [newRole, setNewRole] = useState("");
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved"
-
   const [adminInfo, setAdminInfo] = useState(null);
+
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const navigate = useNavigate();
@@ -28,53 +29,128 @@ export default function Admin() {
   ];
 
   const API_ENDPOINTS = {
+    // RBAC check (permission-based)
+    RBAC_PERMISSIONS: `${API_URL}/admin/rbac/permissions`,
+
+    // Users manage APIs
     USERS_ALL: `${API_URL}/admin/users/all`,
     USER_APPROVE: (id) => `${API_URL}/admin/users/${id}/approve`,
     USER_DELETE: (id) => `${API_URL}/admin/users/${id}`,
     USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`,
   };
 
-  useEffect(() => {
-    const checkAdminAccess = () => {
-      const adminJustLoggedIn = sessionStorage.getItem("adminJustLoggedIn") === "true";
-      const currentUser = localStorage.getItem("currentUser");
-      let userData = null;
+  // ===================== Auth helpers (same spirit as RBACSection) =====================
+  const getAuthToken = () => {
+    const tokenDirect =
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken") ||
+      sessionStorage.getItem("token") ||
+      sessionStorage.getItem("authToken");
 
-      if (currentUser) {
-        try {
-          userData = JSON.parse(currentUser);
-        } catch (error) {
-          // ignore
-        }
+    if (tokenDirect && tokenDirect.trim()) return tokenDirect.trim();
+
+    const currentUserRaw = localStorage.getItem("currentUser");
+    if (currentUserRaw) {
+      try {
+        const u = JSON.parse(currentUserRaw);
+        const tokenFromUser = u?.token || u?.accessToken || u?.jwt || u?.authToken;
+        if (tokenFromUser && String(tokenFromUser).trim()) return String(tokenFromUser).trim();
+        if (u?.id != null) return `user-token-${u.id}`;
+      } catch (e) {
+        // ignore
+      }
+    }
+    return null;
+  };
+
+  const authHeaders = () => {
+    const token = getAuthToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const getCurrentUserFromStorage = () => {
+    const currentUser = localStorage.getItem("currentUser");
+    if (!currentUser) return null;
+    try {
+      return JSON.parse(currentUser);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // ===================== Permission-based access check =====================
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      const userData = getCurrentUserFromStorage();
+      const token = getAuthToken();
+
+      if (!token) {
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+        navigate("/");
+        return;
       }
 
-      if (adminJustLoggedIn || (userData && userData.isBanGiamHieu)) {
-        if (adminJustLoggedIn) {
-          sessionStorage.removeItem("adminJustLoggedIn");
-        }
+      try {
+        // If this returns 200 => actor has PERMISSIONS.MANAGE (role-based or special-user)
+        const res = await fetch(API_ENDPOINTS.RBAC_PERMISSIONS, {
+          headers: { ...authHeaders() },
+        });
+
+        if (res.status === 403) throw new Error("FORBIDDEN");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         setIsAuthenticated(true);
         setAdminInfo(userData);
-        fetchUsers();
-      } else {
-        navigate("/");
+        await fetchUsers(); // load users after authorization success
+      } catch (e) {
+        // Optional fallback for BGH in case RBAC endpoint has issues
+        if (userData?.isBanGiamHieu) {
+          setIsAuthenticated(true);
+          setAdminInfo(userData);
+          await fetchUsers();
+        } else {
+          setIsAuthenticated(false);
+          navigate("/");
+        }
+      } finally {
+        setIsCheckingAuth(false);
       }
-      setIsCheckingAuth(false);
     };
 
-    const timer = setTimeout(checkAdminAccess, 50);
-    return () => clearTimeout(timer);
+    checkAdminAccess();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
+  // ===================== Data loading (with Authorization headers) =====================
   const fetchUsers = async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.USERS_ALL);
+      const response = await fetch(API_ENDPOINTS.USERS_ALL, {
+        headers: { ...authHeaders() },
+      });
+
+      if (response.status === 403) throw new Error("FORBIDDEN");
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
       const data = await response.json();
 
-      const filteredData = data.filter((user) => !user.isBanGiamHieu);
+      // vẫn giữ behavior cũ: không hiển thị BGH trong list
+      const filteredData = (Array.isArray(data) ? data : []).filter((user) => !user.isBanGiamHieu);
       setUsers(filteredData);
       filterUsersByStatus(filteredData, activeTab);
     } catch (error) {
+      if (String(error?.message) === "FORBIDDEN") {
+        Swal.fire({
+          title: "Không có quyền",
+          text: "Tài khoản hiện tại không có quyền truy cập chức năng quản trị.",
+          icon: "error",
+          timer: 3000,
+        });
+        setIsAuthenticated(false);
+        navigate("/");
+        return;
+      }
+
       Swal.fire({
         title: "Lỗi!",
         text: "Không thể tải danh sách người dùng",
@@ -85,27 +161,26 @@ export default function Admin() {
   };
 
   const filterUsersByStatus = (userList, status) => {
-    if (status === "pending") {
-      setFilteredUsers(userList.filter((user) => user.statusValue === 0));
-    } else {
-      setFilteredUsers(userList.filter((user) => user.statusValue === 1));
-    }
+    if (status === "pending") setFilteredUsers((userList || []).filter((user) => user.statusValue === 0));
+    else setFilteredUsers((userList || []).filter((user) => user.statusValue === 1));
   };
 
   useEffect(() => {
     filterUsersByStatus(users, activeTab);
   }, [users, activeTab]);
 
+  // ===================== Chart =====================
   useEffect(() => {
-    if (isAuthenticated && users.length > 0) updateChart();
+    if (isAuthenticated) updateChart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [users, isAuthenticated]);
 
   const updateChart = () => {
     const ctx = chartRef.current?.getContext("2d");
     if (!ctx) return;
 
-    const approved = users.filter((u) => u.statusValue === 1).length;
-    const pending = users.filter((u) => u.statusValue === 0).length;
+    const approved = (users || []).filter((u) => u.statusValue === 1).length;
+    const pending = (users || []).filter((u) => u.statusValue === 0).length;
 
     if (chartInstance.current) chartInstance.current.destroy();
 
@@ -125,10 +200,7 @@ export default function Admin() {
       options: {
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            position: "bottom",
-            labels: { padding: 20, usePointStyle: true },
-          },
+          legend: { position: "bottom", labels: { padding: 20, usePointStyle: true } },
           tooltip: {
             callbacks: {
               label: (ctx) => {
@@ -146,6 +218,160 @@ export default function Admin() {
     });
   };
 
+  // ===================== Actions (with Authorization headers) =====================
+  const approveUser = async (id) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.USER_APPROVE(id), {
+        method: "POST",
+        headers: { ...authHeaders() },
+      });
+
+      if (response.status === 403) throw new Error("FORBIDDEN");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const user = users.find((u) => u.id === id);
+
+      const nextUsers = users.map((u) => (u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u));
+      setUsers(nextUsers);
+      filterUsersByStatus(nextUsers, activeTab);
+
+      Swal.fire({
+        title: "✅ Đã duyệt!",
+        text: `${user?.fullName || "Người dùng"} đã được cấp quyền truy cập.`,
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      if (String(error?.message) === "FORBIDDEN") {
+        Swal.fire({ title: "Không có quyền", text: "Bạn không có quyền thực hiện thao tác này.", icon: "error", timer: 2500 });
+        return;
+      }
+      Swal.fire({ title: "❌ Lỗi!", text: "Không thể duyệt người dùng", icon: "error", timer: 2000 });
+    }
+  };
+
+  const deleteUser = async (id) => {
+    const user = users.find((u) => u.id === id);
+    if (!user) return;
+
+    const isPending = user.statusValue === 0;
+
+    const result = await Swal.fire({
+      title: isPending ? "⚠️ Xác nhận từ chối & xóa?" : "Xác nhận xóa tài khoản?",
+      html: `<div style="text-align: left;">
+        <p><strong>Họ tên:</strong> ${user.fullName}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Phòng ban:</strong> ${user.department}</p>
+        <p><strong>Vai trò:</strong> ${user.role}</p>
+        <p><strong>Trạng thái:</strong> ${isPending ? "Chờ duyệt" : "Đã duyệt"}</p>
+      </div><p style="color: #ef4444; margin-top: 15px;">
+        ${
+          isPending
+            ? "⚠️ Tài khoản sẽ bị từ chối và xóa khỏi hệ thống. Hành động này không thể hoàn tác!"
+            : '⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!'
+        }
+      </p>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: isPending ? "Từ chối & Xóa" : "Xóa vĩnh viễn",
+      cancelButtonText: "Hủy",
+      reverseButtons: true,
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await fetch(API_ENDPOINTS.USER_DELETE(id), {
+        method: "DELETE",
+        headers: { ...authHeaders() },
+      });
+
+      if (response.status === 403) throw new Error("FORBIDDEN");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const nextUsers = users.filter((u) => u.id !== id);
+      setUsers(nextUsers);
+      filterUsersByStatus(nextUsers, activeTab);
+
+      Swal.fire({
+        title: isPending ? "❌ Đã từ chối & xóa!" : "✅ Đã xóa!",
+        text: isPending
+          ? `${user.fullName} đã bị từ chối và xóa khỏi hệ thống.`
+          : `Tài khoản "${user.fullName}" đã bị xóa khỏi hệ thống.`,
+        icon: isPending ? "error" : "success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      if (String(error?.message) === "FORBIDDEN") {
+        Swal.fire({ title: "Không có quyền", text: "Bạn không có quyền thực hiện thao tác này.", icon: "error", timer: 2500 });
+        return;
+      }
+      Swal.fire({ title: "❌ Lỗi!", text: "Không thể xóa người dùng", icon: "error", timer: 2000 });
+    }
+  };
+
+  const changeUserRole = async (id, roleLabel) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.USER_ROLE(id), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ role: roleLabel }),
+      });
+
+      if (response.status === 403) throw new Error("FORBIDDEN");
+
+      if (response.ok) {
+        const nextUsers = users.map((u) => (u.id === id ? { ...u, role: roleLabel } : u));
+        setUsers(nextUsers);
+        filterUsersByStatus(nextUsers, activeTab);
+
+        setEditingUser(null);
+        setNewRole("");
+
+        Swal.fire({
+          title: "✅ Đã cập nhật!",
+          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${roleLabel}</p></div>`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        const errorText = await response.text();
+        Swal.fire({
+          title: "❌ Lỗi!",
+          text: `Không thể thay đổi quyền: ${errorText}`,
+          icon: "error",
+          timer: 3000,
+        });
+      }
+    } catch (error) {
+      if (String(error?.message) === "FORBIDDEN") {
+        Swal.fire({ title: "Không có quyền", text: "Bạn không có quyền thực hiện thao tác này.", icon: "error", timer: 2500 });
+        return;
+      }
+      Swal.fire({ title: "❌ Lỗi kết nối!", text: "Không thể kết nối đến server", icon: "error", timer: 3000 });
+    }
+  };
+
+  const openRoleChangeModal = (user) => {
+    setEditingUser(user);
+    setNewRole(user?.role || "");
+  };
+
+  const closeRoleChangeModal = () => {
+    setEditingUser(null);
+    setNewRole("");
+  };
+
+  const handleRoleChange = () => {
+    if (editingUser && newRole) changeUserRole(editingUser.id, newRole);
+  };
+
+  // ===================== Logout =====================
   const handleLogout = () => {
     Swal.fire({
       title: "Đăng xuất?",
@@ -170,124 +396,7 @@ export default function Admin() {
     });
   };
 
-  const approveUser = async (id) => {
-    try {
-      const response = await fetch(API_ENDPOINTS.USER_APPROVE(id), { method: "POST" });
-      if (response.ok) {
-        const user = users.find((u) => u.id === id);
-        setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u))
-        );
-        filterUsersByStatus(
-          users.map((u) => (u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u)),
-          activeTab
-        );
-        Swal.fire({
-          title: "✅ Đã duyệt!",
-          text: `${user.fullName} đã được cấp quyền truy cập.`,
-          icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      }
-    } catch (error) {
-      Swal.fire({ title: "❌ Lỗi!", text: "Không thể duyệt người dùng", icon: "error", timer: 2000 });
-    }
-  };
-
-  const deleteUser = async (id) => {
-    const user = users.find((u) => u.id === id);
-    const isPending = user.statusValue === 0;
-
-    Swal.fire({
-      title: isPending ? "⚠️ Xác nhận từ chối & xóa?" : "Xác nhận xóa tài khoản?",
-      html: `<div style="text-align: left;">
-        <p><strong>Họ tên:</strong> ${user.fullName}</p>
-        <p><strong>Email:</strong> ${user.email}</p>
-        <p><strong>Phòng ban:</strong> ${user.department}</p>
-        <p><strong>Vai trò:</strong> ${user.role}</p>
-        <p><strong>Trạng thái:</strong> ${isPending ? "Chờ duyệt" : "Đã duyệt"}</p>
-      </div><p style="color: #ef4444; margin-top: 15px;">
-        ${
-          isPending
-            ? "⚠️ Tài khoản sẽ bị từ chối và xóa khỏi hệ thống. Hành động này không thể hoàn tác!"
-            : '⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!'
-        }
-      </p>`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: isPending ? "Từ chối & Xóa" : "Xóa vĩnh viễn",
-      cancelButtonText: "Hủy",
-      reverseButtons: true,
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          const response = await fetch(API_ENDPOINTS.USER_DELETE(id), { method: "DELETE" });
-          if (response.ok) {
-            setUsers((prev) => prev.filter((u) => u.id !== id));
-            filterUsersByStatus(users.filter((u) => u.id !== id), activeTab);
-            Swal.fire({
-              title: isPending ? "❌ Đã từ chối & xóa!" : "✅ Đã xóa!",
-              text: isPending
-                ? `${user.fullName} đã bị từ chối và xóa khỏi hệ thống.`
-                : `Tài khoản "${user.fullName}" đã bị xóa khỏi hệ thống.`,
-              icon: isPending ? "error" : "success",
-              timer: 2000,
-              showConfirmButton: false,
-            });
-          }
-        } catch (error) {
-          Swal.fire({ title: "❌ Lỗi!", text: "Không thể xóa người dùng", icon: "error", timer: 2000 });
-        }
-      }
-    });
-  };
-
-  const changeUserRole = async (id, newRole) => {
-    try {
-      const response = await fetch(API_ENDPOINTS.USER_ROLE(id), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
-      });
-
-      if (response.ok) {
-        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role: newRole } : u)));
-        filterUsersByStatus(users.map((u) => (u.id === id ? { ...u, role: newRole } : u)), activeTab);
-        setEditingUser(null);
-        setNewRole("");
-        Swal.fire({
-          title: "✅ Đã cập nhật!",
-          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${newRole}</p></div>`,
-          icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      } else {
-        const errorText = await response.text();
-        Swal.fire({ title: "❌ Lỗi!", text: `Không thể thay đổi quyền: ${errorText}`, icon: "error", timer: 3000 });
-      }
-    } catch (error) {
-      Swal.fire({ title: "❌ Lỗi kết nối!", text: "Không thể kết nối đến server", icon: "error", timer: 3000 });
-    }
-  };
-
-  const openRoleChangeModal = (user) => {
-    setEditingUser(user);
-    setNewRole(user.role);
-  };
-
-  const closeRoleChangeModal = () => {
-    setEditingUser(null);
-    setNewRole("");
-  };
-
-  const handleRoleChange = () => {
-    if (editingUser && newRole) changeUserRole(editingUser.id, newRole);
-  };
-
+  // ===================== Render guards =====================
   if (isCheckingAuth) {
     return (
       <div className="admin-page">
@@ -305,20 +414,6 @@ export default function Admin() {
 
   return (
     <div className="admin-page">
-      <header className="admin-header">
-        <div className="admin-title">
-          <p>
-            {adminInfo ? (
-              <>
-                Xin chào <strong>{adminInfo.fullName}</strong> - {adminInfo.role}
-              </>
-            ) : (
-              "Duyệt & quản lý tài khoản"
-            )}
-          </p>
-        </div>
-      </header>
-
       <div className="admin-container">
         <div className="admin-grid-layout">
           <div className="admin-chart-card admin-card">
@@ -339,7 +434,6 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Main tabs - chỉ còn quản lý tài khoản */}
             <div className="admin-tabs" style={{ marginTop: 10 }}>
               <button
                 className={`admin-tab ${activeTab === "pending" ? "admin-tab-active" : ""}`}
@@ -381,7 +475,11 @@ export default function Admin() {
                       <td>
                         <div className="admin-role-cell">
                           <span>{u.role}</span>
-                          <button className="admin-edit-role-btn" onClick={() => openRoleChangeModal(u)} title="Thay đổi quyền">
+                          <button
+                            className="admin-edit-role-btn"
+                            onClick={() => openRoleChangeModal(u)}
+                            title="Thay đổi quyền"
+                          >
                             ✏️
                           </button>
                         </div>
@@ -405,6 +503,7 @@ export default function Admin() {
                       </td>
                     </tr>
                   ))}
+
                   {filteredUsers.length === 0 && (
                     <tr className="admin-last-row">
                       <td colSpan="6" className="admin-no-data">
@@ -430,6 +529,7 @@ export default function Admin() {
                 </span>
               </div>
             </div>
+
             <div className="admin-modal-content">
               <div className="admin-user-info">
                 <p>
@@ -463,6 +563,7 @@ export default function Admin() {
                 </select>
               </div>
             </div>
+
             <div className="admin-modal-footer">
               <button className="admin-btn-secondary" onClick={closeRoleChangeModal}>
                 Hủy
