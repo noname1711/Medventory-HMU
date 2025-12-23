@@ -2,6 +2,8 @@ package com.backend.controller;
 
 import com.backend.dto.UserDTO;
 import com.backend.service.UserService;
+import com.backend.dto.*;
+import com.backend.service.RbacService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +17,8 @@ public class AdminController {
 
     @Autowired
     private UserService userService;
+    @Autowired
+    private RbacService rbacService;
 
     @GetMapping("/users/pending")
     public ResponseEntity<List<UserDTO>> getPendingUsers() {
@@ -105,4 +109,71 @@ public class AdminController {
             return ResponseEntity.badRequest().body("Lỗi khi lấy danh sách khoa: " + e.getMessage());
         }
     }
+
+    @GetMapping("/rbac/roles")
+    public ResponseEntity<?> listRoles(@RequestHeader(value = "Authorization", required = false) String auth) {
+        try {
+            return ResponseEntity.ok(rbacService.listRoles(auth));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/rbac/permissions")
+    public ResponseEntity<?> listPermissions(@RequestHeader(value = "Authorization", required = false) String auth) {
+        try {
+            return ResponseEntity.ok(rbacService.listPermissions(auth));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/rbac/roles/{roleCode}/permissions")
+    public ResponseEntity<?> getRolePermissions(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable String roleCode
+    ) {
+        try {
+            return ResponseEntity.ok(rbacService.getRolePermissions(auth, roleCode));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/rbac/roles/{roleCode}/permissions")
+    public ResponseEntity<?> replaceRolePermissions(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable String roleCode,
+            @RequestBody UpdateRolePermissionsRequestDTO req
+    ) {
+        try {
+            List<String> codes = (req == null) ? null : req.getPermissionCodes();
+            return ResponseEntity.ok(rbacService.replaceRolePermissions(auth, roleCode, codes));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/rbac/roles/{roleCode}/permissions/reset")
+    public ResponseEntity<?> resetRolePermissions(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable String roleCode
+    ) {
+        try {
+            return ResponseEntity.ok(rbacService.resetRolePermissionsToDefault(auth, roleCode));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
 }

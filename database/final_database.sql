@@ -446,6 +446,11 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.code='BGH' AND p.code IN ('SUPP_FORECAST.APPROVE','NOTIF.MANAGE');
 
 INSERT INTO role_permissions(role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r, permissions p
+WHERE r.code='BGH' AND p.code IN ('USERS.MANAGE','PERMISSIONS.MANAGE');
+
+INSERT INTO role_permissions(role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.code='LANH_DAO' AND p.code IN ('ISSUE_REQ.APPROVE','NOTIF.MANAGE');
 

@@ -277,13 +277,7 @@ export default function AuthForm() {
             if (data.user) {
               localStorage.setItem('currentUser', JSON.stringify(data.user));
             }
-            
-            if (data.user && data.user.isBanGiamHieu) {
-              sessionStorage.setItem('adminJustLoggedIn', 'true');
-              setTimeout(() => navigate("/admin"), 500);
-            } else {
-              setTimeout(() => navigate("/dashboard"), 500);
-            }
+            setTimeout(() => navigate("/dashboard"), 500);
           } else {
             setEmail(savedEmail);
             setRememberMe(true);
@@ -381,13 +375,7 @@ export default function AuthForm() {
           if (data.user) {
             localStorage.setItem('currentUser', JSON.stringify(data.user));
           }
-          
-          if (data.user && data.user.isBanGiamHieu) {
-            sessionStorage.setItem('adminJustLoggedIn', 'true');
-            setTimeout(() => navigate("/admin"), 800);
-          } else {
-            setTimeout(() => navigate("/dashboard"), 800);
-          }
+          setTimeout(() => navigate("/dashboard"), 800);
         } else {
           toast.error(data.message);
           if (rememberMe) {
@@ -681,7 +669,7 @@ export default function AuthForm() {
           </form>
 
           <div className="footer">
-            <small>Demo Version</small>
+            <small>Version 2.0</small>
           </div>
         </div>
       </div>

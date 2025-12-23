@@ -27,6 +27,7 @@ public class ReceiptService {
     private final MaterialRepository materialRepository;
 
     private final NotificationService notificationService;
+    private final RbacService rbacService;
 
     public ReceiptResponseDTO createReceipt(CreateReceiptDTO request, Long creatorId) {
         try {
@@ -34,7 +35,7 @@ public class ReceiptService {
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
             if (!creator.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-            if (!creator.isThuKho()) throw new RuntimeException("Chỉ thủ kho được tạo phiếu nhập");
+            rbacService.requirePermission(creator, RbacService.PERM_RECEIPT_CREATE, "Bạn không có quyền tạo phiếu nhập");
 
             validateCreateReceipt(request);
 
@@ -88,7 +89,12 @@ public class ReceiptService {
             ReceiptHeader header = receiptHeaderRepository.findById(receiptId)
                     .orElseThrow(() -> new RuntimeException("Phiếu nhập không tồn tại"));
 
-            if (!(user.isThuKho() || user.isLanhDao() || user.isBanGiamHieu())) {
+            if (!rbacService.hasAnyPermission(
+                    user,
+                    RbacService.PERM_RECEIPT_CREATE,
+                    RbacService.PERM_ISSUE_REQ_APPROVE,
+                    RbacService.PERM_SUPP_FORECAST_APPROVE
+            )) {
                 throw new RuntimeException("Bạn không có quyền xem phiếu nhập");
             }
 

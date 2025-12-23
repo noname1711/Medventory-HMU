@@ -4,9 +4,11 @@ import DashboardTabs from "./DashboardTabs";
 import EquipmentList from "./EquipmentList";
 import AddEquipment from "./AddEquipment";
 import ExportEquipment from "./ExportEquipment";
+import Admin from "./Admin";
 import IssueRequestApproval from './IssueRequestApproval';
 import CreateIssueRequest from "./CreateIssueRequest";
 import ReplenishmentRequest from "./ReplenishmentRequest";
+import ForecastApproval from "./ForecastApproval";
 import ReceiptPage from "./ReceiptPage"; 
 import IssuePage from "./IssuePage"; 
 import Chart from "chart.js/auto";
@@ -15,6 +17,7 @@ import "./Dashboard.css";
 
 export default function Dashboard() {
   const [userInfo, setUserInfo] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const initialData = [
     { id: 1, code: "TB001", name: "Máy X-quang", department: "Khoa Nội", status: "Hoạt động tốt", date: "2023-01-15", value: 500000000 },
@@ -44,15 +47,25 @@ export default function Dashboard() {
     if (savedUser) {
       try {
         const userData = JSON.parse(savedUser);
+        console.log("User data from localStorage:", userData); // DEBUG
+        
         // Chuyển đổi role từ backend enum sang tiếng Việt để hiển thị
         const formattedUserData = {
           ...userData,
           role: roleDisplayMapping[userData.role] || userData.role
         };
+        
         setUserInfo(formattedUserData);
+        
+        // Kiểm tra nếu user là Ban giám hiệu
+        const isBanGiamHieu = userData.isBanGiamHieu === true;
+        setIsAdmin(isBanGiamHieu);
+        
       } catch (error) {
         console.error("Error parsing user data:", error);
       }
+    } else {
+      console.log("No user data in localStorage");
     }
   }, []);
 
@@ -112,7 +125,7 @@ export default function Dashboard() {
 
     Swal.fire({
       title: "🎉 Thêm vật tư thành công!",
-      text: `Đã thêm “${newEq.name}” vào danh sách.`,
+      text: `Đã thêm "$${newEq.name}" vào danh sách.`,
       icon: "success",
       showConfirmButton: false,
       timer: 2000,
@@ -126,7 +139,7 @@ export default function Dashboard() {
     const eq = equipmentData.find((e) => e.id === id);
     Swal.fire({
       title: "🗑️ Xác nhận xóa?",
-      text: `Bạn có chắc chắn muốn xóa vật tư “${eq.name}”?`,
+      text: `Bạn có chắc chắn muốn xóa vật tư "$${eq.name}"?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -140,7 +153,7 @@ export default function Dashboard() {
         setEquipmentData((prev) => prev.filter((e) => e.id !== id));
         Swal.fire({
           title: "✅ Đã xóa!",
-          text: `Vật tư “${eq.name}” đã bị xóa.`,
+          text: `Vật tư "$${eq.name}" đã bị xóa.`,
           icon: "success",
           position: "center",
           timer: 2000,
@@ -155,7 +168,7 @@ export default function Dashboard() {
     const eq = equipmentData.find((e) => e.id === id);
     Swal.fire({
       title: "🛠️ Sắp có!",
-      text: `Tính năng chỉnh sửa vật tư “${eq.name}” đang được phát triển.`,
+      text: `Tính năng chỉnh sửa vật tư "$${eq.name}" đang được phát triển.`,
       icon: "info",
       confirmButtonText: "OK",
       backdrop: true,
@@ -209,7 +222,11 @@ export default function Dashboard() {
     <div className="dashboard-page">
       <DashboardHeader userInfo={userInfo} />
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <DashboardTabs active={activeTab} setActive={setActiveTab} />
+        <DashboardTabs 
+          active={activeTab} 
+          setActive={setActiveTab} 
+          isAdmin={isAdmin} 
+        />
 
         <div className="mt-4">
           {activeTab === "dashboard" && (
@@ -247,6 +264,8 @@ export default function Dashboard() {
           {activeTab === "replenish" && <ReplenishmentRequest />}
           {activeTab === "receipt" && <ReceiptPage />}
           {activeTab === "issue" && <IssuePage />}
+          {activeTab === "forecast" && userInfo && <ForecastApproval adminInfo={userInfo} />}
+          {activeTab === "admin" && <Admin />}
         </div>
       </div>
     </div>

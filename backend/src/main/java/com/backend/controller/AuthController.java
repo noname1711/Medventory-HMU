@@ -10,6 +10,7 @@ import com.backend.entity.Department;
 import com.backend.entity.User;
 import com.backend.service.DepartmentService;
 import com.backend.service.UserService;
+import com.backend.service.RbacService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,9 @@ public class AuthController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private RbacService rbacService;
 
     // Map để lưu trữ token tạm thời với expiry time
     private Map<String, ResetTokenInfo> resetTokens = new HashMap<>();
@@ -248,5 +252,21 @@ public class AuthController {
             long tokenAge = currentTime - entry.getValue().getCreatedAt();
             return tokenAge > 7200000; // Dọn token quá 2 giờ
         });
+    }
+
+    @GetMapping("/my-permissions")
+    public ResponseEntity<?> myPermissions(@RequestHeader("X-User-Id") Long userId) {
+        try {
+            var perms = rbacService.getEffectivePermissionCodes(userId); // Set<String>
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "userId", userId,
+                    "permissionCodes", perms
+            ));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        }
     }
 }

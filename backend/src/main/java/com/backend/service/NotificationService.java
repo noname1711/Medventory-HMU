@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class NotificationService {
 
-    // lookup code (theo schema mới)
     private static final String ENTITY_ISSUE_REQ = "ISSUE_REQ";
 
     private static final String EVT_PENDING   = "PENDING";
@@ -36,19 +35,21 @@ public class NotificationService {
     private final NotificationEventRepository notificationEventRepository;
 
     private final IssueReqHeaderRepository issueReqHeaderRepository;
+    private final RbacService rbacService;
 
     // ===================== CREATE NOTIFICATIONS =====================
 
     public void notifyLeadersForApproval(IssueReqHeader header) {
         if (header == null || header.getDepartment() == null) return;
 
-        List<User> leaders = userRepository.findByDepartmentId(header.getDepartment().getId())
+        // Permission-based: ai có ISSUE_REQ.APPROVE trong department thì nhận
+        List<User> approvers = userRepository.findByDepartmentId(header.getDepartment().getId())
                 .stream()
-                .filter(User::isLanhDao)
                 .filter(User::isApproved)
+                .filter(u -> rbacService.hasPermission(u, RbacService.PERM_ISSUE_REQ_APPROVE))
                 .collect(Collectors.toList());
 
-        if (leaders.isEmpty()) return;
+        if (approvers.isEmpty()) return;
 
         String title = "Phiếu xin lĩnh #" + header.getId() + " cần phê duyệt";
         String content = "Có phiếu xin lĩnh mới từ "
@@ -61,7 +62,7 @@ public class NotificationService {
                 EVT_PENDING,
                 title,
                 content,
-                leaders
+                approvers
         );
     }
 
@@ -100,11 +101,10 @@ public class NotificationService {
     public BasicResponseDTO schedulePickupForIssueReq(Long issueReqId, Long thuKhoId,
                                                       LocalDateTime scheduledAt, String note) {
         try {
-            User thuKho = userRepository.findById(thuKhoId)
-                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
-            if (!thuKho.isApproved() || !thuKho.isThuKho()) {
-                throw new RuntimeException("Chỉ thủ kho được hẹn lịch");
-            }
+            User actor = rbacService.requireApprovedUser(thuKhoId);
+
+            // Permission-based: yêu cầu quyền ISSUE.CREATE (thu kho)
+            rbacService.requirePermission(actor, RbacService.PERM_ISSUE_CREATE, "Bạn không có quyền hẹn lịch");
 
             IssueReqHeader header = issueReqHeaderRepository.findById(issueReqId)
                     .orElseThrow(() -> new RuntimeException("Phiếu xin lĩnh không tồn tại"));
@@ -270,7 +270,6 @@ public class NotificationService {
         String entityCode = (n.getEntityType() != null) ? n.getEntityType().getCode() : null;
         String eventCode  = (n.getEventType() != null) ? n.getEventType().getCode() : null;
 
-        // DTO cũ vẫn dùng int để FE không đổi
         dto.setEntityType(entityCodeToInt(entityCode));
         dto.setEntityId(n.getEntityId());
         dto.setEventType(eventCodeToInt(eventCode));

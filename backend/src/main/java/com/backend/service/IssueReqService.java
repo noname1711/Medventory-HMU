@@ -43,6 +43,8 @@ public class IssueReqService {
     private final IssueReservationRepository issueReservationRepository;
     private final ReservationStatusRepository reservationStatusRepository;
 
+    private final RbacService rbacService;
+
     // ==================== DANH SÁCH PHIẾU CHO LÃNH ĐẠO ====================
 
     public IssueReqListResponseDTO getPendingRequestsForLeader(Long leaderId) {
@@ -268,7 +270,7 @@ public class IssueReqService {
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
             if (!creator.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-            if (!creator.isCanBo()) throw new RuntimeException("Chỉ cán bộ được tạo phiếu xin lĩnh");
+            rbacService.requirePermission(creator, RbacService.PERM_ISSUE_REQ_CREATE, "Bạn không có quyền tạo phiếu xin lĩnh");
 
             validateCreateRequest(request);
 
@@ -391,7 +393,7 @@ public class IssueReqService {
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
             if (!canBo.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-            if (!canBo.isCanBo()) throw new RuntimeException("Chỉ cán bộ dùng chức năng này");
+            rbacService.requirePermission(canBo, RbacService.PERM_ISSUE_REQ_CREATE, "Bạn không có quyền dùng chức năng này");
             if (canBo.getDepartment() == null) throw new RuntimeException("Cán bộ phải thuộc một khoa/phòng");
 
             IssueReqHeader prev;
@@ -420,21 +422,20 @@ public class IssueReqService {
     // ==================== VALIDATIONS & BASIC HELPERS ====================
 
     private User getLeaderUser(Long userId, String errorMessage) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
-
-        if (!user.isLanhDao()) throw new RuntimeException(errorMessage);
-        if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-
+        User user = rbacService.requireApprovedUser(userId);
+        rbacService.requirePermission(user, RbacService.PERM_ISSUE_REQ_APPROVE, errorMessage);
         return user;
     }
 
     private boolean hasPermissionToView(IssueReqHeader header, User user) {
         if (header.getCreatedBy() != null && header.getCreatedBy().getId().equals(user.getId())) return true;
-        if (user.isThuKho()) return true;
-        if (user.isLanhDao()) return true;
-        if (user.isBanGiamHieu()) return true;
-        return false;
+        return rbacService.hasAnyPermission(
+                user,
+                RbacService.PERM_ISSUE_REQ_APPROVE,     // lãnh đạo
+                RbacService.PERM_ISSUE_CREATE,          // thủ kho
+                RbacService.PERM_RECEIPT_CREATE,        // thủ kho (nhập kho)
+                RbacService.PERM_SUPP_FORECAST_APPROVE  // bgh
+        );
     }
 
     private void validateCreateRequest(CreateIssueReqDTO request) {
