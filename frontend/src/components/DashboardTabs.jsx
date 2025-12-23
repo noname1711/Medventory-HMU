@@ -70,7 +70,12 @@ export default function DashboardTabs({ active, setActive }) {
   const showApproveIssueReq = hasPerm("ISSUE_REQ.APPROVE");
 
   const showForecastApprove = hasPerm("SUPP_FORECAST.APPROVE");
-  const showAdminManage     = hasPerm("USERS.MANAGE") || hasPerm("PERMISSIONS.MANAGE");
+  
+  // Quản lý RBAC - phân quyền
+  const showRBACManage      = hasPerm("PERMISSIONS.MANAGE");
+  
+  // QUẢN LÝ USERS
+  const showAdminManage     = hasPerm("USERS.MANAGE") || currentUser?.isBanGiamHieu;
 
   const btnClass = (name) => `dt-tab ${active === name ? "active" : ""}`;
 
@@ -123,6 +128,12 @@ export default function DashboardTabs({ active, setActive }) {
       {showAdminManage && (
         <button className={btnClass("admin")} onClick={() => setActive("admin")}>
           Quản lý người dùng
+        </button>
+      )}
+
+      {showRBACManage && (
+        <button className={btnClass("rbac")} onClick={() => setActive("rbac")}>
+          Phân quyền vai trò
         </button>
       )}
 
