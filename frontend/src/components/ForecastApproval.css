@@ -1,0 +1,44 @@
+/* ForecastApproval.css - CSS riêng cho component duyệt dự trù */
+.forecast-approval-container {
+  grid-column: 1 / -1;
+  margin-top: 2rem;
+}
+
+.forecast-approval-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.forecast-approval-header h3 {
+  color: #1f2937;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.forecast-count-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.forecast-count-number {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.forecast-count-text {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+

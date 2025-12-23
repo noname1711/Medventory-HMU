@@ -41,6 +41,7 @@ public class IssueService {
     private final ReservationStatusRepository reservationStatusRepository;
 
     private final UserRepository userRepository;
+    private final RbacService rbacService;
 
     // ------------------------- API METHODS -------------------------
 
@@ -344,7 +345,12 @@ public class IssueService {
             IssueHeader header = issueHeaderRepository.findById(issueId)
                     .orElseThrow(() -> new RuntimeException("Phiếu xuất không tồn tại"));
 
-            if (!(user.isThuKho() || user.isLanhDao() || user.isBanGiamHieu())) {
+            if (!rbacService.hasAnyPermission(
+                    user,
+                    RbacService.PERM_ISSUE_CREATE,
+                    RbacService.PERM_ISSUE_REQ_APPROVE,
+                    RbacService.PERM_SUPP_FORECAST_APPROVE
+            )) {
                 throw new RuntimeException("Bạn không có quyền xem phiếu xuất");
             }
 
@@ -749,8 +755,12 @@ public class IssueService {
     private User validateThuKho(Long userId) {
         User u = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
         if (!u.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
-        if (!u.isThuKho()) throw new RuntimeException("Chỉ thủ kho được thao tác xuất kho");
+
+        if (!rbacService.hasPermission(u, RbacService.PERM_ISSUE_CREATE)) {
+            throw new RuntimeException("Bạn không có quyền xuất kho");
+        }
         return u;
     }
 

@@ -13,7 +13,6 @@ export default function App() {
         <Route path="/" element={<AuthForm />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/admin" element={<Admin />} /> 
         <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </Router>
