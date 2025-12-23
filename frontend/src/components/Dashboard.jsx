@@ -5,6 +5,7 @@ import EquipmentList from "./EquipmentList";
 import AddEquipment from "./AddEquipment";
 import ExportEquipment from "./ExportEquipment";
 import Admin from "./Admin";
+import RBACSection from "./RBACSection";
 import IssueRequestApproval from './IssueRequestApproval';
 import CreateIssueRequest from "./CreateIssueRequest";
 import ReplenishmentRequest from "./ReplenishmentRequest";
@@ -266,6 +267,7 @@ export default function Dashboard() {
           {activeTab === "issue" && <IssuePage />}
           {activeTab === "forecast" && userInfo && <ForecastApproval adminInfo={userInfo} />}
           {activeTab === "admin" && <Admin />}
+          {activeTab === "rbac" && <RBACSection />}
         </div>
       </div>
     </div>

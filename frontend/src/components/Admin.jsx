@@ -14,9 +14,7 @@ export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // ====== NEW: main section tabs ======
-  const [activeSection, setActiveSection] = useState("users"); // "users" | "rbac"
-  const [activeTab, setActiveTab] = useState("pending"); // giữ nguyên: "pending" | "approved"
+  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved"
 
   const [adminInfo, setAdminInfo] = useState(null);
   const chartRef = useRef(null);
@@ -34,61 +32,6 @@ export default function Admin() {
     USER_APPROVE: (id) => `${API_URL}/admin/users/${id}/approve`,
     USER_DELETE: (id) => `${API_URL}/admin/users/${id}`,
     USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`,
-
-    // ====== NEW: RBAC endpoints ======
-    RBAC_ROLES: `${API_URL}/admin/rbac/roles`,
-    RBAC_PERMISSIONS: `${API_URL}/admin/rbac/permissions`,
-    RBAC_ROLE_PERMS: (roleCode) => `${API_URL}/admin/rbac/roles/${roleCode}/permissions`,
-    RBAC_ROLE_PERMS_REPLACE: (roleCode) => `${API_URL}/admin/rbac/roles/${roleCode}/permissions`,
-    RBAC_ROLE_PERMS_RESET: (roleCode) => `${API_URL}/admin/rbac/roles/${roleCode}/permissions/reset`,
-  };
-
-  // ====== NEW: RBAC state ======
-  const [rbacRoles, setRbacRoles] = useState([]);
-  const [rbacPermissions, setRbacPermissions] = useState([]);
-  const [rbacLoading, setRbacLoading] = useState(false);
-
-  const [selectedRoleCode, setSelectedRoleCode] = useState("");
-  const [selectedRoleName, setSelectedRoleName] = useState("");
-
-  const [assignedPermCodes, setAssignedPermCodes] = useState([]); // từ server
-  const [defaultPermCodes, setDefaultPermCodes] = useState([]); // từ server
-  const [editingPermSet, setEditingPermSet] = useState(new Set()); // user đang tick
-
-  const [permSearch, setPermSearch] = useState("");
-  const [rbacSaving, setRbacSaving] = useState(false);
-
-  // ===== Auth token helper (robust) =====
-  const getAuthToken = () => {
-    const tokenDirect =
-      localStorage.getItem("token") ||
-      localStorage.getItem("authToken") ||
-      sessionStorage.getItem("token") ||
-      sessionStorage.getItem("authToken");
-
-    if (tokenDirect && tokenDirect.trim()) return tokenDirect.trim();
-
-    const currentUserRaw = localStorage.getItem("currentUser");
-    if (currentUserRaw) {
-      try {
-        const u = JSON.parse(currentUserRaw);
-        const tokenFromUser = u?.token || u?.accessToken || u?.jwt || u?.authToken;
-        if (tokenFromUser && String(tokenFromUser).trim()) return String(tokenFromUser).trim();
-        if (u?.id != null) return `user-token-${u.id}`;
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    // fallback: nếu adminInfo đã có id
-    if (adminInfo?.id != null) return `user-token-${adminInfo.id}`;
-
-    return null;
-  };
-
-  const authHeaders = () => {
-    const token = getAuthToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
   useEffect(() => {
@@ -345,270 +288,6 @@ export default function Admin() {
     if (editingUser && newRole) changeUserRole(editingUser.id, newRole);
   };
 
-  // =========================
-  // NEW: RBAC tab functions
-  // =========================
-  const setFromRolePermissionsResponse = (resp) => {
-    const roleCode = resp?.roleCode || "";
-    const roleName = resp?.roleName || "";
-
-    const assigned = Array.isArray(resp?.assignedPermissionCodes) ? resp.assignedPermissionCodes : [];
-    const defaults = Array.isArray(resp?.defaultPermissionCodes) ? resp.defaultPermissionCodes : [];
-
-    setSelectedRoleCode(roleCode);
-    setSelectedRoleName(roleName);
-    setAssignedPermCodes(assigned);
-    setDefaultPermCodes(defaults);
-    setEditingPermSet(new Set(assigned));
-  };
-
-  const fetchRbacCatalog = async () => {
-    setRbacLoading(true);
-    try {
-      const [rolesRes, permsRes] = await Promise.all([
-        fetch(API_ENDPOINTS.RBAC_ROLES, { headers: { ...authHeaders() } }),
-        fetch(API_ENDPOINTS.RBAC_PERMISSIONS, { headers: { ...authHeaders() } }),
-      ]);
-
-      if (rolesRes.status === 403 || permsRes.status === 403) {
-        throw new Error("FORBIDDEN");
-      }
-      if (!rolesRes.ok) throw new Error(`roles: HTTP ${rolesRes.status}`);
-      if (!permsRes.ok) throw new Error(`permissions: HTTP ${permsRes.status}`);
-
-      const roles = await rolesRes.json();
-      const perms = await permsRes.json();
-
-      setRbacRoles(Array.isArray(roles) ? roles : []);
-      setRbacPermissions(Array.isArray(perms) ? perms : []);
-
-      // auto chọn role đầu tiên (ưu tiên role không phải BGH để tiện thao tác)
-      if (!selectedRoleCode) {
-        const firstNonBgh = (Array.isArray(roles) ? roles : []).find((r) => String(r.code).toUpperCase() !== "BGH");
-        const first = firstNonBgh || (Array.isArray(roles) ? roles : [])[0];
-        if (first?.code) {
-          await fetchRolePermissions(String(first.code));
-        }
-      }
-    } catch (e) {
-      if (String(e?.message) === "FORBIDDEN") {
-        Swal.fire({
-          title: "Không có quyền",
-          text: "Tài khoản hiện tại không có quyền PERMISSIONS.MANAGE để truy cập chức năng phân quyền.",
-          icon: "error",
-          timer: 3500,
-        });
-      } else {
-        Swal.fire({
-          title: "Lỗi!",
-          text: "Không thể tải dữ liệu phân quyền (roles/permissions).",
-          icon: "error",
-          timer: 3500,
-        });
-      }
-    } finally {
-      setRbacLoading(false);
-    }
-  };
-
-  const fetchRolePermissions = async (roleCode) => {
-    if (!roleCode) return;
-    setRbacLoading(true);
-    try {
-      const res = await fetch(API_ENDPOINTS.RBAC_ROLE_PERMS(roleCode), { headers: { ...authHeaders() } });
-      if (res.status === 403) throw new Error("FORBIDDEN");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const resp = await res.json();
-      setFromRolePermissionsResponse(resp);
-    } catch (e) {
-      if (String(e?.message) === "FORBIDDEN") {
-        Swal.fire({
-          title: "Không có quyền",
-          text: "Bạn không có quyền truy cập chức năng này.",
-          icon: "error",
-          timer: 3000,
-        });
-      } else {
-        Swal.fire({
-          title: "Lỗi!",
-          text: "Không thể tải quyền của role.",
-          icon: "error",
-          timer: 3000,
-        });
-      }
-    } finally {
-      setRbacLoading(false);
-    }
-  };
-
-  const saveRolePermissions = async () => {
-    if (!selectedRoleCode) return;
-
-    const roleCodeUpper = String(selectedRoleCode).toUpperCase();
-    if (roleCodeUpper === "BGH") {
-      Swal.fire({ title: "Không hợp lệ", text: "Backend đã khóa chỉnh role BGH.", icon: "warning", timer: 2500 });
-      return;
-    }
-
-    setRbacSaving(true);
-    try {
-      const body = { permissionCodes: Array.from(editingPermSet || new Set()) };
-
-      const res = await fetch(API_ENDPOINTS.RBAC_ROLE_PERMS_REPLACE(selectedRoleCode), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(body),
-      });
-
-      if (res.status === 403) throw new Error("FORBIDDEN");
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || `HTTP ${res.status}`);
-      }
-
-      const resp = await res.json();
-      setFromRolePermissionsResponse(resp);
-
-      Swal.fire({
-        title: "✅ Đã lưu",
-        text: `Đã cập nhật quyền cho role ${resp?.roleCode || selectedRoleCode}.`,
-        icon: "success",
-        timer: 2200,
-        showConfirmButton: false,
-      });
-    } catch (e) {
-      if (String(e?.message) === "FORBIDDEN") {
-        Swal.fire({ title: "Không có quyền", text: "Bạn không có PERMISSIONS.MANAGE.", icon: "error", timer: 3000 });
-      } else {
-        Swal.fire({ title: "❌ Lỗi!", text: `Không thể lưu phân quyền: ${e?.message || ""}`, icon: "error", timer: 3500 });
-      }
-    } finally {
-      setRbacSaving(false);
-    }
-  };
-
-  const resetRolePermissionsToDefault = async () => {
-    if (!selectedRoleCode) return;
-
-    const roleCodeUpper = String(selectedRoleCode).toUpperCase();
-    if (roleCodeUpper === "BGH") {
-      Swal.fire({ title: "Không hợp lệ", text: "Backend đã khóa chỉnh role BGH.", icon: "warning", timer: 2500 });
-      return;
-    }
-
-    const confirm = await Swal.fire({
-      title: "Đặt về mặc định?",
-      text: `Quyền của role ${selectedRoleCode} sẽ quay về mặc định hệ thống.`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Đặt về mặc định",
-      cancelButtonText: "Hủy",
-      confirmButtonColor: "#10B981",
-      cancelButtonColor: "#6b7280",
-      reverseButtons: true,
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    setRbacSaving(true);
-    try {
-      const res = await fetch(API_ENDPOINTS.RBAC_ROLE_PERMS_RESET(selectedRoleCode), {
-        method: "POST",
-        headers: { ...authHeaders() },
-      });
-
-      if (res.status === 403) throw new Error("FORBIDDEN");
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || `HTTP ${res.status}`);
-      }
-
-      const resp = await res.json();
-      setFromRolePermissionsResponse(resp);
-
-      Swal.fire({
-        title: "✅ Đã reset",
-        text: `Role ${resp?.roleCode || selectedRoleCode} đã quay về mặc định.`,
-        icon: "success",
-        timer: 2200,
-        showConfirmButton: false,
-      });
-    } catch (e) {
-      if (String(e?.message) === "FORBIDDEN") {
-        Swal.fire({ title: "Không có quyền", text: "Bạn không có PERMISSIONS.MANAGE.", icon: "error", timer: 3000 });
-      } else {
-        Swal.fire({ title: "❌ Lỗi!", text: `Không thể reset: ${e?.message || ""}`, icon: "error", timer: 3500 });
-      }
-    } finally {
-      setRbacSaving(false);
-    }
-  };
-
-  const discardRolePermissionChanges = () => {
-    setEditingPermSet(new Set(assignedPermCodes || []));
-  };
-
-  const togglePermission = (code) => {
-    if (!code) return;
-    setEditingPermSet((prev) => {
-      const next = new Set(prev || []);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-  };
-
-  const selectAllFilteredPermissions = (filteredList) => {
-    setEditingPermSet((prev) => {
-      const next = new Set(prev || []);
-      (filteredList || []).forEach((p) => {
-        if (p?.code) next.add(p.code);
-      });
-      return next;
-    });
-  };
-
-  const clearAllFilteredPermissions = (filteredList) => {
-    setEditingPermSet((prev) => {
-      const next = new Set(prev || []);
-      (filteredList || []).forEach((p) => {
-        if (p?.code) next.delete(p.code);
-      });
-      return next;
-    });
-  };
-
-  const isSetEqual = (a, b) => {
-    const A = a || new Set();
-    const B = b || new Set();
-    if (A.size !== B.size) return false;
-    for (const x of A) if (!B.has(x)) return false;
-    return true;
-  };
-
-  const assignedSet = new Set(assignedPermCodes || []);
-  const defaultSet = new Set(defaultPermCodes || []);
-  const dirty = !isSetEqual(editingPermSet, assignedSet);
-
-  const addedVsDefault = Array.from(editingPermSet || new Set()).filter((x) => !defaultSet.has(x)).sort();
-  const removedVsDefault = Array.from(defaultSet).filter((x) => !(editingPermSet || new Set()).has(x)).sort();
-
-  const filteredPermissions = (rbacPermissions || []).filter((p) => {
-    if (!permSearch || !permSearch.trim()) return true;
-    const q = permSearch.trim().toLowerCase();
-    const hay = `${p?.code || ""} ${p?.name || ""} ${p?.description || ""}`.toLowerCase();
-    return hay.includes(q);
-  });
-
-  // auto load RBAC catalog when switch to RBAC tab
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (activeSection === "rbac") {
-      fetchRbacCatalog();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSection, isAuthenticated]);
-
   if (isCheckingAuth) {
     return (
       <div className="admin-page">
@@ -628,7 +307,6 @@ export default function Admin() {
     <div className="admin-page">
       <header className="admin-header">
         <div className="admin-title">
-          <h1>Bảng điều khiển cho Ban giám hiệu</h1>
           <p>
             {adminInfo ? (
               <>
@@ -638,11 +316,6 @@ export default function Admin() {
               "Duyệt & quản lý tài khoản"
             )}
           </p>
-        </div>
-        <div className="admin-header-actions">
-          <button className="admin-logout-btn" onClick={handleLogout} title="Đăng xuất khỏi trang admin">
-            <span className="admin-logout-text">Đăng xuất</span>
-          </button>
         </div>
       </header>
 
@@ -659,302 +332,89 @@ export default function Admin() {
             <div className="admin-card-header">
               <h3>Quản trị hệ thống</h3>
               <div className="admin-user-count-badge">
-                {activeSection === "users" ? (
-                  <>
-                    <span className="admin-count-number">{filteredUsers.length}</span>
-                    <span className="admin-count-text">tài khoản</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="admin-count-number">{rbacRoles.length}</span>
-                    <span className="admin-count-text">roles</span>
-                  </>
-                )}
+                <>
+                  <span className="admin-count-number">{filteredUsers.length}</span>
+                  <span className="admin-count-text">tài khoản</span>
+                </>
               </div>
             </div>
 
-            {/* ===== NEW: Main section tabs ===== */}
-            <div className="admin-tabs">
+            {/* Main tabs - chỉ còn quản lý tài khoản */}
+            <div className="admin-tabs" style={{ marginTop: 10 }}>
               <button
-                className={`admin-tab ${activeSection === "users" ? "admin-tab-active" : ""}`}
-                onClick={() => setActiveSection("users")}
+                className={`admin-tab ${activeTab === "pending" ? "admin-tab-active" : ""}`}
+                onClick={() => setActiveTab("pending")}
               >
-                Quản lý tài khoản
+                Tài khoản chờ duyệt ({users.filter((u) => u.statusValue === 0).length})
               </button>
               <button
-                className={`admin-tab ${activeSection === "rbac" ? "admin-tab-active" : ""}`}
-                onClick={() => setActiveSection("rbac")}
+                className={`admin-tab ${activeTab === "approved" ? "admin-tab-active" : ""}`}
+                onClick={() => setActiveTab("approved")}
               >
-                Phân quyền vai trò
+                Tài khoản đã duyệt ({users.filter((u) => u.statusValue === 1).length})
               </button>
             </div>
 
-            {/* ===== USERS section (giữ nguyên) ===== */}
-            {activeSection === "users" && (
-              <>
-                <div className="admin-tabs" style={{ marginTop: 10 }}>
-                  <button
-                    className={`admin-tab ${activeTab === "pending" ? "admin-tab-active" : ""}`}
-                    onClick={() => setActiveTab("pending")}
-                  >
-                    Tài khoản chờ duyệt ({users.filter((u) => u.statusValue === 0).length})
-                  </button>
-                  <button
-                    className={`admin-tab ${activeTab === "approved" ? "admin-tab-active" : ""}`}
-                    onClick={() => setActiveTab("approved")}
-                  >
-                    Tài khoản đã duyệt ({users.filter((u) => u.statusValue === 1).length})
-                  </button>
-                </div>
-
-                <div className="admin-table-container">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Họ tên</th>
-                        <th>Email</th>
-                        <th>Phòng ban</th>
-                        <th>Vai trò</th>
-                        <th>Trạng thái</th>
-                        <th>Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map((u, index) => (
-                        <tr
-                          key={u.id}
-                          className={`${u.statusValue === 1 ? "admin-approved" : ""} ${
-                            index === filteredUsers.length - 1 ? "admin-last-row" : ""
-                          }`}
-                        >
-                          <td>{u.fullName}</td>
-                          <td>{u.email}</td>
-                          <td>{u.department}</td>
-                          <td>
-                            <div className="admin-role-cell">
-                              <span>{u.role}</span>
-                              <button className="admin-edit-role-btn" onClick={() => openRoleChangeModal(u)} title="Thay đổi quyền">
-                                ✏️
-                              </button>
-                            </div>
-                          </td>
-                          <td>
-                            <span className={`admin-status-badge admin-${u.statusValue === 1 ? "approved" : "pending"}`}>
-                              {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="admin-actions">
-                              {u.statusValue === 0 && (
-                                <button className="admin-approve-btn" onClick={() => approveUser(u.id)}>
-                                  Duyệt
-                                </button>
-                              )}
-                              <button className="admin-delete-btn" onClick={() => deleteUser(u.id)} title="Xóa tài khoản khỏi hệ thống">
-                                {u.statusValue === 0 ? "Từ chối" : "Xóa"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredUsers.length === 0 && (
-                        <tr className="admin-last-row">
-                          <td colSpan="6" className="admin-no-data">
-                            {activeTab === "pending" ? "Không có tài khoản nào đang chờ duyệt" : "Không có tài khoản nào đã được duyệt"}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            {/* ===== NEW: RBAC section ===== */}
-            {activeSection === "rbac" && (
-              <div className="admin-rbac">
-                <div className="admin-rbac-top">
-                  <div className="admin-rbac-field">
-                    <label>Chọn vai trò:</label>
-                    <select
-                      value={selectedRoleCode}
-                      onChange={(e) => fetchRolePermissions(e.target.value)}
-                      disabled={rbacLoading}
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Họ tên</th>
+                    <th>Email</th>
+                    <th>Phòng ban</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((u, index) => (
+                    <tr
+                      key={u.id}
+                      className={`${u.statusValue === 1 ? "admin-approved" : ""} ${
+                        index === filteredUsers.length - 1 ? "admin-last-row" : ""
+                      }`}
                     >
-                      {(rbacRoles || []).map((r) => {
-                        const code = String(r?.code || "");
-                        const locked = code.toUpperCase() === "BGH";
-                        return (
-                          <option key={r.id || code} value={code}>
-                            {code} - {r?.name || ""}{locked ? " (khóa)" : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  <div className="admin-rbac-actions">
-                    <button
-                      className="admin-btn-secondary"
-                      onClick={discardRolePermissionChanges}
-                      disabled={rbacLoading || rbacSaving || !dirty}
-                      title="Hoàn tác về trạng thái đang gán"
-                    >
-                      Hoàn tác
-                    </button>
-                    <button
-                      className="admin-btn-secondary"
-                      onClick={resetRolePermissionsToDefault}
-                      disabled={
-                        rbacLoading ||
-                        rbacSaving ||
-                        !selectedRoleCode ||
-                        String(selectedRoleCode).toUpperCase() === "BGH"
-                      }
-                      title="Đặt quyền của role về mặc định"
-                    >
-                      Đặt về mặc định
-                    </button>
-                    <button
-                      className="admin-btn-primary"
-                      onClick={saveRolePermissions}
-                      disabled={
-                        rbacLoading ||
-                        rbacSaving ||
-                        !selectedRoleCode ||
-                        !dirty ||
-                        String(selectedRoleCode).toUpperCase() === "BGH"
-                      }
-                      title="Lưu thay đổi"
-                    >
-                      {rbacSaving ? "Đang lưu..." : "Lưu thay đổi"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="admin-rbac-meta">
-                  <div>
-                    <strong>Role:</strong> {selectedRoleCode || "-"} {selectedRoleName ? `(${selectedRoleName})` : ""}
-                  </div>
-                  <div>
-                    <strong>Đang chọn:</strong> {Array.from(editingPermSet || new Set()).length} / {rbacPermissions.length} quyền
-                  </div>
-                  <div>
-                    <strong>Trạng thái:</strong>{" "}
-                    {String(selectedRoleCode).toUpperCase() === "BGH"
-                      ? "Role BGH bị khóa chỉnh sửa (backend)."
-                      : dirty
-                      ? "Có thay đổi chưa lưu."
-                      : "Không có thay đổi."}
-                  </div>
-                </div>
-
-                <div className="admin-rbac-diff">
-                  <div>
-                    <strong>So với mặc định:</strong>{" "}
-                    {addedVsDefault.length === 0 && removedVsDefault.length === 0
-                      ? "Đang đúng mặc định."
-                      : `+${addedVsDefault.length} / -${removedVsDefault.length}`}
-                  </div>
-                  {(addedVsDefault.length > 0 || removedVsDefault.length > 0) && (
-                    <div className="admin-rbac-diff-detail">
-                      {addedVsDefault.length > 0 && (
-                        <div>
-                          <span className="admin-rbac-diff-title">Được thêm so với mặc định:</span>{" "}
-                          <span className="admin-rbac-diff-codes">{addedVsDefault.join(", ")}</span>
+                      <td>{u.fullName}</td>
+                      <td>{u.email}</td>
+                      <td>{u.department}</td>
+                      <td>
+                        <div className="admin-role-cell">
+                          <span>{u.role}</span>
+                          <button className="admin-edit-role-btn" onClick={() => openRoleChangeModal(u)} title="Thay đổi quyền">
+                            ✏️
+                          </button>
                         </div>
-                      )}
-                      {removedVsDefault.length > 0 && (
-                        <div>
-                          <span className="admin-rbac-diff-title">Bị bỏ so với mặc định:</span>{" "}
-                          <span className="admin-rbac-diff-codes">{removedVsDefault.join(", ")}</span>
+                      </td>
+                      <td>
+                        <span className={`admin-status-badge admin-${u.statusValue === 1 ? "approved" : "pending"}`}>
+                          {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="admin-actions">
+                          {u.statusValue === 0 && (
+                            <button className="admin-approve-btn" onClick={() => approveUser(u.id)}>
+                              Duyệt
+                            </button>
+                          )}
+                          <button className="admin-delete-btn" onClick={() => deleteUser(u.id)} title="Xóa tài khoản khỏi hệ thống">
+                            {u.statusValue === 0 ? "Từ chối" : "Xóa"}
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredUsers.length === 0 && (
+                    <tr className="admin-last-row">
+                      <td colSpan="6" className="admin-no-data">
+                        {activeTab === "pending" ? "Không có tài khoản nào đang chờ duyệt" : "Không có tài khoản nào đã được duyệt"}
+                      </td>
+                    </tr>
                   )}
-                </div>
-
-                <div className="admin-rbac-tools">
-                  <div className="admin-rbac-search">
-                    <input
-                      type="text"
-                      placeholder="Tìm theo code / tên / mô tả quyền..."
-                      value={permSearch}
-                      onChange={(e) => setPermSearch(e.target.value)}
-                      disabled={rbacLoading}
-                    />
-                  </div>
-
-                  <div className="admin-rbac-bulk">
-                    <button
-                      className="admin-btn-secondary"
-                      onClick={() => selectAllFilteredPermissions(filteredPermissions)}
-                      disabled={
-                        rbacLoading ||
-                        rbacSaving ||
-                        !selectedRoleCode ||
-                        String(selectedRoleCode).toUpperCase() === "BGH" ||
-                        filteredPermissions.length === 0
-                      }
-                      title="Chọn tất cả quyền trong danh sách đang lọc"
-                    >
-                      Chọn tất cả (lọc)
-                    </button>
-                    <button
-                      className="admin-btn-secondary"
-                      onClick={() => clearAllFilteredPermissions(filteredPermissions)}
-                      disabled={
-                        rbacLoading ||
-                        rbacSaving ||
-                        !selectedRoleCode ||
-                        String(selectedRoleCode).toUpperCase() === "BGH" ||
-                        filteredPermissions.length === 0
-                      }
-                      title="Bỏ chọn tất cả quyền trong danh sách đang lọc"
-                    >
-                      Bỏ chọn (lọc)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="admin-rbac-perm-list">
-                  {rbacLoading && <div className="admin-no-data">Đang tải dữ liệu phân quyền...</div>}
-
-                  {!rbacLoading && filteredPermissions.length === 0 && (
-                    <div className="admin-no-data">Không có quyền nào khớp từ khóa tìm kiếm.</div>
-                  )}
-
-                  {!rbacLoading &&
-                    filteredPermissions.map((p) => {
-                      const code = p?.code || "";
-                      const checked = (editingPermSet || new Set()).has(code);
-                      const disabled = String(selectedRoleCode).toUpperCase() === "BGH" || rbacSaving;
-
-                      return (
-                        <label key={code} className={`admin-perm-item ${checked ? "admin-perm-checked" : ""}`}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={disabled}
-                            onChange={() => togglePermission(code)}
-                          />
-                          <div className="admin-perm-text">
-                            <div className="admin-perm-title">
-                              <span className="admin-perm-name">{p?.name || code}</span>
-                              <span className="admin-perm-code">{code}</span>
-                            </div>
-                            {p?.description && <div className="admin-perm-desc">{p.description}</div>}
-                          </div>
-                        </label>
-                      );
-                    })}
-                </div>
-
-                <div className="admin-rbac-footnote">
-                  Ghi chú: Nếu bạn không muốn phân quyền tùy chỉnh cho role, hãy bấm <strong>Đặt về mặc định</strong>.
-                </div>
-              </div>
-            )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
