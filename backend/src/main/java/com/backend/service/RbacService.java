@@ -25,10 +25,11 @@ public class RbacService {
     public static final String PERM_USERS_MANAGE           = "USERS.MANAGE";
     public static final String PERM_PERMISSIONS_MANAGE     = "PERMISSIONS.MANAGE";
 
-    // giữ tên cũ để không phải sửa nhiều chỗ
     private static final String PERM_MANAGE = PERM_PERMISSIONS_MANAGE;
 
     private static final String TOKEN_PREFIX = "user-token-";
+    // ===== user đặc biệt (không theo role) =====
+    public static final String PERM_USER_SPECIAL = "RBAC.USER_SPECIAL";
 
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
@@ -62,18 +63,85 @@ public class RbacService {
         return getEffectivePermissionCodes(u);
     }
 
-    // đổi từ private -> public để các service gọi
     public Set<String> getEffectivePermissionCodes(User user) {
         Set<String> perms = new HashSet<>();
 
-        if (user.getRole() != null) {
+        boolean isSpecial = isSpecialUser(user.getId());
+
+        // User thường: lấy role perms
+        if (!isSpecial && user.getRole() != null) {
             perms.addAll(rolePermissionRepository.findPermissionCodesByRoleId(user.getRole().getId()));
         }
 
-        // override theo user_permissions
+        // User special: chỉ lấy từ user_permissions
         perms.addAll(userPermissionRepository.findGrantedPermissionCodes(user.getId()));
         perms.removeAll(userPermissionRepository.findRevokedPermissionCodes(user.getId()));
+
+        // loại marker ra khỏi effective set
+        perms.remove(PERM_USER_SPECIAL);
+
         return perms;
+    }
+
+    private boolean isSpecialUser(Long userId) {
+        if (userId == null) return false;
+        return userPermissionRepository.existsGrantedByUserIdAndPermissionCode(userId, PERM_USER_SPECIAL);
+    }
+
+    /**
+     * Đảm bảo marker permission tồn tại trong bảng permissions.
+     * Không sửa schema, chỉ thêm data nếu thiếu.
+     */
+    private Permission ensureUserSpecialPermissionExists() {
+        return permissionRepository.findByCode(PERM_USER_SPECIAL)
+                .orElseGet(() -> {
+                    Permission p = new Permission();
+                    p.setCode(PERM_USER_SPECIAL);
+                    p.setName("User đặc biệt (không theo role)");
+                    p.setDescription("Marker nội bộ: user dùng quyền riêng, không phụ thuộc role_permissions.");
+                    return permissionRepository.save(p);
+                });
+    }
+
+    private void upsertUserPermission(User user, Permission perm, String effect) {
+        UserPermission.UserPermissionId id = new UserPermission.UserPermissionId();
+        id.setUserId(user.getId());
+        id.setPermissionId(perm.getId());
+
+        Optional<UserPermission> existing = userPermissionRepository.findById(id);
+        if (existing.isPresent()) {
+            UserPermission up = existing.get();
+            up.setEffect(effect);
+            userPermissionRepository.save(up);
+            return;
+        }
+
+        UserPermission up = new UserPermission();
+        up.setId(id);
+        up.setUser(user);
+        up.setPermission(perm);
+        up.setEffect(effect);
+        userPermissionRepository.save(up);
+    }
+
+    /**
+     * Bảo đảm user đã được gắn marker SPECIAL (để ignore role).
+     */
+    private void ensureUserIsSpecial(User targetUser) {
+        Permission marker = ensureUserSpecialPermissionExists();
+        upsertUserPermission(targetUser, marker, "GRANT");
+    }
+
+    private List<String> filterOutMarker(List<String> codes) {
+        if (codes == null) return List.of();
+        return codes.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .filter(s -> !PERM_USER_SPECIAL.equalsIgnoreCase(s))
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     public boolean hasPermission(User user, String permCode) {
@@ -206,6 +274,156 @@ public class RbacService {
         }
         List<String> defaults = DEFAULT_ROLE_PERMS.getOrDefault(rc, List.of());
         return replaceRolePermissions(authorizationHeader, rc, defaults);
+    }
+
+    // ================== USER-LEVEL RBAC (special users) ==================
+
+    public UserPermissionsResponseDTO getUserPermissions(String authorizationHeader, Long targetUserId) {
+        requirePermissionManage(authorizationHeader);
+
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy userId=" + targetUserId));
+
+        return buildUserPermResponse(target);
+    }
+
+    @Transactional
+    public UserPermissionsResponseDTO replaceUserPermissions(String authorizationHeader, Long targetUserId, List<String> permissionCodes) {
+        requirePermissionManage(authorizationHeader);
+
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy userId=" + targetUserId));
+
+        // normalize + validate permission codes (loại marker nếu client gửi lên)
+        List<String> normalized = normalizePermissionCodes(permissionCodes).stream()
+                .filter(c -> !PERM_USER_SPECIAL.equalsIgnoreCase(c))
+                .collect(Collectors.toList());
+
+        List<Permission> perms = normalized.isEmpty()
+                ? new ArrayList<>()
+                : new ArrayList<>(permissionRepository.findByCodeIn(normalized));
+
+        Set<String> found = perms.stream().map(Permission::getCode).collect(Collectors.toSet());
+        List<String> missing = normalized.stream().filter(c -> !found.contains(c)).toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("Permission code không tồn tại: " + missing);
+        }
+
+        // clear toàn bộ override cũ
+        userPermissionRepository.deleteByUserId(targetUserId);
+        userPermissionRepository.flush();
+
+        // gắn marker special (để user không bị ảnh hưởng bởi role)
+        ensureUserIsSpecial(target);
+
+        // grant đúng danh sách mới
+        for (Permission p : perms) {
+            upsertUserPermission(target, p, "GRANT");
+        }
+
+        return buildUserPermResponse(target);
+    }
+
+    @Transactional
+    public UserPermissionsResponseDTO grantUserPermission(String authorizationHeader, Long targetUserId, String permissionCode) {
+        requirePermissionManage(authorizationHeader);
+
+        if (permissionCode == null || permissionCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("permissionCode không được để trống");
+        }
+        String code = permissionCode.trim();
+
+        if (PERM_USER_SPECIAL.equalsIgnoreCase(code)) {
+            throw new IllegalArgumentException("Không grant trực tiếp marker " + PERM_USER_SPECIAL);
+        }
+
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy userId=" + targetUserId));
+
+        Permission perm = permissionRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Permission code không tồn tại: " + code));
+
+        // đảm bảo special mode
+        ensureUserIsSpecial(target);
+
+        // upsert GRANT
+        upsertUserPermission(target, perm, "GRANT");
+
+        return buildUserPermResponse(target);
+    }
+
+    @Transactional
+    public UserPermissionsResponseDTO removeUserPermission(String authorizationHeader, Long targetUserId, String permissionCode) {
+        requirePermissionManage(authorizationHeader);
+
+        if (permissionCode == null || permissionCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("permissionCode không được để trống");
+        }
+        String code = permissionCode.trim();
+
+        if (PERM_USER_SPECIAL.equalsIgnoreCase(code)) {
+            throw new IllegalArgumentException("Không remove marker bằng API này. Dùng endpoint CLEAR để quay lại theo role.");
+        }
+
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy userId=" + targetUserId));
+
+        Permission perm = permissionRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Permission code không tồn tại: " + code));
+
+        UserPermission.UserPermissionId id = new UserPermission.UserPermissionId();
+        id.setUserId(target.getId());
+        id.setPermissionId(perm.getId());
+
+        if (userPermissionRepository.existsById(id)) {
+            userPermissionRepository.deleteById(id);
+            userPermissionRepository.flush();
+        }
+
+        return buildUserPermResponse(target);
+    }
+
+    @Transactional
+    public UserPermissionsResponseDTO clearUserPermissions(String authorizationHeader, Long targetUserId) {
+        requirePermissionManage(authorizationHeader);
+
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy userId=" + targetUserId));
+
+        // xóa hết override (kể cả marker) => user quay về theo role_permissions
+        userPermissionRepository.deleteByUserId(targetUserId);
+        userPermissionRepository.flush();
+
+        return buildUserPermResponse(target);
+    }
+
+    private UserPermissionsResponseDTO buildUserPermResponse(User target) {
+        UserPermissionsResponseDTO dto = new UserPermissionsResponseDTO();
+        dto.setUserId(target.getId());
+        dto.setFullName(target.getFullName());
+        dto.setEmail(target.getEmail());
+
+        if (target.getRole() != null) {
+            dto.setRoleCode(target.getRole().getCode());
+            dto.setRoleName(target.getRole().getName());
+        }
+
+        boolean special = isSpecialUser(target.getId());
+        dto.setSpecialUser(special);
+
+        List<String> rolePerms = (target.getRole() == null)
+                ? List.of()
+                : rolePermissionRepository.findPermissionCodesByRoleId(target.getRole().getId());
+
+        List<String> grants = userPermissionRepository.findGrantedPermissionCodes(target.getId());
+        List<String> revokes = userPermissionRepository.findRevokedPermissionCodes(target.getId());
+
+        dto.setRolePermissionCodes(sortUnique(rolePerms));
+        dto.setUserGrantedPermissionCodes(filterOutMarker(grants));
+        dto.setUserRevokedPermissionCodes(filterOutMarker(revokes));
+        dto.setEffectivePermissionCodes(sortUnique(new ArrayList<>(getEffectivePermissionCodes(target))));
+
+        return dto;
     }
 
     // ================== Authorization core ==================

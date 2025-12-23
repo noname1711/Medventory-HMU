@@ -176,4 +176,81 @@ public class AdminController {
         }
     }
 
+    // ================== USER-LEVEL RBAC (special users) ==================
+
+    @GetMapping("/rbac/users/{userId}/permissions")
+    public ResponseEntity<?> getUserPermissions(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long userId
+    ) {
+        try {
+            return ResponseEntity.ok(rbacService.getUserPermissions(auth, userId));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/rbac/users/{userId}/permissions")
+    public ResponseEntity<?> replaceUserPermissions(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long userId,
+            @RequestBody UpdateRolePermissionsRequestDTO req
+    ) {
+        try {
+            List<String> codes = (req == null) ? null : req.getPermissionCodes();
+            return ResponseEntity.ok(rbacService.replaceUserPermissions(auth, userId, codes));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/rbac/users/{userId}/permissions/grant")
+    public ResponseEntity<?> grantUserPermission(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> req
+    ) {
+        try {
+            String code = (req == null) ? null : (String) req.get("permissionCode");
+            return ResponseEntity.ok(rbacService.grantUserPermission(auth, userId, code));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/rbac/users/{userId}/permissions/remove")
+    public ResponseEntity<?> removeUserPermission(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> req
+    ) {
+        try {
+            String code = (req == null) ? null : (String) req.get("permissionCode");
+            return ResponseEntity.ok(rbacService.removeUserPermission(auth, userId, code));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/rbac/users/{userId}/permissions")
+    public ResponseEntity<?> clearUserPermissions(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long userId
+    ) {
+        try {
+            return ResponseEntity.ok(rbacService.clearUserPermissions(auth, userId));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }
