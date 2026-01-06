@@ -5,8 +5,10 @@ import com.backend.dto.MaterialFeedItemDTO;
 import com.backend.dto.MaterialFeedResponseDTO;
 import com.backend.entity.Material;
 import com.backend.entity.User;
+import com.backend.entity.Unit;
 import com.backend.repository.MaterialRepository;
 import com.backend.repository.UserRepository;
+import com.backend.repository.UnitRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,63 @@ public class MaterialService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UnitRepository unitRepository;
+
+    public MaterialDTO addMaterial(MaterialDTO dto) {
+
+        // 1. Validate bắt buộc
+        if (dto.getMaterialCode() == null || dto.getMaterialCode().isBlank())
+            throw new RuntimeException("Mã vật tư không được để trống");
+
+        if (materialRepository.existsByCode(dto.getMaterialCode()))
+            throw new RuntimeException("Mã vật tư đã tồn tại");
+
+        if (dto.getMaterialName() == null || dto.getMaterialName().isBlank())
+            throw new RuntimeException("Tên vật tư không được để trống");
+
+        if (dto.getSpecification() == null || dto.getSpecification().isBlank())
+            throw new RuntimeException("Quy cách đóng gói không được để trống");
+
+        if (dto.getUnitId() == null)
+            throw new RuntimeException("Chưa chọn đơn vị tính");
+
+        if (dto.getManufacturer() == null || dto.getManufacturer().isBlank())
+            throw new RuntimeException("Hãng sản xuất không được để trống");
+
+        if (!List.of("A","B","C","D").contains(dto.getCategory()))
+            throw new RuntimeException("Phân loại vật tư không hợp lệ");
+
+        // 2. Lấy UnitEntity
+        Unit unit = unitRepository.findById(dto.getUnitId())
+                .orElseThrow(() -> new RuntimeException("Đơn vị tính không tồn tại"));
+
+        // 3. Map DTO → Entity
+        Material material = new Material();
+        material.setName(dto.getMaterialName());
+        material.setSpec(dto.getSpecification());
+        material.setCode(dto.getMaterialCode());
+        material.setManufacturer(dto.getManufacturer());
+        material.setCategory(dto.getCategory());
+        material.setUnit(unit);
+
+        // 4. Save
+        Material saved = materialRepository.save(material);
+
+        // 5. Trả DTO
+        MaterialDTO res = new MaterialDTO();
+        res.setMaterialId(saved.getId());
+        res.setMaterialName(saved.getName());
+        res.setSpecification(saved.getSpec());
+        res.setMaterialCode(saved.getCode());
+        res.setManufacturer(saved.getManufacturer());
+        res.setCategory(saved.getCategory());
+        res.setUnitId(unit.getId());
+        res.setUnitName(unit.getName());
+
+        return res;
+    }
 
     public List<MaterialDTO> getAllMaterials() {
         return materialRepository.findAll()

@@ -34,4 +34,15 @@ public interface InventoryCardRepository extends JpaRepository<InventoryCard, Lo
             """, nativeQuery = true)
     Optional<InventoryCard> lockLatestByMaterialAndLot(@Param("materialId") Long materialId,
                                                        @Param("lotNumber") String lotNumber);
+
+    @Query("""
+    SELECT 
+        ic.material.id,
+        SUM(ic.closingStock)
+    FROM InventoryCard ic
+    GROUP BY ic.material.id
+""")
+    List<Object[]> sumClosingStockGroupByMaterial();
+
 }
+
