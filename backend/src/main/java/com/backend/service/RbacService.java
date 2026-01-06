@@ -51,7 +51,7 @@ public class RbacService {
         User u = userRepository.findById(userId)
                 .orElseThrow(() -> new SecurityException("User không tồn tại"));
 
-        // giữ tương thích login hiện tại của bạn: BGH vào luôn; user khác phải approved
+        // BGH vào luôn; user khác phải approved
         if (!u.isBanGiamHieu() && !u.isApproved()) {
             throw new SecurityException("Tài khoản chưa được kích hoạt");
         }

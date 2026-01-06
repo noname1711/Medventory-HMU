@@ -90,7 +90,7 @@ CREATE TABLE role_permissions (
   permission_id INT NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
   PRIMARY KEY (role_id, permission_id)
 );
-
+-- grant: cấp quyền, revoke: thu hồi quyền
 CREATE TABLE user_permissions (
   user_id       INT NOT NULL,
   permission_id INT NOT NULL,
