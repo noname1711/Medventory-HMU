@@ -12,7 +12,6 @@ import ReplenishmentRequest from "./ReplenishmentRequest";
 import ForecastApproval from "./ForecastApproval";
 import ReceiptPage from "./ReceiptPage"; 
 import IssuePage from "./IssuePage"; 
-import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
 import "./Dashboard.css";
 
@@ -30,10 +29,7 @@ export default function Dashboard() {
 
   const [equipmentData, setEquipmentData] = useState(initialData);
   const [nextId, setNextId] = useState(6);
-  const [activeTab, setActiveTab] = useState("dashboard");
-
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
+  const [activeTab, setActiveTab] = useState("equipment");
 
   // Role mapping để hiển thị tiếng Việt
   const roleDisplayMapping = {
@@ -69,53 +65,6 @@ export default function Dashboard() {
       console.log("No user data in localStorage");
     }
   }, []);
-
-  // Cập nhật chart khi data thay đổi
-  useEffect(() => {
-    if (activeTab === "dashboard") updateStatusChart();
-  }, [equipmentData, activeTab]);
-
-  function updateStatusChart() {
-    const ctx = chartRef.current?.getContext("2d");
-    if (!ctx) return;
-
-    const working = equipmentData.filter((e) => e.status === "Hoạt động tốt").length;
-    const maintenance = equipmentData.filter((e) => e.status === "Cần bảo trì").length;
-    const broken = equipmentData.filter((e) => e.status === "Hỏng hóc").length;
-
-    if (chartInstance.current) chartInstance.current.destroy();
-
-    chartInstance.current = new Chart(ctx, {
-      type: "doughnut",
-      data: {
-        labels: ["Hoạt động tốt", "Cần bảo trì", "Hỏng hóc"],
-        datasets: [{
-          data: [working, maintenance, broken],
-          backgroundColor: ["#10B981", "#F59E0B", "#EF4444"],
-          borderColor: "#fff",
-          borderWidth: 3
-        }]
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "bottom" },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const label = ctx.label || "";
-                const value = ctx.parsed;
-                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const perc = total ? ((value / total) * 100).toFixed(1) : 0;
-                return `${label}: ${value} vật tư (${perc}%)`;
-              }
-            }
-          }
-        },
-        cutout: "60%"
-      }
-    });
-  }
 
   // === HÀNH ĐỘNG ===
 
@@ -212,12 +161,6 @@ export default function Dashboard() {
     });
   }
 
-  // === THỐNG KÊ ===
-  const total = equipmentData.length;
-  const working = equipmentData.filter(e => e.status === "Hoạt động tốt").length;
-  const maintenance = equipmentData.filter(e => e.status === "Cần bảo trì").length;
-  const broken = equipmentData.filter(e => e.status === "Hỏng hóc").length;
-
   // === GIAO DIỆN ===
   return (
     <div className="dashboard-page">
@@ -230,31 +173,6 @@ export default function Dashboard() {
         />
 
         <div className="mt-4">
-          {activeTab === "dashboard" && (
-            <div className="overview-grid">
-              <div className="stats-grid">
-                <div className="stat card"><div className="muted">Tổng vật tư</div><div className="big">{total}</div></div>
-                <div className="stat card"><div className="muted">Hoạt động tốt</div><div className="big green-text">{working}</div></div>
-                <div className="stat card"><div className="muted">Cần bảo trì</div><div className="big yellow-text">{maintenance}</div></div>
-                <div className="stat card"><div className="muted">Hỏng hóc</div><div className="big red-text">{broken}</div></div>
-              </div>
-              <div className="main-grid">
-                <div className="chart card">
-                  <h3>Phân bố theo trạng thái</h3>
-                  <div className="chart-wrap"><canvas ref={chartRef} width="300" height="300" /></div>
-                </div>
-                <div className="activity card">
-                  <h3>Hoạt động gần đây</h3>
-                  <div className="activity-list">
-                    <div className="act blue"><div className="dot" /><div className="text">Thêm mới vật tư TB005 - Máy xét nghiệm máu</div></div>
-                    <div className="act yellow"><div className="dot" /><div className="text">Cập nhật TB003 - Cần bảo trì</div></div>
-                    <div className="act green"><div className="dot" /><div className="text">Hoàn thành bảo trì TB002 - Máy siêu âm</div></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeTab === "equipment" && (
             <EquipmentList equipmentData={equipmentData} onDelete={deleteEquipment} onEdit={editEquipment} />
           )}

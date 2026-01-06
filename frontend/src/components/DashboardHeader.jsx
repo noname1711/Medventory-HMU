@@ -334,7 +334,7 @@ export default function DashboardHeader({ userInfo }) {
                       <span className="dh-dropdown-icon">👤</span> Thông tin cá nhân
                     </div>
                     <div className="dh-dropdown-item dh-dropdown-logout" onClick={handleLogout}>
-                      <span className="dh-dropdown-icon">🚪</span> Đăng xuất
+                      <span className="dh-dropdown-icon">⎋</span> Đăng xuất
                     </div>
                   </div>
                 </div>

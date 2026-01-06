@@ -81,9 +81,6 @@ export default function DashboardTabs({ active, setActive }) {
 
   return (
     <nav className="dt-nav max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <button className={btnClass("dashboard")} onClick={() => setActive("dashboard")}>
-        Tổng quan
-      </button>
 
       <button className={btnClass("equipment")} onClick={() => setActive("equipment")}>
         Danh sách vật tư
