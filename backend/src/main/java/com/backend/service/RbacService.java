@@ -37,7 +37,7 @@ public class RbacService {
     @Autowired private RolePermissionRepository rolePermissionRepository;
     @Autowired private UserPermissionRepository userPermissionRepository;
 
-    // ===== Default mapping đúng theo SQL seed bạn gửi =====
+    // ===== Default mapping =====
     private static final Map<String, List<String>> DEFAULT_ROLE_PERMS = Map.of(
             "BGH",      List.of("SUPP_FORECAST.APPROVE", "NOTIF.MANAGE", "USERS.MANAGE", "PERMISSIONS.MANAGE"),
             "LANH_DAO", List.of("ISSUE_REQ.APPROVE", "NOTIF.MANAGE"),
