@@ -78,4 +78,15 @@ public class MaterialController {
             return ResponseEntity.ok(MaterialFeedResponseDTO.error("Không thể lấy feed hàng hóa"));
         }
     }
+
+    @PostMapping
+    public ResponseEntity<?> addMaterial(@RequestBody MaterialDTO dto) {
+        try {
+            return ResponseEntity.ok(materialService.addMaterial(dto));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
 }

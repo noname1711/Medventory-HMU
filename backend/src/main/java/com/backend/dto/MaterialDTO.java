@@ -8,6 +8,7 @@ public class MaterialDTO {
     private String materialName;
     private String specification;
     private Long unitId;
+    private String unitName;
     private String manufacturer;
     private String materialCode;
     private String category;

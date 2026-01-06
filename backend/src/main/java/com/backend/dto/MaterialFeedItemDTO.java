@@ -3,7 +3,7 @@ package com.backend.dto;
 import lombok.Data;
 
 @Data
-public class MaterialFeedItemDTO {
+public class    MaterialFeedItemDTO {
     private Long id;
     private String code;
     private String name;

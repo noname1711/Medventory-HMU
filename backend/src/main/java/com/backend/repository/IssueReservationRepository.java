@@ -44,4 +44,15 @@ public interface IssueReservationRepository extends JpaRepository<IssueReservati
     """)
     List<Object[]> sumActiveReservedGroupByLot(@Param("materialId") Long materialId);
 
+    @Query("""
+    SELECT 
+        r.material.id,
+        COALESCE(SUM(r.qtyReserved), 0)
+    FROM IssueReservation r
+    WHERE r.status.code = 'ACTIVE'
+    GROUP BY r.material.id
+""")
+    List<Object[]> sumActiveReservedGroupByMaterial();
+
+
 }
