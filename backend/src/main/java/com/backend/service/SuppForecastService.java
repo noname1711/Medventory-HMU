@@ -33,6 +33,7 @@ public class SuppForecastService {
     private final DocStatusRepository docStatusRepository;
 
     private final RbacService rbacService;
+    private final NotificationService notificationService;
 
     public ResponseEntity<?> getPendingForecasts(Long bghId) {
         try {
@@ -98,10 +99,14 @@ public class SuppForecastService {
                 header.setStatus(requireDocStatus(DOC_REJECTED));
             }
 
-            headerRepository.save(header);
+
+            boolean approved = (request.getAction() == 1);
+            SuppForecastHeader saved = headerRepository.save(header);
+            notificationService.notifySuppForecastResult(saved, approved, request.getNote());
+
 
             return ResponseEntity.ok(Map.of(
-                    "message", request.getAction() == 1 ? "Đã phê duyệt dự trù" : "Đã từ chối dự trù",
+                    "message", approved ? "Đã phê duyệt dự trù" : "Đã từ chối dự trù",
                     "success", true
             ));
 
@@ -180,8 +185,11 @@ public class SuppForecastService {
                 header.getDetails().add(detail);
             }
         }
+        SuppForecastHeader saved = headerRepository.save(header);
+        notificationService.notifyBghForSuppForecastApproval(saved);
+        return saved;
 
-        return headerRepository.save(header);
+
     }
 
     public List<SuppForecastPreviousDTO> loadPreviousForecast(Long departmentId) {

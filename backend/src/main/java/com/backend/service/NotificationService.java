@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private static final String ENTITY_ISSUE_REQ = "ISSUE_REQ";
+    private static final String ENTITY_SUPP_FORECAST = "SUPP_FORECAST";
 
     private static final String EVT_PENDING   = "PENDING";
     private static final String EVT_APPROVED  = "APPROVED";
@@ -40,16 +41,23 @@ public class NotificationService {
     // ===================== CREATE NOTIFICATIONS =====================
 
     public void notifyLeadersForApproval(IssueReqHeader header) {
-        if (header == null || header.getDepartment() == null) return;
+        if (header == null) return;
 
-        // Permission-based: ai có ISSUE_REQ.APPROVE trong department thì nhận
-        List<User> approvers = userRepository.findByDepartmentId(header.getDepartment().getId())
-                .stream()
-                .filter(User::isApproved)
-                .filter(u -> rbacService.hasPermission(u, RbacService.PERM_ISSUE_REQ_APPROVE))
+        // CHỈ GỬI CHO LÃNH ĐẠO (Logic mới: Thủ kho không nhận thông báo tạo mới)
+        List<User> recipients = new ArrayList<>();
+
+        List<User> leaders = userRepository.findByRole_CodeAndStatus_Code("LANH_DAO", "APPROVED");
+        if (leaders != null) recipients.addAll(leaders);
+
+        Long creatorId = header.getCreatedBy() != null ? header.getCreatedBy().getId() : null;
+
+        recipients = recipients.stream()
+                .filter(Objects::nonNull)
+                .filter(u -> creatorId == null || !u.getId().equals(creatorId)) // tránh tự gửi cho mình
+                .distinct()
                 .collect(Collectors.toList());
 
-        if (approvers.isEmpty()) return;
+        if (recipients.isEmpty()) return;
 
         String title = "Phiếu xin lĩnh #" + header.getId() + " cần phê duyệt";
         String content = "Có phiếu xin lĩnh mới từ "
@@ -62,7 +70,7 @@ public class NotificationService {
                 EVT_PENDING,
                 title,
                 content,
-                approvers
+                recipients
         );
     }
 
@@ -70,18 +78,46 @@ public class NotificationService {
         if (header == null || header.getCreatedBy() == null) return;
 
         User requester = header.getCreatedBy();
-        if (!requester.isApproved()) return;
+
+        List<User> recipients = new ArrayList<>();
+
+        // 1. Luôn gửi cho người tạo (nếu tài khoản còn active)
+        if (requester.isApproved()) {
+            recipients.add(requester);
+        }
+
+        // 2. Logic mới: NẾU ĐƯỢC DUYỆT -> Gửi thêm cho THỦ KHO
+        if (approved) {
+            List<User> storekeepers = userRepository.findByRole_CodeAndStatus_Code("THU_KHO", "APPROVED");
+            if (storekeepers != null) {
+                recipients.addAll(storekeepers);
+            }
+        }
+
+        recipients = recipients.stream().distinct().collect(Collectors.toList());
+
+        if (recipients.isEmpty()) return;
+
+        String title = "Phiếu xin lĩnh #" + header.getId() + (approved ? " đã được phê duyệt" : " bị từ chối");
+        String content = safe(note);
+
+        if (content.isEmpty()) {
+            content = approved
+                    ? "Phiếu đã được phê duyệt. Thủ kho vui lòng kiểm tra để xuất kho."
+                    : "Phiếu đã bị từ chối phê duyệt.";
+        }
 
         createNotificationForUsers(
                 ENTITY_ISSUE_REQ,
                 header.getId(),
                 approved ? EVT_APPROVED : EVT_REJECTED,
-                "Phiếu xin lĩnh #" + header.getId() + (approved ? " đã được phê duyệt" : " bị từ chối"),
-                safe(note),
-                List.of(requester)
+                title,
+                content,
+                recipients
         );
     }
 
+    // --- PHƯƠNG THỨC BẠN BỊ THIẾU DẪN ĐẾN LỖI ---
     public void notifyAdjustmentRequest(IssueReqHeader header, String note) {
         if (header == null || header.getCreatedBy() == null) return;
 
@@ -97,6 +133,7 @@ public class NotificationService {
                 List.of(requester)
         );
     }
+    // ---------------------------------------------
 
     public BasicResponseDTO schedulePickupForIssueReq(Long issueReqId, Long thuKhoId,
                                                       LocalDateTime scheduledAt, String note) {
@@ -109,7 +146,6 @@ public class NotificationService {
             IssueReqHeader header = issueReqHeaderRepository.findById(issueReqId)
                     .orElseThrow(() -> new RuntimeException("Phiếu xin lĩnh không tồn tại"));
 
-            // giữ logic cũ: chỉ hẹn khi đã duyệt
             if (header.getStatus() == null || header.getStatus().getCode() == null
                     || !"APPROVED".equalsIgnoreCase(header.getStatus().getCode())) {
                 throw new RuntimeException("Chỉ hẹn lịch cho phiếu đã được phê duyệt");
@@ -143,6 +179,64 @@ public class NotificationService {
         } catch (Exception e) {
             return BasicResponseDTO.error("Không thể tạo lịch hẹn: " + e.getMessage());
         }
+    }
+
+    public void notifyBghForSuppForecastApproval(SuppForecastHeader header) {
+        if (header == null) return;
+
+        List<User> approvers = userRepository.findAll().stream()
+                .filter(User::isApproved)
+                .filter(u -> rbacService.hasPermission(u, RbacService.PERM_SUPP_FORECAST_APPROVE))
+                .toList();
+
+        if (approvers.isEmpty()) return;
+
+        String title = "Phiếu dự trù #" + header.getId() + " cần phê duyệt";
+        String content = "Có phiếu dự trù mới (" + safe(header.getAcademicYear()) + ")"
+                + (header.getDepartment() != null ? (" từ " + safe(header.getDepartment().getName())) : "");
+
+        createNotificationForUsers(
+                ENTITY_SUPP_FORECAST,
+                header.getId(),
+                EVT_PENDING,
+                title,
+                content,
+                approvers
+        );
+    }
+
+    public void notifySuppForecastResult(SuppForecastHeader header, boolean approved, String note) {
+        if (header == null) return;
+
+        List<User> recipients = new ArrayList<>();
+
+        if (header.getCreatedBy() != null && header.getCreatedBy().isApproved()) {
+            recipients.add(header.getCreatedBy());
+        } else if (header.getDepartment() != null && header.getDepartment().getId() != null) {
+            recipients.addAll(
+                    userRepository.findByDepartmentId(header.getDepartment().getId()).stream()
+                            .filter(User::isApproved)
+                            .toList()
+            );
+        }
+
+        if (recipients.isEmpty()) return;
+
+        String title = "Phiếu dự trù #" + header.getId() + (approved ? " đã được phê duyệt" : " bị từ chối");
+
+        String content = safe(note);
+        if (content.isEmpty()) {
+            content = approved ? "Phiếu dự trù đã được duyệt." : "Phiếu dự trù đã bị từ chối.";
+        }
+
+        createNotificationForUsers(
+                ENTITY_SUPP_FORECAST,
+                header.getId(),
+                approved ? EVT_APPROVED : EVT_REJECTED,
+                title,
+                content,
+                recipients
+        );
     }
 
     private Notification createNotificationForUsers(String entityCode,
@@ -285,6 +379,7 @@ public class NotificationService {
     private int entityCodeToInt(String code) {
         if (code == null) return 0;
         if (ENTITY_ISSUE_REQ.equalsIgnoreCase(code)) return 0;
+        if (ENTITY_SUPP_FORECAST.equalsIgnoreCase(code)) return 1;
         return 0;
     }
 
