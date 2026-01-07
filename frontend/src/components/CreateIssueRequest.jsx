@@ -881,15 +881,6 @@ export default function CreateIssueRequest() {
           <div className="form-section">
             <div className="section-header">
               <h3 className="section-title">Danh sách vật tư xin lĩnh</h3>
-              <div className="section-actions">
-                <button
-                  type="button"
-                  onClick={addNewRow}
-                  className="btn-add-row"
-                >
-                  Thêm hàng
-                </button>
-              </div>
             </div>
 
             <div className="table-container">
@@ -1038,6 +1029,14 @@ export default function CreateIssueRequest() {
           </div>
 
           <div className="form-actions">
+             <button
+              type="button"
+              onClick={addNewRow}
+              className="btn-add-row"
+              disabled={loading}
+            >
+              Thêm hàng
+            </button>
             <button
               type="button"
               onClick={resetForm}
