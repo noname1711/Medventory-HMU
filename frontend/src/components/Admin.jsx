@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import "./dashboard-ui.css";
 import "./Admin.css";
 
 const API_URL = "http://localhost:8080/api";
@@ -15,7 +16,7 @@ export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved"
+  const [activeTab, setActiveTab] = useState("pending");
   const [adminInfo, setAdminInfo] = useState(null);
 
   const chartRef = useRef(null);
@@ -29,17 +30,13 @@ export default function Admin() {
   ];
 
   const API_ENDPOINTS = {
-    // RBAC check (permission-based)
     RBAC_PERMISSIONS: `${API_URL}/admin/rbac/permissions`,
-
-    // Users manage APIs
     USERS_ALL: `${API_URL}/admin/users/all`,
     USER_APPROVE: (id) => `${API_URL}/admin/users/${id}/approve`,
     USER_DELETE: (id) => `${API_URL}/admin/users/${id}`,
     USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`,
   };
 
-  // ===================== Auth helpers (same spirit as RBACSection) =====================
   const getAuthToken = () => {
     const tokenDirect =
       localStorage.getItem("token") ||
@@ -56,8 +53,8 @@ export default function Admin() {
         const tokenFromUser = u?.token || u?.accessToken || u?.jwt || u?.authToken;
         if (tokenFromUser && String(tokenFromUser).trim()) return String(tokenFromUser).trim();
         if (u?.id != null) return `user-token-${u.id}`;
-      } catch (e) {
-        // ignore
+      } catch {
+        return null;
       }
     }
     return null;
@@ -73,12 +70,11 @@ export default function Admin() {
     if (!currentUser) return null;
     try {
       return JSON.parse(currentUser);
-    } catch (e) {
+    } catch {
       return null;
     }
   };
 
-  // ===================== Permission-based access check =====================
   useEffect(() => {
     const checkAdminAccess = async () => {
       const userData = getCurrentUserFromStorage();
@@ -92,7 +88,6 @@ export default function Admin() {
       }
 
       try {
-        // If this returns 200 => actor has PERMISSIONS.MANAGE (role-based or special-user)
         const res = await fetch(API_ENDPOINTS.RBAC_PERMISSIONS, {
           headers: { ...authHeaders() },
         });
@@ -102,9 +97,8 @@ export default function Admin() {
 
         setIsAuthenticated(true);
         setAdminInfo(userData);
-        await fetchUsers(); // load users after authorization success
+        await fetchUsers();
       } catch (e) {
-        // Optional fallback for BGH in case RBAC endpoint has issues
         if (userData?.isBanGiamHieu) {
           setIsAuthenticated(true);
           setAdminInfo(userData);
@@ -122,7 +116,6 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  // ===================== Data loading (with Authorization headers) =====================
   const fetchUsers = async () => {
     try {
       const response = await fetch(API_ENDPOINTS.USERS_ALL, {
@@ -133,8 +126,6 @@ export default function Admin() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json();
-
-      // vẫn giữ behavior cũ: không hiển thị BGH trong list
       const filteredData = (Array.isArray(data) ? data : []).filter((user) => !user.isBanGiamHieu);
       setUsers(filteredData);
       filterUsersByStatus(filteredData, activeTab);
@@ -161,26 +152,25 @@ export default function Admin() {
   };
 
   const filterUsersByStatus = (userList, status) => {
-    if (status === "pending") setFilteredUsers((userList || []).filter((user) => user.statusValue === 0));
-    else setFilteredUsers((userList || []).filter((user) => user.statusValue === 1));
+    if (status === "pending") {
+      setFilteredUsers((userList || []).filter((user) => user.statusValue === 0));
+    } else {
+      setFilteredUsers((userList || []).filter((user) => user.statusValue === 1));
+    }
   };
 
   useEffect(() => {
     filterUsersByStatus(users, activeTab);
   }, [users, activeTab]);
 
-  // ===================== Chart =====================
-  useEffect(() => {
-    if (isAuthenticated) updateChart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, isAuthenticated]);
+  const approvedCount = useMemo(() => users.filter((u) => u.statusValue === 1).length, [users]);
+  const pendingCount = useMemo(() => users.filter((u) => u.statusValue === 0).length, [users]);
+  const totalCount = users.length;
 
-  const updateChart = () => {
+  useEffect(() => {
+    if (!isAuthenticated) return;
     const ctx = chartRef.current?.getContext("2d");
     if (!ctx) return;
-
-    const approved = (users || []).filter((u) => u.statusValue === 1).length;
-    const pending = (users || []).filter((u) => u.statusValue === 0).length;
 
     if (chartInstance.current) chartInstance.current.destroy();
 
@@ -190,35 +180,45 @@ export default function Admin() {
         labels: ["Đã duyệt", "Chờ duyệt"],
         datasets: [
           {
-            data: [approved, pending],
-            backgroundColor: ["#10B981", "#FACC15"],
-            borderColor: "#fff",
-            borderWidth: 3,
+            data: [approvedCount, pendingCount],
+            backgroundColor: ["#16a34a", "#d97706"],
+            borderColor: "#ffffff",
+            borderWidth: 4,
           },
         ],
       },
       options: {
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: "bottom", labels: { padding: 20, usePointStyle: true } },
+          legend: {
+            position: "bottom",
+            labels: {
+              usePointStyle: true,
+              padding: 18,
+              font: { size: 12, weight: 700 },
+            },
+          },
           tooltip: {
             callbacks: {
               label: (ctx) => {
                 const label = ctx.label || "";
                 const value = ctx.parsed;
                 const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const perc = total ? ((value / total) * 100).toFixed(1) : 0;
-                return `${label}: ${value} tài khoản (${perc}%)`;
+                const percent = total ? ((value / total) * 100).toFixed(1) : 0;
+                return `${label}: ${value} tài khoản (${percent}%)`;
               },
             },
           },
         },
-        cutout: "60%",
+        cutout: "62%",
       },
     });
-  };
 
-  // ===================== Actions (with Authorization headers) =====================
+    return () => {
+      if (chartInstance.current) chartInstance.current.destroy();
+    };
+  }, [approvedCount, pendingCount, isAuthenticated]);
+
   const approveUser = async (id) => {
     try {
       const response = await fetch(API_ENDPOINTS.USER_APPROVE(id), {
@@ -230,7 +230,6 @@ export default function Admin() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const user = users.find((u) => u.id === id);
-
       const nextUsers = users.map((u) => (u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u));
       setUsers(nextUsers);
       filterUsersByStatus(nextUsers, activeTab);
@@ -259,22 +258,15 @@ export default function Admin() {
 
     const result = await Swal.fire({
       title: isPending ? "⚠️ Xác nhận từ chối & xóa?" : "Xác nhận xóa tài khoản?",
-      html: `<div style="text-align: left;">
+      html: `<div style="text-align:left;line-height:1.7;">
         <p><strong>Họ tên:</strong> ${user.fullName}</p>
         <p><strong>Email:</strong> ${user.email}</p>
         <p><strong>Phòng ban:</strong> ${user.department}</p>
         <p><strong>Vai trò:</strong> ${user.role}</p>
-        <p><strong>Trạng thái:</strong> ${isPending ? "Chờ duyệt" : "Đã duyệt"}</p>
-      </div><p style="color: #ef4444; margin-top: 15px;">
-        ${
-          isPending
-            ? "⚠️ Tài khoản sẽ bị từ chối và xóa khỏi hệ thống. Hành động này không thể hoàn tác!"
-            : '⚠️ Tài khoản sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác!'
-        }
-      </p>`,
+      </div>`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#ef4444",
+      confirmButtonColor: "#dc2626",
       cancelButtonColor: "#6b7280",
       confirmButtonText: isPending ? "Từ chối & Xóa" : "Xóa vĩnh viễn",
       cancelButtonText: "Hủy",
@@ -324,36 +316,36 @@ export default function Admin() {
 
       if (response.status === 403) throw new Error("FORBIDDEN");
 
-      if (response.ok) {
-        const nextUsers = users.map((u) => (u.id === id ? { ...u, role: roleLabel } : u));
-        setUsers(nextUsers);
-        filterUsersByStatus(nextUsers, activeTab);
-
-        setEditingUser(null);
-        setNewRole("");
-
-        Swal.fire({
-          title: "✅ Đã cập nhật!",
-          html: `<div style="text-align: left;"><p><strong>Quyền mới:</strong> ${roleLabel}</p></div>`,
-          icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      } else {
+      if (!response.ok) {
         const errorText = await response.text();
-        Swal.fire({
-          title: "❌ Lỗi!",
-          text: `Không thể thay đổi quyền: ${errorText}`,
-          icon: "error",
-          timer: 3000,
-        });
+        throw new Error(errorText || "Không thể thay đổi quyền");
       }
+
+      const nextUsers = users.map((u) => (u.id === id ? { ...u, role: roleLabel } : u));
+      setUsers(nextUsers);
+      filterUsersByStatus(nextUsers, activeTab);
+
+      setEditingUser(null);
+      setNewRole("");
+
+      Swal.fire({
+        title: "✅ Đã cập nhật!",
+        html: `<div style="text-align:left;"><p><strong>Quyền mới:</strong> ${roleLabel}</p></div>`,
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (error) {
       if (String(error?.message) === "FORBIDDEN") {
         Swal.fire({ title: "Không có quyền", text: "Bạn không có quyền thực hiện thao tác này.", icon: "error", timer: 2500 });
         return;
       }
-      Swal.fire({ title: "❌ Lỗi kết nối!", text: "Không thể kết nối đến server", icon: "error", timer: 3000 });
+      Swal.fire({
+        title: "❌ Lỗi!",
+        text: error?.message || "Không thể thay đổi quyền",
+        icon: "error",
+        timer: 2500,
+      });
     }
   };
 
@@ -371,37 +363,11 @@ export default function Admin() {
     if (editingUser && newRole) changeUserRole(editingUser.id, newRole);
   };
 
-  // ===================== Logout =====================
-  const handleLogout = () => {
-    Swal.fire({
-      title: "Đăng xuất?",
-      text: "Bạn có chắc muốn đăng xuất khỏi trang quản trị?",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Đăng xuất",
-      cancelButtonText: "Ở lại",
-      reverseButtons: true,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        localStorage.removeItem("currentUser");
-        sessionStorage.removeItem("adminJustLoggedIn");
-        const cookiesToDelete = ["rememberedEmail", "rememberedPassword", "rememberMe"];
-        cookiesToDelete.forEach((cookieName) => {
-          document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-        });
-        navigate("/");
-      }
-    });
-  };
-
-  // ===================== Render guards =====================
   if (isCheckingAuth) {
     return (
-      <div className="admin-page">
-        <div className="admin-auth-wrapper">
-          <div className="admin-auto-login-loading">
+      <div className="ui-page">
+        <div className="ui-page-frame">
+          <div className="admin-loading-box">
             <div className="admin-loading-spinner"></div>
             <p>Đang kiểm tra quyền truy cập...</p>
           </div>
@@ -413,44 +379,79 @@ export default function Admin() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="admin-page">
-      <div className="admin-container">
-        <div className="admin-grid-layout">
-          <div className="admin-chart-card admin-card">
-            <h3>Thống kê trạng thái tài khoản</h3>
-            <div className="admin-chart-wrap">
-              <canvas ref={chartRef} width="400" height="400" style={{ maxWidth: "100%", height: "auto" }}></canvas>
-            </div>
+    <div className="ui-page admin-page-shell">
+      <div className="ui-page-frame">
+        <div className="ui-page-head">
+          <div>
+            <h1 className="ui-page-title">Quản lý người dùng</h1>
+            <p className="ui-page-subtitle">
+              Duyệt tài khoản, theo dõi trạng thái truy cập và thay đổi vai trò trong cùng một giao diện thống nhất.
+            </p>
           </div>
+          <div className="admin-page-meta">
+            <div className="admin-page-user">{adminInfo?.fullName || "Quản trị viên"}</div>
+          </div>
+        </div>
 
-          <div className="admin-user-list admin-card">
-            <div className="admin-card-header">
-              <h3>Quản trị hệ thống</h3>
-              <div className="admin-user-count-badge">
-                <>
-                  <span className="admin-count-number">{filteredUsers.length}</span>
-                  <span className="admin-count-text">tài khoản</span>
-                </>
+        <div className="ui-stat-grid admin-stat-grid">
+          <div className="ui-stat-card is-primary">
+            <p className="ui-stat-label">Tổng tài khoản</p>
+            <p className="ui-stat-value">{totalCount}</p>
+            <p className="ui-stat-note">Toàn bộ người dùng đang quản lý</p>
+          </div>
+          <div className="ui-stat-card is-warning">
+            <p className="ui-stat-label">Chờ duyệt</p>
+            <p className="ui-stat-value">{pendingCount}</p>
+            <p className="ui-stat-note">Cần kiểm tra và phê duyệt</p>
+          </div>
+          <div className="ui-stat-card">
+            <p className="ui-stat-label">Đã duyệt</p>
+            <p className="ui-stat-value">{approvedCount}</p>
+            <p className="ui-stat-note">Đã có quyền truy cập hệ thống</p>
+          </div>
+        </div>
+
+        <div className="admin-layout-grid">
+          <section className="ui-section admin-chart-section">
+            <div className="ui-section-head">
+              <div>
+                <h2 className="ui-section-title">Thống kê trạng thái</h2>
+                <p className="ui-section-subtitle">Biểu đồ tổng quan theo tình trạng phê duyệt tài khoản.</p>
               </div>
             </div>
+            <div className="admin-chart-wrap">
+              <canvas ref={chartRef}></canvas>
+            </div>
+          </section>
 
-            <div className="admin-tabs" style={{ marginTop: 10 }}>
+          <section className="ui-section admin-table-section">
+            <div className="ui-section-head">
+              <div>
+                <h2 className="ui-section-title">Danh sách tài khoản</h2>
+                <p className="ui-section-subtitle">Duyệt, từ chối hoặc cập nhật vai trò người dùng.</p>
+              </div>
+              <div className="admin-count-chip">{filteredUsers.length} tài khoản</div>
+            </div>
+
+            <div className="admin-tabs">
               <button
-                className={`admin-tab ${activeTab === "pending" ? "admin-tab-active" : ""}`}
+                className={`admin-tab ${activeTab === "pending" ? "active" : ""}`}
                 onClick={() => setActiveTab("pending")}
+                type="button"
               >
-                Tài khoản chờ duyệt ({users.filter((u) => u.statusValue === 0).length})
+                Chờ duyệt ({pendingCount})
               </button>
               <button
-                className={`admin-tab ${activeTab === "approved" ? "admin-tab-active" : ""}`}
+                className={`admin-tab ${activeTab === "approved" ? "active" : ""}`}
                 onClick={() => setActiveTab("approved")}
+                type="button"
               >
-                Tài khoản đã duyệt ({users.filter((u) => u.statusValue === 1).length})
+                Đã duyệt ({approvedCount})
               </button>
             </div>
 
-            <div className="admin-table-container">
-              <table className="admin-table">
+            <div className="ui-table-wrap admin-table-wrap">
+              <table className="ui-table admin-user-table">
                 <thead>
                   <tr>
                     <th>Họ tên</th>
@@ -458,103 +459,109 @@ export default function Admin() {
                     <th>Phòng ban</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th>Thao tác</th>
+                    <th className="text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((u, index) => (
-                    <tr
-                      key={u.id}
-                      className={`${u.statusValue === 1 ? "admin-approved" : ""} ${
-                        index === filteredUsers.length - 1 ? "admin-last-row" : ""
-                      }`}
-                    >
-                      <td>{u.fullName}</td>
-                      <td>{u.email}</td>
-                      <td>{u.department}</td>
-                      <td>
-                        <div className="admin-role-cell">
-                          <span>{u.role}</span>
-                          <button
-                            className="admin-edit-role-btn"
-                            onClick={() => openRoleChangeModal(u)}
-                            title="Thay đổi quyền"
-                          >
-                            ✏️
-                          </button>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`admin-status-badge admin-${u.statusValue === 1 ? "approved" : "pending"}`}>
-                          {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="admin-actions">
-                          {u.statusValue === 0 && (
-                            <button className="admin-approve-btn" onClick={() => approveUser(u.id)}>
-                              Duyệt
+                  {filteredUsers.length > 0 ? (
+                    filteredUsers.map((u) => (
+                      <tr key={u.id}>
+                        <td>
+                          <div className="admin-cell-main">{u.fullName}</div>
+                        </td>
+                        <td>{u.email}</td>
+                        <td>{u.department}</td>
+                        <td>
+                          <div className="admin-role-cell">
+                            <span>{u.role}</span>
+                            <button
+                              className="ui-btn ui-btn-secondary ui-btn-sm admin-inline-edit"
+                              onClick={() => openRoleChangeModal(u)}
+                              title="Thay đổi quyền"
+                              type="button"
+                            >
+                              Sửa
                             </button>
-                          )}
-                          <button className="admin-delete-btn" onClick={() => deleteUser(u.id)} title="Xóa tài khoản khỏi hệ thống">
-                            {u.statusValue === 0 ? "Từ chối" : "Xóa"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {filteredUsers.length === 0 && (
-                    <tr className="admin-last-row">
-                      <td colSpan="6" className="admin-no-data">
-                        {activeTab === "pending" ? "Không có tài khoản nào đang chờ duyệt" : "Không có tài khoản nào đã được duyệt"}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`admin-status-pill ${u.statusValue === 1 ? "approved" : "pending"}`}>
+                            {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-row-actions">
+                            {u.statusValue === 0 && (
+                              <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => approveUser(u.id)} type="button">
+                                Duyệt
+                              </button>
+                            )}
+                            <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => deleteUser(u.id)} type="button">
+                              {u.statusValue === 0 ? "Từ chối" : "Xóa"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="ui-empty">
+                        {activeTab === "pending"
+                          ? "Không có tài khoản nào đang chờ duyệt"
+                          : "Không có tài khoản nào đã được duyệt"}
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         </div>
       </div>
 
       {editingUser && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal">
+        <div className="admin-modal-overlay" onMouseDown={closeRoleChangeModal}>
+          <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
-              <h3>Thay đổi quyền người dùng</h3>
-              <div className="admin-user-status-info">
-                <span className={`admin-status-badge admin-${editingUser.statusValue === 1 ? "approved" : "pending"}`}>
-                  {editingUser.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
-                </span>
+              <div>
+                <h3>Thay đổi quyền người dùng</h3>
+                <p>Điều chỉnh vai trò và giữ nguyên trạng thái tài khoản hiện tại.</p>
               </div>
+              <span className={`admin-status-pill ${editingUser.statusValue === 1 ? "approved" : "pending"}`}>
+                {editingUser.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
+              </span>
             </div>
 
             <div className="admin-modal-content">
-              <div className="admin-user-info">
-                <p>
-                  <strong>Họ tên:</strong> {editingUser.fullName}
-                </p>
-                <p>
-                  <strong>Email:</strong> {editingUser.email}
-                </p>
-                <p>
-                  <strong>Phòng ban:</strong> {editingUser.department}
-                </p>
-                <p>
-                  <strong>Quyền hiện tại:</strong> {editingUser.role}
-                </p>
-                <p>
-                  <strong>Trạng thái:</strong>{" "}
-                  <span className={`admin-status-badge admin-${editingUser.statusValue === 1 ? "approved" : "pending"}`}>
-                    {editingUser.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
-                  </span>
-                </p>
+              <div className="admin-modal-grid">
+                <div className="admin-info-box">
+                  <div className="admin-info-label">Họ tên</div>
+                  <div className="admin-info-value">{editingUser.fullName}</div>
+                </div>
+                <div className="admin-info-box">
+                  <div className="admin-info-label">Email</div>
+                  <div className="admin-info-value">{editingUser.email}</div>
+                </div>
+                <div className="admin-info-box">
+                  <div className="admin-info-label">Phòng ban</div>
+                  <div className="admin-info-value">{editingUser.department}</div>
+                </div>
+                <div className="admin-info-box">
+                  <div className="admin-info-label">Vai trò hiện tại</div>
+                  <div className="admin-info-value">{editingUser.role}</div>
+                </div>
               </div>
 
-              <div className="admin-role-selection">
-                <label htmlFor="role-select">Chọn quyền mới:</label>
-                <select id="role-select" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="role-select">
+                  Chọn quyền mới
+                </label>
+                <select
+                  id="role-select"
+                  className="ui-select"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                >
                   {availableRoles.map((role) => (
                     <option key={role.value} value={role.value}>
                       {role.label}
@@ -565,10 +572,15 @@ export default function Admin() {
             </div>
 
             <div className="admin-modal-footer">
-              <button className="admin-btn-secondary" onClick={closeRoleChangeModal}>
+              <button className="ui-btn ui-btn-secondary" onClick={closeRoleChangeModal} type="button">
                 Hủy
               </button>
-              <button className="admin-btn-primary" onClick={handleRoleChange} disabled={!newRole || newRole === editingUser.role}>
+              <button
+                className="ui-btn ui-btn-primary"
+                onClick={handleRoleChange}
+                type="button"
+                disabled={!newRole || newRole === editingUser.role}
+              >
                 Cập nhật quyền
               </button>
             </div>

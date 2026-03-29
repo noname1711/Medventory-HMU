@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { createPortal } from "react-dom";
+import "./dashboard-ui.css";
 import "./ReceiptPage.css";
 
 const API_URL = "http://localhost:8080/api";
@@ -54,15 +55,15 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
-const MaterialSearch = ({
+function MaterialSearch({
   value,
   onChange,
   onPick,
   fetchMaterials,
   placeholder = "Gõ để tìm...",
-  mode = "name", // "name" | "code"
+  mode = "name",
   isDuplicate = false,
-}) => {
+}) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -72,50 +73,51 @@ const MaterialSearch = ({
 
   const updatePosition = () => {
     if (!inputRef.current) return;
+
     const rect = inputRef.current.getBoundingClientRect();
     setDropdownStyle({
       position: "absolute",
-      top: rect.bottom + window.scrollY,
+      top: rect.bottom + window.scrollY + 4,
       left: rect.left + window.scrollX,
       width: rect.width,
-      maxHeight: 260,
+      maxHeight: 280,
       overflowY: "auto",
-      background: "#fff",
-      border: "1px solid #dbeafe",
       zIndex: 9999,
-      borderRadius: 8,
-      boxShadow: "0 10px 20px rgba(2, 132, 199, 0.12)",
     });
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
+
     updatePosition();
-    const fn = () => updatePosition();
-    window.addEventListener("resize", fn);
-    window.addEventListener("scroll", fn);
+    const handleMove = () => updatePosition();
+    window.addEventListener("resize", handleMove);
+    window.addEventListener("scroll", handleMove, true);
+
     return () => {
-      window.removeEventListener("resize", fn);
-      window.removeEventListener("scroll", fn);
+      window.removeEventListener("resize", handleMove);
+      window.removeEventListener("scroll", handleMove, true);
     };
   }, [open]);
 
   useEffect(() => {
-    const onDown = (e) => {
+    const handleClickOutside = (event) => {
+      const dropdown = document.getElementById("receipt-material-dropdown");
       if (
         inputRef.current &&
-        !inputRef.current.contains(e.target) &&
-        !document.getElementById("material-dropdown")?.contains(e.target)
+        !inputRef.current.contains(event.target) &&
+        !(dropdown && dropdown.contains(event.target))
       ) {
         setOpen(false);
       }
     };
-    if (open) document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const doSearch = async (q) => {
-    const keyword = q.trim();
+  async function doSearch(query) {
+    const keyword = query.trim();
     if (!keyword) {
       setItems([]);
       setLoading(false);
@@ -126,13 +128,14 @@ const MaterialSearch = ({
     try {
       const data = await fetchMaterials(keyword);
       let list = Array.isArray(data) ? data : [];
-      const kw = keyword.toLowerCase();
+      const search = keyword.toLowerCase();
 
       if (mode === "name") {
-        list = list.filter((m) => m?.name && m.name.toLowerCase().includes(kw));
+        list = list.filter((item) => item?.name && item.name.toLowerCase().includes(search));
       }
+
       if (mode === "code") {
-        list = list.filter((m) => m?.code && m.code.toLowerCase().includes(kw));
+        list = list.filter((item) => item?.code && item.code.toLowerCase().includes(search));
       }
 
       setItems(list.slice(0, 12));
@@ -141,68 +144,64 @@ const MaterialSearch = ({
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
+
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => doSearch(value), 200);
     return () => clearTimeout(debounceRef.current);
-    // eslint-disable-next-line
   }, [value, open]);
 
-  const pick = (m) => {
-    onPick(m);
+  function handlePick(material) {
+    onPick(material);
     setOpen(false);
-  };
+  }
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="receipt-material-search">
       <input
         ref={inputRef}
-        className={`table-input ${isDuplicate ? "duplicate-highlight" : ""}`}
+        className={`ui-input receipt-table-input ${isDuplicate ? "is-duplicate" : ""}`}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setOpen(true)}
         autoComplete="off"
-        style={{
-          backgroundColor: isDuplicate ? "#fee2e2" : "white",
-          borderColor: isDuplicate ? "#f87171" : "#e2e8f0",
-        }}
       />
 
       {open &&
         createPortal(
-          <div id="material-dropdown" style={dropdownStyle}>
+          <div id="receipt-material-dropdown" className="receipt-dropdown" style={dropdownStyle}>
             {loading ? (
-              <div className="material-dropdown__empty">Đang tìm...</div>
-            ) : items.length ? (
-              items.map((m) => (
+              <div className="receipt-dropdown-empty">Đang tìm...</div>
+            ) : items.length > 0 ? (
+              items.map((item) => (
                 <button
-                  key={m.id}
+                  key={item.id}
                   type="button"
-                  className="material-dropdown__item"
-                  onClick={() => pick(m)}
+                  className="receipt-dropdown-item"
+                  onClick={() => handlePick(item)}
                 >
-                  <div className="material-dropdown__name">
-                    {m.name} <span className="material-pill">({m.code})</span>
+                  <div className="receipt-dropdown-name">
+                    {item.name}
+                    <span className="receipt-dropdown-pill">{item.code}</span>
                   </div>
                 </button>
               ))
             ) : (
-              <div className="material-dropdown__empty">Không có kết quả</div>
+              <div className="receipt-dropdown-empty">Không có kết quả</div>
             )}
           </div>,
           document.body
         )}
     </div>
   );
-};
+}
 
 export default function ReceiptPage() {
-  const [activeTab, setActiveTab] = useState("create"); // create | history
-
+  const [activeTab, setActiveTab] = useState("create");
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -215,33 +214,35 @@ export default function ReceiptPage() {
 
   const [rows, setRows] = useState([makeRow()]);
 
-  // History
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyErr, setHistoryErr] = useState("");
   const [historyItems, setHistoryItems] = useState([]);
   const [historyAfterId, setHistoryAfterId] = useState(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
   const HISTORY_LIMIT = 20;
 
-  const [historySearch, setHistorySearch] = useState("");
-
   useEffect(() => {
-    const init = async () => {
+    async function init() {
       try {
         const userFromStorage = JSON.parse(localStorage.getItem("currentUser") || "{}");
         const email = userFromStorage.email;
+
         if (!email) {
           setMessage({ type: "error", text: "Không tìm thấy email người dùng trong localStorage" });
           return;
         }
+
         const res = await fetch(`${API_ENDPOINTS.AUTH}/user-info?email=${encodeURIComponent(email)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         const data = await res.json();
         setCurrentUser(data);
       } catch {
         setMessage({ type: "error", text: "Không thể tải thông tin người dùng" });
       }
-    };
+    }
+
     init();
   }, []);
 
@@ -252,24 +253,29 @@ export default function ReceiptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentUser?.id]);
 
-  const fetchMaterials = async (keyword) => {
+  async function fetchMaterials(keyword) {
     const q = (keyword || "").trim();
     const url = `${API_ENDPOINTS.MATERIALS}/search?keyword=${encodeURIComponent(q)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
-  };
+  }
 
-  const setRow = (rowKey, patch) => {
-    setRows((prev) => prev.map((r) => (r.key === rowKey ? { ...r, ...patch } : r)));
-  };
+  function setRow(rowKey, patch) {
+    setRows((prev) => prev.map((row) => (row.key === rowKey ? { ...row, ...patch } : row)));
+  }
 
-  const addRow = () => setRows((prev) => [...prev, makeRow()]);
-  const removeRow = (rowKey) =>
-    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== rowKey)));
+  function addRow() {
+    setRows((prev) => [...prev, makeRow()]);
+  }
 
-  const pickMaterial = (rowKey, material) => {
+  function removeRow(rowKey) {
+    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((row) => row.key !== rowKey)));
+  }
+
+  function pickMaterial(rowKey, material) {
     if (!material) return;
+
     setRow(rowKey, {
       materialId: material.id,
       name: material.name || "",
@@ -278,60 +284,67 @@ export default function ReceiptPage() {
       unitId: material.unit?.id || material.unitId || "",
       unitName: material.unit?.name || material.unitName || "",
     });
-  };
+  }
 
-  // Duplicate checks within table
   const duplicateNames = useMemo(() => {
     const counts = {};
-    const dup = new Set();
-    rows.forEach((r) => {
-      const name = (r.name || "").trim();
+    const duplicates = new Set();
+
+    rows.forEach((row) => {
+      const name = String(row.name || "").trim();
       if (!name) return;
-      const k = name.toLowerCase();
-      counts[k] = (counts[k] || 0) + 1;
+
+      const key = name.toLowerCase();
+      counts[key] = (counts[key] || 0) + 1;
     });
-    Object.keys(counts).forEach((k) => {
-      if (counts[k] > 1) dup.add(k);
+
+    Object.keys(counts).forEach((key) => {
+      if (counts[key] > 1) duplicates.add(key);
     });
-    return dup;
+
+    return duplicates;
   }, [rows]);
 
   const duplicateCodes = useMemo(() => {
     const counts = {};
-    const dup = new Set();
-    rows.forEach((r) => {
-      const code = (r.code || "").trim();
+    const duplicates = new Set();
+
+    rows.forEach((row) => {
+      const code = String(row.code || "").trim();
       if (!code) return;
-      const k = code.toLowerCase();
-      counts[k] = (counts[k] || 0) + 1;
+
+      const key = code.toLowerCase();
+      counts[key] = (counts[key] || 0) + 1;
     });
-    Object.keys(counts).forEach((k) => {
-      if (counts[k] > 1) dup.add(k);
+
+    Object.keys(counts).forEach((key) => {
+      if (counts[key] > 1) duplicates.add(key);
     });
-    return dup;
+
+    return duplicates;
   }, [rows]);
 
   const totals = useMemo(() => {
-    const rowTotals = rows.map((r) => toNumber(r.qtyActual) * toNumber(r.price));
-    const grand = rowTotals.reduce((a, b) => a + b, 0);
+    const rowTotals = rows.map((row) => toNumber(row.qtyActual) * toNumber(row.price));
+    const grand = rowTotals.reduce((sum, value) => sum + value, 0);
     return { rowTotals, grand };
   }, [rows]);
 
-  const getDuplicateStatusForRow = (row) => {
-    const nameKey = (row.name || "").trim().toLowerCase();
-    const codeKey = (row.code || "").trim().toLowerCase();
+  function getDuplicateStatusForRow(row) {
+    const nameKey = String(row.name || "").trim().toLowerCase();
+    const codeKey = String(row.code || "").trim().toLowerCase();
+
     return {
       isNameDuplicate: !!nameKey && duplicateNames.has(nameKey),
       isCodeDuplicate: !!codeKey && duplicateCodes.has(codeKey),
     };
-  };
+  }
 
-  // Resolve materialId if user typed code/name without selecting dropdown
-  const resolveMaterialIdIfNeeded = async (row) => {
+  async function resolveMaterialIdIfNeeded(row) {
     if (row.materialId) return row;
 
-    const code = (row.code || "").trim();
-    const name = (row.name || "").trim();
+    const code = String(row.code || "").trim();
+    const name = String(row.name || "").trim();
     const keyword = code || name;
     if (!keyword) return row;
 
@@ -339,43 +352,47 @@ export default function ReceiptPage() {
     const list = Array.isArray(data) ? data : [];
 
     if (code) {
-      const hit = list.filter((m) => (m?.code || "").trim().toLowerCase() === code.toLowerCase());
-      if (hit.length === 1) {
-        const m = hit[0];
+      const matched = list.filter(
+        (item) => String(item?.code || "").trim().toLowerCase() === code.toLowerCase()
+      );
+
+      if (matched.length === 1) {
+        const material = matched[0];
         return {
           ...row,
-          materialId: m.id,
-          name: m.name || row.name,
-          code: m.code || row.code,
-          spec: m.spec || "",
-          unitId: m.unit?.id || m.unitId || "",
-          unitName: m.unit?.name || m.unitName || "",
+          materialId: material.id,
+          name: material.name || row.name,
+          code: material.code || row.code,
+          spec: material.spec || "",
+          unitId: material.unit?.id || material.unitId || "",
+          unitName: material.unit?.name || material.unitName || "",
         };
       }
-      return row;
     }
 
     if (name) {
-      const hit = list.filter((m) => (m?.name || "").trim().toLowerCase() === name.toLowerCase());
-      if (hit.length === 1) {
-        const m = hit[0];
+      const matched = list.filter(
+        (item) => String(item?.name || "").trim().toLowerCase() === name.toLowerCase()
+      );
+
+      if (matched.length === 1) {
+        const material = matched[0];
         return {
           ...row,
-          materialId: m.id,
-          name: m.name || row.name,
-          code: m.code || row.code,
-          spec: m.spec || "",
-          unitId: m.unit?.id || m.unitId || "",
-          unitName: m.unit?.name || m.unitName || "",
+          materialId: material.id,
+          name: material.name || row.name,
+          code: material.code || row.code,
+          spec: material.spec || "",
+          unitId: material.unit?.id || material.unitId || "",
+          unitName: material.unit?.name || material.unitName || "",
         };
       }
-      return row;
     }
 
     return row;
-  };
+  }
 
-  const validateBeforeSubmit = (effectiveRows) => {
+  function validateBeforeSubmit(effectiveRows) {
     if (!currentUser?.id) return "Chưa xác định được người dùng (X-User-Id)";
     if (!header.receivedFrom.trim()) return "Vui lòng nhập nhà cung cấp / người giao";
     if (!header.receiptDate) return "Vui lòng chọn ngày nhập";
@@ -383,44 +400,59 @@ export default function ReceiptPage() {
     if (duplicateNames.size > 0) {
       return `Có vật tư trùng tên trong bảng: ${Array.from(duplicateNames).join(", ")}.`;
     }
+
     if (duplicateCodes.size > 0) {
       return `Có vật tư trùng mã trong bảng: ${Array.from(duplicateCodes).join(", ")}.`;
     }
 
-    const usableRows = effectiveRows.filter((r) => r.materialId || r.name.trim() || r.code.trim());
+    const usableRows = effectiveRows.filter(
+      (row) => row.materialId || row.name.trim() || row.code.trim()
+    );
+
     if (!usableRows.length) return "Phiếu nhập phải có ít nhất 1 dòng vật tư";
 
-    for (let i = 0; i < effectiveRows.length; i++) {
-      const r = effectiveRows[i];
-      const isBlank = !r.materialId && !r.name.trim() && !r.code.trim();
+    for (let i = 0; i < effectiveRows.length; i += 1) {
+      const row = effectiveRows[i];
+      const isBlank = !row.materialId && !row.name.trim() && !row.code.trim();
       if (isBlank) continue;
 
-      if (!r.materialId) return `Dòng ${i + 1}: Vui lòng chọn vật tư hoặc nhập mã/tên đúng để hệ thống nhận diện`;
-      const qty = toNumber(r.qtyActual);
-      if (qty <= 0) return `Dòng ${i + 1}: Số lượng thực nhập phải > 0`;
-      const price = toNumber(r.price);
-      if (price < 0) return `Dòng ${i + 1}: Đơn giá không hợp lệ`;
-      if (!String(r.lotNumber || "").trim()) return `Dòng ${i + 1}: Vui lòng nhập số lô`;
-      if (r.mfgDate && r.expDate && r.mfgDate > r.expDate) return `Dòng ${i + 1}: Ngày SX không được sau HSD`;
-    }
-    return "";
-  };
+      if (!row.materialId) {
+        return `Dòng ${i + 1}: Vui lòng chọn vật tư hoặc nhập mã/tên đúng để hệ thống nhận diện`;
+      }
 
-  const buildPayload = (effectiveRows) => {
+      const qty = toNumber(row.qtyActual);
+      if (qty <= 0) return `Dòng ${i + 1}: Số lượng thực nhập phải > 0`;
+
+      const price = toNumber(row.price);
+      if (price < 0) return `Dòng ${i + 1}: Đơn giá không hợp lệ`;
+
+      if (!String(row.lotNumber || "").trim()) {
+        return `Dòng ${i + 1}: Vui lòng nhập số lô`;
+      }
+
+      if (row.mfgDate && row.expDate && row.mfgDate > row.expDate) {
+        return `Dòng ${i + 1}: Ngày sản xuất không được sau hạn dùng`;
+      }
+    }
+
+    return "";
+  }
+
+  function buildPayload(effectiveRows) {
     const details = effectiveRows
-      .filter((r) => r.materialId)
-      .map((r) => ({
-        materialId: r.materialId,
-        name: r.name,
-        spec: r.spec,
-        code: r.code,
-        unitId: r.unitId || null,
-        price: toNumber(r.price),
-        qtyDoc: r.qtyDoc === "" ? null : toNumber(r.qtyDoc),
-        qtyActual: toNumber(r.qtyActual),
-        lotNumber: (r.lotNumber || "").trim(),
-        mfgDate: r.mfgDate || null,
-        expDate: r.expDate || null,
+      .filter((row) => row.materialId)
+      .map((row) => ({
+        materialId: row.materialId,
+        name: row.name,
+        spec: row.spec,
+        code: row.code,
+        unitId: row.unitId || null,
+        price: toNumber(row.price),
+        qtyDoc: row.qtyDoc === "" ? null : toNumber(row.qtyDoc),
+        qtyActual: toNumber(row.qtyActual),
+        lotNumber: String(row.lotNumber || "").trim(),
+        mfgDate: row.mfgDate || null,
+        expDate: row.expDate || null,
       }));
 
     return {
@@ -429,36 +461,34 @@ export default function ReceiptPage() {
       receiptDate: header.receiptDate,
       details,
     };
-  };
+  }
 
-  const submit = async () => {
+  async function submit() {
     setMessage({ type: "", text: "" });
-
-    // 1) resolve materialId if user typed code/name but did not click dropdown
     setLoading(true);
+
     try {
-      const resolved = [];
-      for (const r of rows) {
-        const isBlank = !r.materialId && !r.name.trim() && !r.code.trim();
+      const resolvedRows = [];
+
+      for (const row of rows) {
+        const isBlank = !row.materialId && !row.name.trim() && !row.code.trim();
         if (isBlank) {
-          resolved.push(r);
+          resolvedRows.push(row);
           continue;
         }
-        resolved.push(await resolveMaterialIdIfNeeded(r));
+
+        resolvedRows.push(await resolveMaterialIdIfNeeded(row));
       }
 
-      // reflect resolved rows back to UI (so user sees materialId resolved -> spec/unit filled)
-      setRows(resolved);
+      setRows(resolvedRows);
 
-      // 2) validate on resolved rows
-      const err = validateBeforeSubmit(resolved);
-      if (err) {
-        setMessage({ type: "error", text: err });
+      const error = validateBeforeSubmit(resolvedRows);
+      if (error) {
+        setMessage({ type: "error", text: error });
         return;
       }
 
-      // 3) submit
-      const payload = buildPayload(resolved);
+      const payload = buildPayload(resolvedRows);
       const res = await fetch(`${API_ENDPOINTS.RECEIPTS}/create`, {
         method: "POST",
         headers: {
@@ -469,7 +499,9 @@ export default function ReceiptPage() {
       });
 
       const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) throw new Error(data?.message || `HTTP ${res.status}`);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || `HTTP ${res.status}`);
+      }
 
       await Swal.fire({
         icon: "success",
@@ -480,20 +512,19 @@ export default function ReceiptPage() {
 
       setHeader({ receivedFrom: "", reason: "", receiptDate: todayISO() });
       setRows([makeRow()]);
+      setMessage({ type: "success", text: "Đã lưu phiếu nhập thành công." });
 
-      // If user is in history tab, refresh
       if (activeTab === "history") {
         await loadHistory(true);
       }
-    } catch (e) {
-      setMessage({ type: "error", text: e?.message || "Có lỗi xảy ra" });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Có lỗi xảy ra" });
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  // ---------------- HISTORY ----------------
-  const normalizeFeed = (data) => {
+  function normalizeFeed(data) {
     const list =
       (Array.isArray(data?.items) && data.items) ||
       (Array.isArray(data?.content) && data.content) ||
@@ -501,13 +532,12 @@ export default function ReceiptPage() {
       (Array.isArray(data) && data) ||
       [];
 
-    // nếu backend có createdById thì lọc thêm cho chắc chắn "đúng tài khoản"
     let filtered = list;
-    if (filtered.some((x) => x?.createdById !== undefined)) {
-      filtered = filtered.filter((x) => Number(x.createdById) === Number(currentUser?.id));
+    if (filtered.some((item) => item?.createdById !== undefined)) {
+      filtered = filtered.filter((item) => Number(item.createdById) === Number(currentUser?.id));
     }
-    if (filtered.some((x) => x?.createdBy?.id !== undefined)) {
-      filtered = filtered.filter((x) => Number(x.createdBy.id) === Number(currentUser?.id));
+    if (filtered.some((item) => item?.createdBy?.id !== undefined)) {
+      filtered = filtered.filter((item) => Number(item.createdBy.id) === Number(currentUser?.id));
     }
 
     const hasMore =
@@ -519,42 +549,48 @@ export default function ReceiptPage() {
       (filtered.length ? filtered[filtered.length - 1]?.id : null);
 
     return { list: filtered, hasMore, nextAfterId };
-  };
+  }
 
-  const loadHistory = async (reset = false) => {
+  async function loadHistory(reset = false) {
     if (!currentUser?.id) return;
+
     setHistoryErr("");
     setHistoryLoading(true);
+
     try {
       const afterId = reset ? null : historyAfterId;
       const qs = new URLSearchParams();
       qs.set("limit", String(HISTORY_LIMIT));
-      if (afterId !== null && afterId !== undefined && afterId !== "") qs.set("afterId", String(afterId));
+      if (afterId !== null && afterId !== undefined && afterId !== "") {
+        qs.set("afterId", String(afterId));
+      }
 
       const res = await fetch(`${API_ENDPOINTS.RECEIPTS}/feed?${qs.toString()}`, {
         headers: { "X-User-Id": String(currentUser.id) },
       });
+
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
 
       const { list, hasMore, nextAfterId } = normalizeFeed(data);
-
       setHistoryItems((prev) => (reset ? list : [...prev, ...list]));
-      setHistoryHasMore(!!hasMore);
+      setHistoryHasMore(Boolean(hasMore));
       setHistoryAfterId(nextAfterId ?? null);
-    } catch (e) {
-      setHistoryErr(e?.message || "Không thể tải lịch sử phiếu nhập");
+    } catch (error) {
+      setHistoryErr(error?.message || "Không thể tải lịch sử phiếu nhập");
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }
 
-  const openReceiptDetail = async (receiptId) => {
+  async function openReceiptDetail(receiptId) {
     if (!currentUser?.id) return;
+
     try {
       const res = await fetch(`${API_ENDPOINTS.RECEIPTS}/${receiptId}/detail`, {
         headers: { "X-User-Id": String(currentUser.id) },
       });
+
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
 
@@ -569,17 +605,18 @@ export default function ReceiptPage() {
 
       const rowsHtml = Array.isArray(details)
         ? details
-            .map((d, idx) => {
-              const name = d?.name || d?.materialName || "";
-              const code = d?.code || "";
-              const lot = d?.lotNumber || d?.lot_number || "";
-              const exp = d?.expDate || d?.exp_date || "";
-              const qty = d?.qtyActual ?? d?.qty_actual ?? 0;
-              const price = d?.price ?? 0;
-              const total = d?.total ?? (Number(qty) * Number(price));
+            .map((detail, index) => {
+              const name = detail?.name || detail?.materialName || "";
+              const code = detail?.code || "";
+              const lot = detail?.lotNumber || detail?.lot_number || "";
+              const exp = detail?.expDate || detail?.exp_date || "";
+              const qty = detail?.qtyActual ?? detail?.qty_actual ?? 0;
+              const price = detail?.price ?? 0;
+              const total = detail?.total ?? Number(qty) * Number(price);
+
               return `
                 <tr>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${idx + 1}</td>
+                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${index + 1}</td>
                   <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(name)}</td>
                   <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(code)}</td>
                   <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(lot)}</td>
@@ -630,399 +667,423 @@ export default function ReceiptPage() {
         width: 900,
         confirmButtonText: "Đóng",
       });
-    } catch (e) {
+    } catch (error) {
       await Swal.fire({
         icon: "error",
         title: "Không thể tải chi tiết",
-        text: e?.message || "Có lỗi xảy ra",
+        text: error?.message || "Có lỗi xảy ra",
         confirmButtonText: "OK",
       });
     }
-  };
+  }
 
   const filteredHistory = useMemo(() => {
-    const q = (historySearch || "").trim().toLowerCase();
-    if (!q) return historyItems;
-    return historyItems.filter((x) => {
-      const id = String(x?.id ?? "").toLowerCase();
-      const from = String(x?.receivedFrom ?? x?.received_from ?? "").toLowerCase();
-      const reason = String(x?.reason ?? "").toLowerCase();
-      const date = String(x?.receiptDate ?? x?.receipt_date ?? "").toLowerCase();
-      return id.includes(q) || from.includes(q) || reason.includes(q) || date.includes(q);
+    const search = String(historySearch || "").trim().toLowerCase();
+    if (!search) return historyItems;
+
+    return historyItems.filter((item) => {
+      const id = String(item?.id ?? "").toLowerCase();
+      const from = String(item?.receivedFrom ?? item?.received_from ?? "").toLowerCase();
+      const reason = String(item?.reason ?? "").toLowerCase();
+      const date = String(item?.receiptDate ?? item?.receipt_date ?? "").toLowerCase();
+      return id.includes(search) || from.includes(search) || reason.includes(search) || date.includes(search);
     });
   }, [historyItems, historySearch]);
 
-  // ---------------- UI ----------------
   return (
-    <div className="receipt-page">
-      <div className="page-head">
-        <h1 className="page-title">Nhập kho</h1>
+    <div className="ui-page receipt-page">
+      <div className="ui-page-frame">
+        <div className="ui-page-head">
+          <div>
+            <h1 className="ui-page-title">Nhập kho</h1>
+            <p className="ui-page-subtitle">
+              Trang nhập kho đã được đưa về cùng khung trắng, cùng giới hạn chiều ngang,
+              cùng hệ button, form và bảng với các trang trước.
+            </p>
+          </div>
 
-        <div className="page-tabs">
-          <button
-            type="button"
-            className={`tab-btn ${activeTab === "create" ? "active" : ""}`}
-            onClick={() => setActiveTab("create")}
-          >
-            Tạo phiếu nhập
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeTab === "history" ? "active" : ""}`}
-            onClick={() => setActiveTab("history")}
-          >
-            Lịch sử phiếu nhập
-          </button>
+          <div className="receipt-tabs">
+            <button
+              type="button"
+              className={`receipt-tab-btn ${activeTab === "create" ? "active" : ""}`}
+              onClick={() => setActiveTab("create")}
+            >
+              Tạo phiếu nhập
+            </button>
+            <button
+              type="button"
+              className={`receipt-tab-btn ${activeTab === "history" ? "active" : ""}`}
+              onClick={() => setActiveTab("history")}
+            >
+              Lịch sử phiếu nhập
+            </button>
+          </div>
         </div>
-      </div>
 
-      {message.text ? (
-        <div className={`message ${message.type === "error" ? "error" : "success"}`}>
-          {message.text}
-        </div>
-      ) : null}
-
-      {activeTab === "create" ? (
-        <div className="receipt-form">
-          {(duplicateNames.size > 0 || duplicateCodes.size > 0) && (
-            <div className="message warning">
-              <b>Cảnh báo trùng lặp:</b>
-              {duplicateNames.size > 0 && <div>Trùng tên: {Array.from(duplicateNames).join(", ")}</div>}
-              {duplicateCodes.size > 0 && <div>Trùng mã: {Array.from(duplicateCodes).join(", ")}</div>}
-              <div className="hint">Các ô bị trùng được tô màu đỏ nhạt.</div>
-            </div>
-          )}
-
-          <div className="section-header">
-            <h2 className="section-title">Thông tin phiếu nhập</h2>
+        {message.text ? (
+          <div className={`ui-alert ${message.type === "error" ? "is-error" : "is-success"}`}>
+            {message.text}
           </div>
+        ) : null}
 
-          <div className="header-grid">
-            <div className="form-group">
-              <label className="form-label">Nhà cung cấp / người giao</label>
-              <input
-                className="form-input"
-                value={header.receivedFrom}
-                onChange={(e) => setHeader((p) => ({ ...p, receivedFrom: e.target.value }))}
-                placeholder="Ví dụ: Công ty ABC - Nguyễn Văn A"
-              />
-            </div>
+        {activeTab === "create" ? (
+          <div className="receipt-stack">
+            <div className="ui-section">
+              <div className="ui-section-head">
+                <div>
+                  <h2 className="ui-section-title">Thông tin phiếu nhập</h2>
+                  <p className="ui-section-subtitle">
+                    Nhập thông tin chung của phiếu trước khi thêm danh sách vật tư.
+                  </p>
+                </div>
+              </div>
 
-            <div className="form-group">
-              <label className="form-label">Ngày nhập</label>
-              <input
-                className="form-input"
-                type="date"
-                value={header.receiptDate}
-                onChange={(e) => setHeader((p) => ({ ...p, receiptDate: e.target.value }))}
-              />
-            </div>
+              <div className="receipt-header-grid">
+                <div className="ui-field">
+                  <label className="ui-label">Nhà cung cấp / người giao</label>
+                  <input
+                    className="ui-input"
+                    value={header.receivedFrom}
+                    onChange={(e) => setHeader((prev) => ({ ...prev, receivedFrom: e.target.value }))}
+                    placeholder="Ví dụ: Công ty ABC - Nguyễn Văn A"
+                  />
+                </div>
 
-            <div className="form-group header-reason">
-              <label className="form-label">Lý do nhập</label>
-              <input
-                className="form-input"
-                value={header.reason}
-                onChange={(e) => setHeader((p) => ({ ...p, reason: e.target.value }))}
-                placeholder="Ví dụ: Nhu cầu từ đơn vị / Nhập theo hợp đồng..."
-              />
-            </div>
-          </div>
+                <div className="ui-field">
+                  <label className="ui-label">Ngày nhập</label>
+                  <input
+                    className="ui-input"
+                    type="date"
+                    value={header.receiptDate}
+                    onChange={(e) => setHeader((prev) => ({ ...prev, receiptDate: e.target.value }))}
+                  />
+                </div>
 
-          <div className="section-header">
-            <h2 className="section-title">Danh sách vật tư nhập</h2>
-          </div>
-
-          <div className="table-container">
-            <table className="receipt-table">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 260 }}>Tên vật tư</th>
-                  <th style={{ minWidth: 150 }}>Mã</th>
-                  <th style={{ minWidth: 180 }}>Quy cách</th>
-                  <th style={{ minWidth: 90 }}>ĐVT</th>
-                  <th style={{ minWidth: 120 }} className="text-right">
-                    SL chứng từ
-                  </th>
-                  <th style={{ minWidth: 120 }} className="text-right">
-                    SL thực nhập
-                  </th>
-                  <th style={{ minWidth: 130 }} className="text-right">
-                    Đơn giá
-                  </th>
-                  <th style={{ minWidth: 140 }}>Số lô</th>
-                  <th style={{ minWidth: 130 }}>Ngày SX</th>
-                  <th style={{ minWidth: 130 }}>Hạn dùng</th>
-                  <th style={{ minWidth: 130 }} className="text-right">
-                    Thành tiền
-                  </th>
-                  <th style={{ width: 90 }} className="text-center">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {rows.map((r, idx) => {
-                  const { isNameDuplicate, isCodeDuplicate } = getDuplicateStatusForRow(r);
-                  const rowWarn = isNameDuplicate || isCodeDuplicate;
-
-                  return (
-                    <tr key={r.key} style={{ backgroundColor: rowWarn ? "#fef2f2" : "transparent" }}>
-                      <td>
-                        <MaterialSearch
-                          mode="name"
-                          value={r.name}
-                          onChange={(v) =>
-                            setRow(r.key, {
-                              name: v,
-                              materialId: null,
-                              code: "",
-                              spec: "",
-                              unitId: "",
-                              unitName: "",
-                            })
-                          }
-                          onPick={(m) => pickMaterial(r.key, m)}
-                          fetchMaterials={fetchMaterials}
-                          placeholder="Gõ tên vật tư..."
-                          isDuplicate={isNameDuplicate}
-                        />
-                      </td>
-
-                      <td>
-                        <MaterialSearch
-                          mode="code"
-                          value={r.code}
-                          onChange={(v) =>
-                            setRow(r.key, {
-                              code: v,
-                              materialId: null,
-                              name: "",
-                              spec: "",
-                              unitId: "",
-                              unitName: "",
-                            })
-                          }
-                          onPick={(m) => pickMaterial(r.key, m)}
-                          fetchMaterials={fetchMaterials}
-                          placeholder="Gõ mã vật tư..."
-                          isDuplicate={isCodeDuplicate}
-                        />
-                      </td>
-
-                      <td>
-                        <input className="table-input" value={r.spec} disabled />
-                      </td>
-
-                      <td>
-                        <input className="table-input" value={r.unitName || ""} disabled />
-                      </td>
-
-                      <td>
-                        <input
-                          className="table-input number-input"
-                          value={r.qtyDoc}
-                          onChange={(e) => setRow(r.key, { qtyDoc: e.target.value })}
-                          placeholder="0"
-                        />
-                      </td>
-
-                      <td>
-                        <input
-                          className="table-input number-input"
-                          value={r.qtyActual}
-                          onChange={(e) => setRow(r.key, { qtyActual: e.target.value })}
-                          placeholder="0"
-                        />
-                      </td>
-
-                      <td>
-                        <input
-                          className="table-input number-input"
-                          value={r.price}
-                          onChange={(e) => setRow(r.key, { price: e.target.value })}
-                          placeholder="0"
-                        />
-                      </td>
-
-                      <td>
-                        <input
-                          className="table-input"
-                          value={r.lotNumber}
-                          onChange={(e) => setRow(r.key, { lotNumber: e.target.value })}
-                          placeholder="Ví dụ: LOT-0125-A"
-                        />
-                      </td>
-
-                      <td>
-                        <input
-                          className="table-input"
-                          type="date"
-                          value={r.mfgDate}
-                          onChange={(e) => setRow(r.key, { mfgDate: e.target.value })}
-                        />
-                      </td>
-
-                      <td>
-                        <input
-                          className="table-input"
-                          type="date"
-                          value={r.expDate}
-                          onChange={(e) => setRow(r.key, { expDate: e.target.value })}
-                        />
-                      </td>
-
-                      <td className="text-right">
-                        <div className="money" style={{ color: rowWarn ? "#dc2626" : "#1e293b" }}>
-                          {moneyFmt.format(totals.rowTotals[idx] || 0)}
-                        </div>
-                      </td>
-
-                      <td className="text-center">
-                        <button
-                          type="button"
-                          className="btn-remove-row"
-                          onClick={() => removeRow(r.key)}
-                          disabled={rows.length <= 1}
-                          title="Xóa dòng"
-                        >
-                          Xóa
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="row-container">
-            <div className="totals">
-              <div className="totals__row">
-                <div className="totals__value">Tổng chi phí: {moneyFmt.format(totals.grand)}</div>
+                <div className="ui-field">
+                  <label className="ui-label">Lý do nhập</label>
+                  <input
+                    className="ui-input"
+                    value={header.reason}
+                    onChange={(e) => setHeader((prev) => ({ ...prev, reason: e.target.value }))}
+                    placeholder="Ví dụ: Nhập theo hợp đồng / bổ sung tồn kho / tiếp nhận bàn giao..."
+                  />
+                </div>
               </div>
             </div>
-            <div className="section-actions">
-              <button type="button" className="btn-add-row" onClick={addRow}>
-                + Thêm dòng
-              </button>
+
+            <div className="ui-section">
+              <div className="ui-section-head">
+                <div>
+                  <h2 className="ui-section-title">Danh sách vật tư nhập</h2>
+                  <p className="ui-section-subtitle">
+                    Có thể gõ tên hoặc mã vật tư để tìm nhanh. Các dòng trùng sẽ được tô nhạt để tránh nhập lặp.
+                  </p>
+                </div>
+              </div>
+
+              {(duplicateNames.size > 0 || duplicateCodes.size > 0) && (
+                <div className="ui-alert is-warning receipt-duplicate-alert">
+                  {duplicateNames.size > 0 && (
+                    <div>Trùng tên: {Array.from(duplicateNames).join(", ")}</div>
+                  )}
+                  {duplicateCodes.size > 0 && (
+                    <div>Trùng mã: {Array.from(duplicateCodes).join(", ")}</div>
+                  )}
+                </div>
+              )}
+
+              <div className="ui-table-wrap">
+                <table className="ui-table receipt-table">
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: 250 }}>Tên vật tư</th>
+                      <th style={{ minWidth: 150 }}>Mã vật tư</th>
+                      <th style={{ minWidth: 180 }}>Quy cách</th>
+                      <th style={{ minWidth: 90 }}>ĐVT</th>
+                      <th style={{ minWidth: 120 }} className="text-right">SL chứng từ</th>
+                      <th style={{ minWidth: 120 }} className="text-right">SL thực nhập</th>
+                      <th style={{ minWidth: 130 }} className="text-right">Đơn giá</th>
+                      <th style={{ minWidth: 150 }}>Số lô</th>
+                      <th style={{ minWidth: 130 }}>Ngày SX</th>
+                      <th style={{ minWidth: 130 }}>Hạn dùng</th>
+                      <th style={{ minWidth: 130 }} className="text-right">Thành tiền</th>
+                      <th style={{ width: 100 }} className="text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {rows.map((row, index) => {
+                      const { isNameDuplicate, isCodeDuplicate } = getDuplicateStatusForRow(row);
+                      const isDuplicate = isNameDuplicate || isCodeDuplicate;
+
+                      return (
+                        <tr key={row.key} className={`receipt-row ${isDuplicate ? "duplicate-row" : ""}`}>
+                          <td>
+                            <MaterialSearch
+                              mode="name"
+                              value={row.name}
+                              onChange={(value) =>
+                                setRow(row.key, {
+                                  name: value,
+                                  materialId: null,
+                                  code: "",
+                                  spec: "",
+                                  unitId: "",
+                                  unitName: "",
+                                })
+                              }
+                              onPick={(material) => pickMaterial(row.key, material)}
+                              fetchMaterials={fetchMaterials}
+                              placeholder="Gõ tên vật tư..."
+                              isDuplicate={isNameDuplicate}
+                            />
+                          </td>
+
+                          <td>
+                            <MaterialSearch
+                              mode="code"
+                              value={row.code}
+                              onChange={(value) =>
+                                setRow(row.key, {
+                                  code: value,
+                                  materialId: null,
+                                  name: "",
+                                  spec: "",
+                                  unitId: "",
+                                  unitName: "",
+                                })
+                              }
+                              onPick={(material) => pickMaterial(row.key, material)}
+                              fetchMaterials={fetchMaterials}
+                              placeholder="Gõ mã vật tư..."
+                              isDuplicate={isCodeDuplicate}
+                            />
+                          </td>
+
+                          <td>
+                            <input className="ui-input receipt-table-input" value={row.spec} disabled />
+                          </td>
+
+                          <td>
+                            <input className="ui-input receipt-table-input" value={row.unitName || ""} disabled />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input receipt-table-input text-right"
+                              value={row.qtyDoc}
+                              onChange={(e) => setRow(row.key, { qtyDoc: e.target.value })}
+                              placeholder="0"
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input receipt-table-input text-right"
+                              value={row.qtyActual}
+                              onChange={(e) => setRow(row.key, { qtyActual: e.target.value })}
+                              placeholder="0"
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input receipt-table-input text-right"
+                              value={row.price}
+                              onChange={(e) => setRow(row.key, { price: e.target.value })}
+                              placeholder="0"
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input receipt-table-input"
+                              value={row.lotNumber}
+                              onChange={(e) => setRow(row.key, { lotNumber: e.target.value })}
+                              placeholder="Ví dụ: LOT-0125-A"
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input receipt-table-input"
+                              type="date"
+                              value={row.mfgDate}
+                              onChange={(e) => setRow(row.key, { mfgDate: e.target.value })}
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input receipt-table-input"
+                              type="date"
+                              value={row.expDate}
+                              onChange={(e) => setRow(row.key, { expDate: e.target.value })}
+                            />
+                          </td>
+
+                          <td className="text-right">
+                            <span className={`receipt-money ${isDuplicate ? "is-duplicate" : ""}`}>
+                              {moneyFmt.format(totals.rowTotals[index] || 0)}
+                            </span>
+                          </td>
+
+                          <td className="text-center">
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-danger ui-btn-sm"
+                              onClick={() => removeRow(row.key)}
+                              disabled={rows.length <= 1}
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="receipt-controls-row">
+                <div className="receipt-total-box">
+                  <p className="receipt-total-label">Tổng chi phí phiếu nhập</p>
+                  <p className="receipt-total-value">{moneyFmt.format(totals.grand)}</p>
+                  <p className="receipt-total-hint">
+                    Giá trị này được cộng tự động từ số lượng thực nhập và đơn giá của từng dòng.
+                  </p>
+                </div>
+
+                <div className="receipt-actions">
+                  <button type="button" className="ui-btn ui-btn-secondary" onClick={addRow}>
+                    + Thêm dòng
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-secondary"
+                    onClick={() => {
+                      setHeader({ receivedFrom: "", reason: "", receiptDate: todayISO() });
+                      setRows([makeRow()]);
+                      setMessage({ type: "", text: "" });
+                    }}
+                    disabled={loading}
+                  >
+                    Làm mới
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-primary"
+                    onClick={submit}
+                    disabled={loading}
+                  >
+                    {loading ? "Đang lưu..." : "Lưu phiếu nhập"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn-cancel"
-              onClick={() => {
-                setHeader({ receivedFrom: "", reason: "", receiptDate: todayISO() });
-                setRows([makeRow()]);
-                setMessage({ type: "", text: "" });
-              }}
-              disabled={loading}
-            >
-              Làm mới
-            </button>
-
-            <button type="button" className="btn-submit" onClick={submit} disabled={loading}>
-              {loading ? "Đang lưu..." : "Lưu phiếu nhập"}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="history-wrap">
-          <div className="history-toolbar">
-            <div className="history-left">
-              <input
-                className="form-input"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Tìm theo mã phiếu / ngày / nhà cung cấp / lý do..."
-              />
+        ) : (
+          <div className="ui-section">
+            <div className="ui-section-head">
+              <div>
+                <h2 className="ui-section-title">Lịch sử phiếu nhập</h2>
+                <p className="ui-section-subtitle">
+                  Tra cứu các phiếu nhập bạn đã tạo trước đó và xem lại chi tiết từng phiếu.
+                </p>
+              </div>
             </div>
-            <div className="history-right">
+
+            <div className="receipt-history-toolbar">
+              <div className="receipt-history-search">
+                <input
+                  className="ui-input"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Tìm theo mã phiếu / ngày / nhà cung cấp / lý do..."
+                />
+              </div>
+
+              <div className="receipt-actions">
+                <button
+                  type="button"
+                  className="ui-btn ui-btn-secondary"
+                  onClick={() => loadHistory(true)}
+                  disabled={historyLoading}
+                >
+                  Tải lại
+                </button>
+              </div>
+            </div>
+
+            {historyErr ? <div className="ui-alert is-error">{historyErr}</div> : null}
+
+            <div className="ui-table-wrap">
+              <table className="ui-table receipt-table">
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: 120 }}>Mã phiếu</th>
+                    <th style={{ minWidth: 140 }}>Ngày nhập</th>
+                    <th style={{ minWidth: 260 }}>Nhà cung cấp / người giao</th>
+                    <th style={{ minWidth: 260 }}>Lý do</th>
+                    <th style={{ minWidth: 140 }} className="text-right">Tổng tiền</th>
+                    <th style={{ width: 120 }} className="text-center">Thao tác</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredHistory.length > 0 ? (
+                    filteredHistory.map((item) => {
+                      const id = item?.id;
+                      const date = item?.receiptDate ?? item?.receipt_date ?? "";
+                      const from = item?.receivedFrom ?? item?.received_from ?? "";
+                      const reason = item?.reason ?? "";
+                      const total = item?.totalAmount ?? item?.total_amount ?? 0;
+
+                      return (
+                        <tr key={id ?? Math.random()}>
+                          <td>#{id}</td>
+                          <td>{date}</td>
+                          <td>{from}</td>
+                          <td>{reason}</td>
+                          <td className="text-right">{moneyFmt.format(total)}</td>
+                          <td className="text-center">
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-secondary ui-btn-sm"
+                              onClick={() => openReceiptDetail(id)}
+                              disabled={!id}
+                            >
+                              Xem
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="ui-empty">
+                        {historyLoading ? "Đang tải..." : "Chưa có phiếu nhập"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="receipt-history-footer">
               <button
                 type="button"
-                className="btn-secondary"
-                onClick={() => loadHistory(true)}
-                disabled={historyLoading}
+                className="ui-btn ui-btn-secondary"
+                onClick={() => loadHistory(false)}
+                disabled={historyLoading || !historyHasMore}
+                title={!historyHasMore ? "Không còn dữ liệu" : ""}
               >
-                Tải lại
+                {historyLoading ? "Đang tải..." : "Tải thêm"}
               </button>
             </div>
           </div>
-
-          {historyErr ? <div className="message error">{historyErr}</div> : null}
-
-          <div className="table-container">
-            <table className="receipt-table">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 110 }}>Mã phiếu</th>
-                  <th style={{ minWidth: 140 }}>Ngày nhập</th>
-                  <th style={{ minWidth: 260 }}>Nhà cung cấp / người giao</th>
-                  <th style={{ minWidth: 260 }}>Lý do</th>
-                  <th style={{ minWidth: 140 }} className="text-right">
-                    Tổng tiền
-                  </th>
-                  <th style={{ width: 120 }} className="text-center">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHistory.length ? (
-                  filteredHistory.map((x) => {
-                    const id = x?.id;
-                    const date = x?.receiptDate ?? x?.receipt_date ?? "";
-                    const from = x?.receivedFrom ?? x?.received_from ?? "";
-                    const reason = x?.reason ?? "";
-                    const total = x?.totalAmount ?? x?.total_amount ?? 0;
-
-                    return (
-                      <tr key={id ?? Math.random()}>
-                        <td>#{id}</td>
-                        <td>{date}</td>
-                        <td>{from}</td>
-                        <td>{reason}</td>
-                        <td className="text-right">{moneyFmt.format(total)}</td>
-                        <td className="text-center">
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => openReceiptDetail(id)}
-                            disabled={!id}
-                          >
-                            Xem
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="text-center" style={{ padding: 14 }}>
-                      {historyLoading ? "Đang tải..." : "Chưa có phiếu nhập"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="history-footer">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => loadHistory(false)}
-              disabled={historyLoading || !historyHasMore}
-              title={!historyHasMore ? "Không còn dữ liệu" : ""}
-            >
-              {historyLoading ? "Đang tải..." : "Tải thêm"}
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

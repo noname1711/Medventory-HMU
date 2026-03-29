@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import "./Admin.css";
+import "./dashboard-ui.css";
+import "./ForecastApproval.css";
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = "http://localhost:8080/api";
 
 export default function ForecastApproval({ adminInfo }) {
   const [forecasts, setForecasts] = useState([]);
@@ -20,6 +21,7 @@ export default function ForecastApproval({ adminInfo }) {
     if (adminInfo?.id) {
       fetchForecasts();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeForecastTab, adminInfo]);
 
   const fetchForecasts = async () => {
@@ -27,13 +29,14 @@ export default function ForecastApproval({ adminInfo }) {
 
     setIsLoading(true);
     try {
-      const endpoint = activeForecastTab === "pending" 
-        ? API_ENDPOINTS.FORECASTS_PENDING(adminInfo.id)
-        : API_ENDPOINTS.FORECASTS_PROCESSED(adminInfo.id);
-      
+      const endpoint =
+        activeForecastTab === "pending"
+          ? API_ENDPOINTS.FORECASTS_PENDING(adminInfo.id)
+          : API_ENDPOINTS.FORECASTS_PROCESSED(adminInfo.id);
+
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
+
       const data = await response.json();
       setForecasts(data || []);
     } catch (error) {
@@ -65,36 +68,38 @@ export default function ForecastApproval({ adminInfo }) {
     if (note !== undefined) {
       try {
         const requestBody = {
-          forecastId: forecastId,
+          forecastId,
           action: 1,
           note: note || "Đã phê duyệt",
-          approverId: adminInfo.id
+          approverId: adminInfo.id,
         };
 
         const response = await fetch(API_ENDPOINTS.FORECAST_APPROVE, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
         });
 
-        if (response.ok) {
-          Swal.fire({
-            title: "✅ Đã phê duyệt!",
-            text: "Dự trù đã được phê duyệt thành công.",
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false
-          });
-          fetchForecasts();
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        Swal.fire({
+          title: "Đã phê duyệt!",
+          text: "Dự trù đã được phê duyệt thành công.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        if (selectedForecast?.id === forecastId) {
+          setSelectedForecast(null);
         }
+        fetchForecasts();
       } catch (error) {
         Swal.fire({
-          title: "❌ Lỗi!",
+          title: "Lỗi!",
           text: "Không thể phê duyệt dự trù",
           icon: "error",
-          timer: 2000
+          timer: 2000,
         });
       }
     }
@@ -111,342 +116,409 @@ export default function ForecastApproval({ adminInfo }) {
       confirmButtonText: "Từ chối",
       confirmButtonColor: "#EF4444",
       cancelButtonText: "Hủy",
-      preConfirm: (note) => {
-        if (!note || note.trim().length === 0) {
+      preConfirm: (value) => {
+        if (!value || value.trim().length === 0) {
           Swal.showValidationMessage("Vui lòng nhập lý do từ chối!");
           return false;
         }
-        return note;
-      }
+        return value;
+      },
     });
 
     if (note) {
       try {
         const requestBody = {
-          forecastId: forecastId,
+          forecastId,
           action: 2,
-          note: note,
-          approverId: adminInfo.id
+          note,
+          approverId: adminInfo.id,
         };
 
         const response = await fetch(API_ENDPOINTS.FORECAST_APPROVE, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
         });
 
-        if (response.ok) {
-          Swal.fire({
-            title: "✅ Đã từ chối!",
-            text: "Dự trù đã được từ chối thành công.",
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false
-          });
-          fetchForecasts();
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        Swal.fire({
+          title: "Đã từ chối!",
+          text: "Dự trù đã được từ chối thành công.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        if (selectedForecast?.id === forecastId) {
+          setSelectedForecast(null);
         }
+        fetchForecasts();
       } catch (error) {
         Swal.fire({
-          title: "❌ Lỗi!",
+          title: "Lỗi!",
           text: "Không thể từ chối dự trù",
           icon: "error",
-          timer: 2000
+          timer: 2000,
         });
       }
     }
-  };
-
-  const viewForecastDetails = (forecast) => {
-    setSelectedForecast(forecast);
   };
 
   const closeForecastDetails = () => {
     setSelectedForecast(null);
   };
 
-  // HÀM PHÁT HIỆN ĐÚNG TRẠNG THÁI 
+  // Hàm đọc trạng thái theo nhiều định dạng backend khác nhau.
   const getStatusBadge = (status) => {
-    // Trường hợp 1: Status là object có thuộc tính value (giống user status trong Admin.jsx)
-    if (status && typeof status === 'object') {
+    if (status && typeof status === "object") {
       if (status.value !== undefined) {
-        const statusValue = status.value;
-        switch (statusValue) {
-          case 0: return { text: "Chờ duyệt", class: "pending" };
-          case 1: return { text: "Đã duyệt", class: "approved" };
-          case 2: return { text: "Đã từ chối", class: "rejected" };
+        switch (status.value) {
+          case 0:
+            return { text: "Chờ duyệt", className: "pending" };
+          case 1:
+            return { text: "Đã duyệt", className: "approved" };
+          case 2:
+            return { text: "Đã từ chối", className: "rejected" };
+          default:
+            break;
         }
       }
+
       if (status.name) {
         const statusName = status.name.toLowerCase();
-        if (statusName.includes('pending') || statusName.includes('chờ')) {
-          return { text: "Chờ duyệt", class: "pending" };
-        } else if (statusName.includes('approved') || statusName.includes('đã duyệt')) {
-          return { text: "Đã duyệt", class: "approved" };
-        } else if (statusName.includes('rejected') || statusName.includes('từ chối')) {
-          return { text: "Đã từ chối", class: "rejected" };
+        if (statusName.includes("pending") || statusName.includes("chờ")) {
+          return { text: "Chờ duyệt", className: "pending" };
+        }
+        if (statusName.includes("approved") || statusName.includes("đã duyệt")) {
+          return { text: "Đã duyệt", className: "approved" };
+        }
+        if (statusName.includes("rejected") || statusName.includes("từ chối")) {
+          return { text: "Đã từ chối", className: "rejected" };
         }
       }
     }
-    
-    // Trường hợp 2: Status là số hoặc chuỗi số
+
     let statusNum;
-    if (typeof status === 'string') {
+    if (typeof status === "string") {
       statusNum = parseInt(status, 10);
-    } else if (typeof status === 'number') {
+    } else if (typeof status === "number") {
       statusNum = status;
     }
-    
-    if (!isNaN(statusNum)) {
+
+    if (!Number.isNaN(statusNum)) {
       switch (statusNum) {
-        case 0: return { text: "Chờ duyệt", class: "pending" };
-        case 1: return { text: "Đã duyệt", class: "approved" };
-        case 2: return { text: "Đã từ chối", class: "rejected" };
+        case 0:
+          return { text: "Chờ duyệt", className: "pending" };
+        case 1:
+          return { text: "Đã duyệt", className: "approved" };
+        case 2:
+          return { text: "Đã từ chối", className: "rejected" };
+        default:
+          break;
       }
     }
-    
-    // Trường hợp 3: Status là chuỗi
-    if (typeof status === 'string') {
+
+    if (typeof status === "string") {
       const statusLower = status.toLowerCase();
-      if (statusLower.includes('pending') || statusLower.includes('chờ')) {
-        return { text: "Chờ duyệt", class: "pending" };
-      } else if (statusLower.includes('approved') || statusLower.includes('đã duyệt')) {
-        return { text: "Đã duyệt", class: "approved" };
-      } else if (statusLower.includes('rejected') || statusLower.includes('từ chối')) {
-        return { text: "Đã từ chối", class: "rejected" };
+      if (statusLower.includes("pending") || statusLower.includes("chờ")) {
+        return { text: "Chờ duyệt", className: "pending" };
+      }
+      if (statusLower.includes("approved") || statusLower.includes("đã duyệt")) {
+        return { text: "Đã duyệt", className: "approved" };
+      }
+      if (statusLower.includes("rejected") || statusLower.includes("từ chối")) {
+        return { text: "Đã từ chối", className: "rejected" };
       }
     }
-    
-    // Trường hợp 4: Mặc định
-    return { text: "Không xác định", class: "unknown" };
+
+    return { text: "Không xác định", className: "unknown" };
   };
 
-  // HÀM KIỂM TRA "CHỜ DUYỆT" - HOẠT ĐỘNG VỚI MỌI ĐỊNH DẠNG
-  const isPendingStatus = (status) => {
-    // Lấy thông tin từ getStatusBadge
-    const badgeInfo = getStatusBadge(status);
-    return badgeInfo.class === "pending";
-  };
+  const isPendingStatus = (status) => getStatusBadge(status).className === "pending";
 
-  if (isLoading) {
-    return (
-      <div className="admin-loading">
-        <div className="admin-loading-spinner"></div>
-        <p>Đang tải dữ liệu dự trù...</p>
-      </div>
-    );
-  }
+  const stats = useMemo(() => {
+    const total = forecasts.length;
+    const pending = forecasts.filter((item) => isPendingStatus(item.status)).length;
+    const processed = total - pending;
+    return { total, pending, processed };
+  }, [forecasts]);
+
+  const pageTitle = "Phê duyệt dự trù";
+  const pageSubtitle =
+    "Theo dõi danh sách phiếu dự trù, xem chi tiết từng đề xuất và thực hiện phê duyệt hoặc từ chối ngay trên cùng một giao diện.";
 
   return (
-    <>
-      <div className="admin-forecast-list admin-card">
-        <div className="admin-card-header">
-          <h3>Duyệt dự trù bổ sung</h3>
-          <div className="admin-user-count-badge">
-            <span className="admin-count-number">
-              {isLoading ? "..." : forecasts.length}
-            </span>
-            <span className="admin-count-text">dự trù</span>
+    <div className="ui-page">
+      <div className="ui-page-frame fa-page-frame">
+        <div className="ui-page-head">
+          <div>
+            <h1 className="ui-page-title">{pageTitle}</h1>
+            <p className="ui-page-subtitle">{pageSubtitle}</p>
           </div>
         </div>
 
-        <div className="admin-tabs">
-          <button 
-            className={`admin-tab ${activeForecastTab === "pending" ? "admin-tab-active" : ""}`}
-            onClick={() => setActiveForecastTab("pending")}
-          >
-            Chờ duyệt
-          </button>
-          <button 
-            className={`admin-tab ${activeForecastTab === "processed" ? "admin-tab-active" : ""}`}
-            onClick={() => setActiveForecastTab("processed")}
-          >
-            Đã xử lý
-          </button>
+        <div className="ui-stat-grid fa-stat-grid">
+          <div className="ui-stat-card is-primary">
+            <p className="ui-stat-label">Tổng dự trù đang hiển thị</p>
+            <p className="ui-stat-value">{stats.total}</p>
+            <p className="ui-stat-note">Theo tab hiện tại</p>
+          </div>
+          <div className="ui-stat-card is-warning">
+            <p className="ui-stat-label">Dự trù chờ duyệt</p>
+            <p className="ui-stat-value">{stats.pending}</p>
+            <p className="ui-stat-note">Cần xử lý</p>
+          </div>
+          <div className="ui-stat-card">
+            <p className="ui-stat-label">Dự trù đã xử lý</p>
+            <p className="ui-stat-value">{stats.processed}</p>
+            <p className="ui-stat-note">Đã duyệt hoặc từ chối</p>
+          </div>
         </div>
 
-        <div className="admin-table-container">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Khoa/Phòng</th>
-                <th>Năm học</th>
-                <th>Người tạo</th>
-                <th>Ngày tạo</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {forecasts.map((forecast, index) => {
-                const status = getStatusBadge(forecast.status);
-                const isPending = isPendingStatus(forecast.status);
-                
-                return (
-                  <tr key={forecast.id} className={index === forecasts.length - 1 ? "admin-last-row" : ""}>
-                    <td>{forecast.department?.name || "Không xác định"}</td>
-                    <td>{forecast.academicYear}</td>
-                    <td>{forecast.createdBy?.fullName || "Không xác định"}</td>
-                    <td>{new Date(forecast.createdAt).toLocaleDateString('vi-VN')}</td>
-                    <td>
-                      <span className={`admin-status-badge admin-${status.class}`}>
-                        {status.text}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="admin-actions">
-                        <button 
-                          className="admin-view-btn" 
-                          onClick={() => viewForecastDetails(forecast)}
-                          title="Xem chi tiết"
-                        >
-                          👁️
-                        </button>
-                        {isPending && (
-                          <>
-                            <button 
-                              className="admin-approve-btn" 
-                              onClick={() => approveForecast(forecast.id)} 
-                              title="Phê duyệt"
-                            >
-                              ✓
-                            </button>
-                            <button 
-                              className="admin-reject-btn" 
-                              onClick={() => rejectForecast(forecast.id)} 
-                              title="Từ chối"
-                            >
-                              ✗
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+        <div className="ui-section">
+          <div className="ui-section-head">
+            <div>
+              <h2 className="ui-section-title">Danh sách dự trù</h2>
+              <p className="ui-section-subtitle">
+                Chuyển tab để xem phiếu đang chờ duyệt hoặc các phiếu đã được xử lý trước đó.
+              </p>
+            </div>
+
+            <div className="ui-toolbar-actions">
+              <button className="ui-btn ui-btn-secondary" type="button" onClick={fetchForecasts} disabled={isLoading}>
+                {isLoading ? "Đang tải..." : "Tải lại"}
+              </button>
+            </div>
+          </div>
+
+          <div className="fa-tabs">
+            <button
+              type="button"
+              className={`fa-tab ${activeForecastTab === "pending" ? "is-active" : ""}`}
+              onClick={() => setActiveForecastTab("pending")}
+            >
+              Chờ duyệt
+            </button>
+            <button
+              type="button"
+              className={`fa-tab ${activeForecastTab === "processed" ? "is-active" : ""}`}
+              onClick={() => setActiveForecastTab("processed")}
+            >
+              Đã xử lý
+            </button>
+          </div>
+
+          {isLoading ? (
+            <div className="fa-loading-box">
+              <div className="fa-loading-spinner" />
+              <p>Đang tải dữ liệu dự trù...</p>
+            </div>
+          ) : (
+            <div className="ui-table-wrap">
+              <table className="ui-table fa-table">
+                <thead>
+                  <tr>
+                    <th>Khoa/Phòng</th>
+                    <th>Năm học</th>
+                    <th>Người tạo</th>
+                    <th>Ngày tạo</th>
+                    <th>Trạng thái</th>
+                    <th className="text-center">Thao tác</th>
                   </tr>
-                );
-              })}
-              {forecasts.length === 0 && (
-                <tr className="admin-last-row">
-                  <td colSpan="6" className="admin-no-data">
-                    {activeForecastTab === "pending" 
-                      ? "Không có dự trù nào chờ duyệt" 
-                      : "Không có dự trù nào đã xử lý"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {forecasts.length > 0 ? (
+                    forecasts.map((forecast) => {
+                      const status = getStatusBadge(forecast.status);
+                      const isPending = isPendingStatus(forecast.status);
+
+                      return (
+                        <tr key={forecast.id}>
+                          <td>{forecast.department?.name || "Không xác định"}</td>
+                          <td>{forecast.academicYear || "-"}</td>
+                          <td>{forecast.createdBy?.fullName || "Không xác định"}</td>
+                          <td>
+                            {forecast.createdAt
+                              ? new Date(forecast.createdAt).toLocaleDateString("vi-VN")
+                              : "-"}
+                          </td>
+                          <td>
+                            <span className={`fa-status-badge ${status.className}`}>{status.text}</span>
+                          </td>
+                          <td className="text-center">
+                            <div className="fa-action-group">
+                              <button
+                                type="button"
+                                className="ui-btn ui-btn-secondary ui-btn-sm"
+                                onClick={() => setSelectedForecast(forecast)}
+                              >
+                                Xem
+                              </button>
+                              {isPending && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="ui-btn ui-btn-primary ui-btn-sm"
+                                    onClick={() => approveForecast(forecast.id)}
+                                  >
+                                    Duyệt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ui-btn ui-btn-danger ui-btn-sm"
+                                    onClick={() => rejectForecast(forecast.id)}
+                                  >
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="ui-empty">
+                        {activeForecastTab === "pending"
+                          ? "Không có dự trù nào chờ duyệt"
+                          : "Không có dự trù nào đã xử lý"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
       {selectedForecast && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal admin-forecast-modal">
-            <div className="admin-modal-header">
-              <h3>Chi tiết dự trù #{selectedForecast.id}</h3>
-              <div className="admin-user-status-info">
-                {(() => {
-                  const status = getStatusBadge(selectedForecast.status);
-                  return (
-                    <span className={`admin-status-badge admin-${status.class}`}>
-                      {status.text}
-                    </span>
-                  );
-                })()}
+        <div className="fa-modal-overlay" onMouseDown={closeForecastDetails}>
+          <div className="fa-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="fa-modal-header">
+              <div>
+                <h3 className="fa-modal-title">Chi tiết dự trù #{selectedForecast.id}</h3>
+                <p className="fa-modal-subtitle">Xem thông tin chung và danh sách vật tư của phiếu dự trù.</p>
+              </div>
+              <div className="fa-modal-header-right">
+                <span className={`fa-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
+                  {getStatusBadge(selectedForecast.status).text}
+                </span>
+                <button type="button" className="fa-modal-close" onClick={closeForecastDetails}>
+                  ×
+                </button>
               </div>
             </div>
-            <div className="admin-modal-content">
-              <div className="admin-forecast-info">
-                <div className="admin-info-row">
-                  <div className="admin-info-item">
-                    <strong>Khoa/Phòng:</strong> {selectedForecast.department?.name || "Không xác định"}
-                  </div>
-                  <div className="admin-info-item">
-                    <strong>Năm học:</strong> {selectedForecast.academicYear}
-                  </div>
+
+            <div className="fa-modal-content">
+              <div className="fa-info-grid">
+                <div className="fa-info-card">
+                  <span className="fa-info-label">Khoa/Phòng</span>
+                  <strong className="fa-info-value">{selectedForecast.department?.name || "Không xác định"}</strong>
                 </div>
-                <div className="admin-info-row">
-                  <div className="admin-info-item">
-                    <strong>Người tạo:</strong> {selectedForecast.createdBy?.fullName || "Không xác định"}
-                  </div>
-                  <div className="admin-info-item">
-                    <strong>Ngày tạo:</strong> {new Date(selectedForecast.createdAt).toLocaleDateString('vi-VN')}
-                  </div>
+                <div className="fa-info-card">
+                  <span className="fa-info-label">Năm học</span>
+                  <strong className="fa-info-value">{selectedForecast.academicYear || "-"}</strong>
+                </div>
+                <div className="fa-info-card">
+                  <span className="fa-info-label">Người tạo</span>
+                  <strong className="fa-info-value">{selectedForecast.createdBy?.fullName || "Không xác định"}</strong>
+                </div>
+                <div className="fa-info-card">
+                  <span className="fa-info-label">Ngày tạo</span>
+                  <strong className="fa-info-value">
+                    {selectedForecast.createdAt
+                      ? new Date(selectedForecast.createdAt).toLocaleDateString("vi-VN")
+                      : "-"}
+                  </strong>
                 </div>
                 {selectedForecast.approvalBy && (
-                  <div className="admin-info-row">
-                    <div className="admin-info-item">
-                      <strong>Người duyệt:</strong> {selectedForecast.approvalBy?.fullName}
-                    </div>
-                    <div className="admin-info-item">
-                      <strong>Ngày duyệt:</strong> {new Date(selectedForecast.approvalAt).toLocaleDateString('vi-VN')}
-                    </div>
+                  <div className="fa-info-card">
+                    <span className="fa-info-label">Người duyệt</span>
+                    <strong className="fa-info-value">{selectedForecast.approvalBy?.fullName || "-"}</strong>
                   </div>
                 )}
-                {selectedForecast.approvalNote && (
-                  <div className="admin-info-row">
-                    <div className="admin-info-item full-width">
-                      <strong>Ghi chú:</strong> {selectedForecast.approvalNote}
-                    </div>
+                {selectedForecast.approvalAt && (
+                  <div className="fa-info-card">
+                    <span className="fa-info-label">Ngày duyệt</span>
+                    <strong className="fa-info-value">
+                      {new Date(selectedForecast.approvalAt).toLocaleDateString("vi-VN")}
+                    </strong>
                   </div>
                 )}
               </div>
 
-              {selectedForecast.details && selectedForecast.details.length > 0 && (
-                <div className="admin-forecast-details">
-                  <h4>Danh sách vật tư</h4>
-                  <div className="admin-details-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Tên vật tư</th>
-                          <th>Tồn hiện tại</th>
-                          <th>Năm trước</th>
-                          <th>Dự trù năm nay</th>
-                          <th>Lý do</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedForecast.details.map((detail, index) => (
-                          <tr key={index}>
-                            <td>{detail.material?.name || "Vật tư mới"}</td>
-                            <td>{detail.currentStock}</td>
-                            <td>{detail.prevYearQty}</td>
-                            <td><strong>{detail.thisYearQty}</strong></td>
-                            <td>{detail.justification}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {selectedForecast.approvalNote && (
+                <div className="ui-alert is-warning fa-note-box">
+                  <strong>Ghi chú xử lý:</strong> {selectedForecast.approvalNote}
                 </div>
               )}
+
+              <div className="fa-detail-block">
+                <div className="ui-section-head fa-detail-head">
+                  <div>
+                    <h4 className="ui-section-title">Danh sách vật tư</h4>
+                    <p className="ui-section-subtitle">
+                      Tổng số dòng: {selectedForecast.details?.length || 0}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="ui-table-wrap">
+                  <table className="ui-table fa-detail-table">
+                    <thead>
+                      <tr>
+                        <th>Tên vật tư</th>
+                        <th className="text-right">Tồn hiện tại</th>
+                        <th className="text-right">Năm trước</th>
+                        <th className="text-right">Dự trù năm nay</th>
+                        <th>Lý do</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedForecast.details && selectedForecast.details.length > 0 ? (
+                        selectedForecast.details.map((detail, index) => (
+                          <tr key={index}>
+                            <td>{detail.material?.name || "Vật tư mới"}</td>
+                            <td className="text-right">{detail.currentStock ?? 0}</td>
+                            <td className="text-right">{detail.prevYearQty ?? 0}</td>
+                            <td className="text-right fa-strong-cell">{detail.thisYearQty ?? 0}</td>
+                            <td>{detail.justification || "-"}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="5" className="ui-empty">
+                            Không có dữ liệu chi tiết.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-            <div className="admin-modal-footer">
+
+            <div className="fa-modal-footer">
               {isPendingStatus(selectedForecast.status) && (
                 <>
-                  <button 
-                    className="admin-reject-btn" 
-                    onClick={() => rejectForecast(selectedForecast.id)} 
-                  >
+                  <button type="button" className="ui-btn ui-btn-danger" onClick={() => rejectForecast(selectedForecast.id)}>
                     Từ chối
                   </button>
-                  <button 
-                    className="admin-approve-btn" 
-                    onClick={() => approveForecast(selectedForecast.id)} 
-                  >
+                  <button type="button" className="ui-btn ui-btn-primary" onClick={() => approveForecast(selectedForecast.id)}>
                     Phê duyệt
                   </button>
                 </>
               )}
-              <button className="admin-btn-secondary" onClick={closeForecastDetails}>
+              <button type="button" className="ui-btn ui-btn-secondary" onClick={closeForecastDetails}>
                 Đóng
               </button>
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

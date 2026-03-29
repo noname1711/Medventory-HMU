@@ -1,206 +1,78 @@
-/* ============ FORM CONTAINER (FULL WIDTH + CARD UI) ============ */
-.req-root {
+/* =========================================================
+   REPLENISHMENT REQUEST PAGE
+   File này chỉ giữ lại layout đặc thù của trang dự trù.
+   Style chung đã chuyển sang dashboard-ui.css.
+========================================================= */
+
+.req-page {
   width: 100%;
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.04);
-  display: flex;
-  flex-direction: column;
-  padding: 2rem 2.5rem;
-  box-sizing: border-box;
 }
 
-/* căn giữa khi hiển thị trong dashboard */
-@media (min-width: 1024px) {
-  .req-root {
-    margin-left: auto;
-    margin-right: auto;
-    max-width: 1300px;
-  }
+.req-page-header {
+  margin-bottom: 0;
 }
 
-/* Tiêu đề */
-.req-root h3 {
-  margin: 0 0 1.25rem 0;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #1e3a8a;
-  text-align: left;
-}
-
-/* ============ FORM ============ */
 .req-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 18px;
 }
 
-/* Field chung */
-.req-field {
+/* Thanh trên của form: chọn bộ môn + nút tải dữ liệu cũ */
+.req-topbar {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.req-field.full textarea {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  border: 1px solid #d1d5db;
-  font-size: 0.95rem;
-  background: #f9fafb;
-}
-
-.req-field textarea:focus {
-  outline: none;
-  background: white;
-  border-color: #2563eb;
-}
-
-/* ============ TABLE ============ */
-.req-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.req-table th {
-  background: #2563eb;
-  color: white;
-  padding: 8px;
-  text-align: center;
-  font-weight: 600;
-  border-right: 1px solid rgba(255, 255, 255, 0.3);
-}
-.req-table th:last-child {
-  border-right: none;
-}
-
-.req-table td {
-  border: 1px solid #e5e7eb;
-  padding: 6px;
-  text-align: center;
-}
-
-/* Input + Select trong bảng */
-.req-table input,
-.req-table select {
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-
-.req-table input:focus,
-.req-table select:focus {
-  outline: none;
-  background: white;
-  border-color: #2563eb;
-}
-
-/* ============ ACTION BUTTONS ============ */
-.req-actions {
-  margin-top: 1rem;
-  display: flex;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
-.btn {
-  padding: 0.7rem 1.4rem;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s ease;
+.req-department-field {
+  min-width: 280px;
+  max-width: 420px;
 }
 
-.btn.primary {
-  background: #2563eb;
-  color: white;
-}
-.btn.primary:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
+.req-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.btn.secondary {
-  background: transparent;
-  border: 1px solid #d1d5db;
-  color: #374151;
-}
-.btn.secondary:hover {
-  background: #f3f4f6;
-}
-
-/* Nút xoá dòng */
-.btn.delete {
-  padding: 4px 8px;
-  background: #ef4444;
-  color: white;
-  border-radius: 6px;
-}
-.btn.delete:hover {
-  background: #dc2626;
+/* Footer của form: nút thêm dòng bên trái, nút gửi phiếu bên phải */
+.req-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-/* không cho xoá dòng cuối */
-.btn.delete.disabled {
-  background: #9ca3af !important;
-  cursor: not-allowed !important;
+/* Bảng dự trù có nhiều cột hơn, nên đặt min-width lớn hơn bảng vật tư */
+.req-table {
+  min-width: 1320px;
 }
 
-/* ============ RESPONSIVE ============ */
-@media (max-width: 800px) {
-  .req-table {
-    font-size: 0.8rem;
+.req-table th,
+.req-table td {
+  white-space: nowrap;
+}
+
+/* Riêng cột lý do cho phép nội dung dài hơn */
+.req-table td:nth-child(10),
+.req-table th:nth-child(10) {
+  min-width: 180px;
+}
+
+@media (max-width: 900px) {
+  .req-topbar,
+  .req-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .req-root {
-    padding: 1.25rem;
+  .req-department-field {
+    min-width: 100%;
+    max-width: 100%;
   }
-}
-/* Giữ màu chữ option trong dropdown */
-select option {
-  color: black !important;
-  background: white;
-}
-
-/* Trong trường hợp select đang bị css override */
-select {
-  color: black;         /* màu chữ */
-  background-color: white;
-}
-
-/* FIX HIỂN THỊ DROPDOWN BỊ TRẮNG */
-.req-table select,
-.req-table option {
-  color: black !important;
-  background-color: white !important;
-}
-
-/* Nếu bảng đang bị style nền xám/đen */
-.req-table select:focus {
-  background-color: white !important;
-}
-
-/* Style input readonly cho đồng bộ */
-.req-table input[readonly] {
-  background: #f2f2f2;
-  cursor: not-allowed;
-}
-
-.req-field.half {
-  display: inline-block;
-  width: 48%;
-  margin-right: 2%;
-}
-
-.req-field.half select {
-  width: 100%;
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  font-size: 15px;
 }
