@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { createPortal } from "react-dom";
+import "./dashboard-ui.css";
 import "./IssuePage.css";
 
 const API_URL = "http://localhost:8080/api";
@@ -590,59 +591,72 @@ export default function IssuePage() {
 
   if (bootError) {
     return (
-      <div className="issue-page">
-        <h1 className="page-title">Xuất kho</h1>
-        <div className="message error">{bootError}</div>
+      <div className="ui-page issue-page">
+        <div className="ui-page-frame">
+          <div className="ui-page-head">
+            <div>
+              <h1 className="ui-page-title">Xuất kho</h1>
+              <p className="ui-page-subtitle">Tạo phiếu xuất từ các phiếu xin lĩnh đã đủ điều kiện.</p>
+            </div>
+          </div>
+          <div className="ui-alert is-error">{bootError}</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="issue-page">
-      <div className="page-head">
-        <h1 className="page-title">Xuất kho</h1>
-      </div>
+    <div className="ui-page issue-page">
+      <div className="ui-page-frame">
+        <div className="ui-page-head">
+          <div>
+            <h1 className="ui-page-title">Xuất kho</h1>
+            <p className="ui-page-subtitle">Chọn phiếu xin lĩnh đủ điều kiện, xem trước phân bổ lô và tạo phiếu xuất kho.</p>
+          </div>
+        </div>
+
+        <div className="issue-stack">
 
       {/* DANH SÁCH PHIẾU ĐỦ ĐIỀU KIỆN */}
-      <div className="card">
-        <div className="card-head">
-          <h2 className="card-title">Phiếu xin lĩnh đủ điều kiện xuất</h2>
-          <div className="card-actions">
-            <button className="btn btn-outline" onClick={loadEligibleList} disabled={loadingList}>
+      <div className="ui-section">
+        <div className="ui-section-head">
+          <h2 className="ui-section-title">Phiếu xin lĩnh đủ điều kiện xuất</h2>
+          <div className="issue-inline-actions">
+            <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={loadEligibleList} disabled={loadingList}>
               {loadingList ? "Đang tải..." : "Tải lại"}
             </button>
           </div>
         </div>
 
         {listMsg.text ? (
-          <div className={`message ${listMsg.type === "error" ? "error" : "success"}`}>{listMsg.text}</div>
+          <div className={`ui-alert ${listMsg.type === "error" ? "is-error" : "is-success"}`}>{listMsg.text}</div>
         ) : null}
 
-        <div className="filters">
-          <div className="form-group">
-            <label className="form-label">Lọc theo Khoa (ID)</label>
+        <div className="issue-filter-grid">
+          <div className="ui-field">
+            <label className="ui-label">Lọc theo Khoa (ID)</label>
             <input
-              className="form-input"
+              className="ui-input"
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
               placeholder="Ví dụ: 1"
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Lọc theo Bộ môn (ID)</label>
+          <div className="ui-field">
+            <label className="ui-label">Lọc theo Bộ môn (ID)</label>
             <input
-              className="form-input"
+              className="ui-input"
               value={subDepartmentId}
               onChange={(e) => setSubDepartmentId(e.target.value)}
               placeholder="Ví dụ: 3"
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Số phiếu hiển thị</label>
+          <div className="ui-field">
+            <label className="ui-label">Số phiếu hiển thị</label>
             <input
-              className="form-input"
+              className="ui-input"
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
               placeholder="80"
@@ -651,24 +665,26 @@ export default function IssuePage() {
         </div>
 
         {summary ? (
-          <div className="summary-strip">
-            <div className="summary-item">
-              <div className="summary-label">Đã kiểm tra</div>
-              <div className="summary-value">{summary.checked ?? "-"}</div>
+          <div className="issue-summary-grid">
+            <div className="ui-stat-card">
+              <p className="ui-stat-label">Đã kiểm tra</p>
+              <p className="ui-stat-value">{summary.checked ?? "-"}</p>
             </div>
-            <div className="summary-item">
-              <div className="summary-label">Đủ điều kiện</div>
-              <div className="summary-value ok">{summary.eligible ?? eligible.length}</div>
+            <div className="ui-stat-card is-primary">
+              <p className="ui-stat-label">Đủ điều kiện</p>
+              <p className="ui-stat-value">{summary.eligible ?? eligible.length}</p>
+              <p className="ui-stat-note">Sẵn sàng xuất kho</p>
             </div>
-            <div className="summary-item">
-              <div className="summary-label">Không đủ điều kiện</div>
-              <div className="summary-value warn">{summary.ineligible ?? ineligible.length}</div>
+            <div className="ui-stat-card is-warning">
+              <p className="ui-stat-label">Không đủ điều kiện</p>
+              <p className="ui-stat-value">{summary.ineligible ?? ineligible.length}</p>
+              <p className="ui-stat-note">Cần xử lý trước</p>
             </div>
           </div>
         ) : null}
 
-        <div className="table-container">
-          <table className="issue-table">
+        <div className="ui-table-wrap">
+          <table className="ui-table issue-table">
             <thead>
               <tr>
                 <th style={{ width: 90 }}>Mã phiếu</th>
@@ -686,15 +702,15 @@ export default function IssuePage() {
               {eligible?.length ? (
                 eligible.map((r) => (
                   <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
-                    <td className="mono">{r.id}</td>
+                    <td className="issue-mono">{r.id}</td>
                     <td>{r.subDepartmentName || "-"}</td>
                     <td>{r.departmentName || "-"}</td>
                     <td>{r.createdByName || "-"}</td>
-                    <td className="mono">{fmtDateTime(r.requestedAt)}</td>
-                    <td className="muted">{r.note || ""}</td>
+                    <td className="issue-mono">{fmtDateTime(r.requestedAt)}</td>
+                    <td className="issue-muted">{r.note || ""}</td>
                     <td className="text-right">
                       <button
-                        className="btn btn-primary"
+                        className="ui-btn ui-btn-primary ui-btn-sm"
                         onClick={() => loadPreview(r)}
                         disabled={loadingPreview && selected?.id === r.id}
                       >
@@ -705,7 +721,7 @@ export default function IssuePage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="table-empty">
+                  <td colSpan={7} className="ui-empty">
                     Không có phiếu đủ điều kiện theo bộ lọc hiện tại.
                   </td>
                 </tr>
@@ -714,17 +730,17 @@ export default function IssuePage() {
           </table>
         </div>
 
-        <div className="ineligible-toggle">
-          <button className="btn btn-outline" onClick={() => setShowIneligible((p) => !p)}>
+        <div className="issue-toggle-row">
+          <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => setShowIneligible((p) => !p)}>
             {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
           </button>
         </div>
 
         {showIneligible ? (
-          <div className="ineligible-box">
-            <div className="ineligible-title">Phiếu không đủ điều kiện (tóm tắt lý do)</div>
-            <div className="table-container">
-              <table className="issue-table small">
+          <div className="issue-collapse-box">
+            <div className="issue-collapse-title">Phiếu không đủ điều kiện (tóm tắt lý do)</div>
+            <div className="ui-table-wrap">
+              <table className="ui-table issue-table issue-table-sm">
                 <thead>
                   <tr>
                     <th style={{ width: 90 }}>Mã phiếu</th>
@@ -739,9 +755,9 @@ export default function IssuePage() {
                       const reasonText = vnReason(x.reasonCode);
                       return (
                         <tr key={`${x.reqId}-${idx}`}>
-                          <td className="mono">{x.reqId}</td>
-                          <td className="mono">{fmtDateTime(x.requestedAt)}</td>
-                          <td className="muted">
+                          <td className="issue-mono">{x.reqId}</td>
+                          <td className="issue-mono">{fmtDateTime(x.requestedAt)}</td>
+                          <td className="issue-muted">
                             {reasonText}
                             {x.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
                           </td>
@@ -750,7 +766,7 @@ export default function IssuePage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="table-empty">
+                      <td colSpan={4} className="ui-empty">
                         Không có dữ liệu.
                       </td>
                     </tr>
@@ -763,46 +779,46 @@ export default function IssuePage() {
       </div>
 
       {/* XEM TRƯỚC + TẠO PHIẾU XUẤT */}
-      <div className="card">
-        <div className="card-head">
-          <h2 className="card-title">Xem trước và xuất kho</h2>
+      <div className="ui-section">
+        <div className="ui-section-head">
+          <h2 className="ui-section-title">Xem trước và xuất kho</h2>
         </div>
 
         {!selected ? (
-          <div className="hint">Chọn một phiếu ở danh sách phía trên để xem trước và xuất kho.</div>
+          <div className="ui-alert is-warning">Chọn một phiếu ở danh sách phía trên để xem trước và xuất kho.</div>
         ) : (
           <>
             {previewMsg.text ? (
-              <div className={`message ${previewMsg.type === "error" ? "error" : "success"}`}>
+              <div className={`ui-alert ${previewMsg.type === "error" ? "is-error" : "is-success"}`}>
                 {previewMsg.text}
               </div>
             ) : null}
 
-            <div className="req-info">
-              <div className="req-grid">
-                <div className="req-item">
-                  <div className="req-label">Phiếu xin lĩnh</div>
-                  <div className="req-value mono">#{selected.id}</div>
+            <div className="issue-request-info">
+              <div className="issue-request-grid">
+                <div className="issue-request-item">
+                  <div className="issue-request-label">Phiếu xin lĩnh</div>
+                  <div className="issue-request-value issue-mono">#{selected.id}</div>
                 </div>
-                <div className="req-item">
-                  <div className="req-label">Bộ môn</div>
-                  <div className="req-value">{selected.subDepartmentName || "-"}</div>
+                <div className="issue-request-item">
+                  <div className="issue-request-label">Bộ môn</div>
+                  <div className="issue-request-value">{selected.subDepartmentName || "-"}</div>
                 </div>
-                <div className="req-item">
-                  <div className="req-label">Khoa / Phòng</div>
-                  <div className="req-value">{selected.departmentName || "-"}</div>
+                <div className="issue-request-item">
+                  <div className="issue-request-label">Khoa / Phòng</div>
+                  <div className="issue-request-value">{selected.departmentName || "-"}</div>
                 </div>
-                <div className="req-item">
-                  <div className="req-label">Ngày gửi</div>
-                  <div className="req-value mono">{fmtDateTime(selected.requestedAt)}</div>
+                <div className="issue-request-item">
+                  <div className="issue-request-label">Ngày gửi</div>
+                  <div className="issue-request-value issue-mono">{fmtDateTime(selected.requestedAt)}</div>
                 </div>
               </div>
-              {selected.note ? <div className="req-note">{selected.note}</div> : null}
+              {selected.note ? <div className="issue-request-note">{selected.note}</div> : null}
             </div>
 
             {previewMissingMessages.length ? (
-              <div className="message error">
-                <div className="muted-strong">Không thể xuất kho vì:</div>
+              <div className="ui-alert is-error">
+                <div className="issue-muted-strong">Không thể xuất kho vì:</div>
                 <ul className="mini-list">
                   {previewMissingMessages.map((m, i) => (
                     <li key={i}>{m}</li>
@@ -811,54 +827,54 @@ export default function IssuePage() {
               </div>
             ) : null}
 
-            <div className="config">
-              <div className="config-head">
-                <h3 className="config-title">Thông tin phiếu xuất</h3>
+            <div className="issue-config-box">
+              <div className="issue-config-head">
+                <h3 className="issue-config-title">Thông tin phiếu xuất</h3>
               </div>
 
-              <div className="config-grid">
-                <div className="form-group">
-                  <label className="form-label">Ngày xuất</label>
+              <div className="issue-config-grid">
+                <div className="ui-field">
+                  <label className="ui-label">Ngày xuất</label>
                   <input
                     type="date"
-                    className="form-input"
+                    className="ui-input"
                     value={issueDate}
                     onChange={(e) => setIssueDate(e.target.value)}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Kho</label>
+                <div className="ui-field">
+                  <label className="ui-label">Kho</label>
                   <input
-                    className="form-input"
+                    className="ui-input"
                     value={warehouseName}
                     onChange={(e) => setWarehouseName(e.target.value)}
                     placeholder="Kho chính"
                   />
                 </div>
 
-                <div className="form-group grow">
-                  <label className="form-label">Người nhận (nếu cần)</label>
+                <div className="ui-field">
+                  <label className="ui-label">Người nhận (nếu cần)</label>
                   <input
-                    className="form-input"
+                    className="ui-input"
                     value={receiverName}
                     onChange={(e) => setReceiverName(e.target.value)}
                     placeholder="Có thể để trống"
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Cách chọn lô</label>
-                  <div className="segmented">
+                <div className="ui-field">
+                  <label className="ui-label">Cách chọn lô</label>
+                  <div className="issue-segmented">
                     <button
-                      className={`seg-btn ${autoAllocate ? "active" : ""}`}
+                      className={`issue-seg-btn ${autoAllocate ? "active" : ""}`}
                       type="button"
                       onClick={() => setAutoAllocate(true)}
                     >
                       Tự động (FEFO)
                     </button>
                     <button
-                      className={`seg-btn ${!autoAllocate ? "active" : ""}`}
+                      className={`issue-seg-btn ${!autoAllocate ? "active" : ""}`}
                       type="button"
                       onClick={() => setAutoAllocate(false)}
                     >
@@ -869,8 +885,8 @@ export default function IssuePage() {
               </div>
             </div>
 
-            <div className="table-container">
-              <table className="issue-table">
+            <div className="ui-table-wrap">
+              <table className="ui-table issue-table">
                 <thead>
                   <tr>
                     <th style={{ minWidth: 240 }}>Tên vật tư</th>
@@ -892,7 +908,7 @@ export default function IssuePage() {
                 <tbody>
                   {loadingPreview ? (
                     <tr>
-                      <td colSpan={8} className="table-empty">
+                      <td colSpan={8} className="ui-empty">
                         Đang tải...
                       </td>
                     </tr>
@@ -904,31 +920,31 @@ export default function IssuePage() {
                       return (
                         <tr key={ln.materialId}>
                           <td>
-                            <div className="cell-main">{ln.name}</div>
+                            <div className="issue-cell-main">{ln.name}</div>
                           </td>
-                          <td className="mono">{ln.code}</td>
-                          <td className="muted">{ln.spec}</td>
+                          <td className="issue-mono">{ln.code}</td>
+                          <td className="issue-muted">{ln.spec}</td>
                           <td>{ln.unitName || "-"}</td>
-                          <td className="text-right mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
-                          <td className="text-right mono">{qtyFmt.format(need)}</td>
-                          <td className="muted">
+                          <td className="text-right issue-mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
+                          <td className="text-right issue-mono">{qtyFmt.format(need)}</td>
+                          <td className="issue-muted">
                             {Array.isArray(ln.lots) && ln.lots.length ? (
-                              <div className="lot-list">
+                              <div className="issue-lot-list">
                                 {ln.lots.slice(0, 3).map((l, i) => (
-                                  <div className="lot-item" key={i}>
-                                    <span className="lot-pill">{l.lotNumber}</span>
-                                    <span className="lot-meta">
+                                  <div className="issue-lot-item" key={i}>
+                                    <span className="issue-lot-pill">{l.lotNumber}</span>
+                                    <span className="issue-lot-meta">
                                       HSD: {l.expDate || "-"} | Tồn: {qtyFmt.format(toNumber(l.availableStock))} → Xuất:{" "}
                                       <b>{qtyFmt.format(toNumber(l.qtyOut))}</b>
                                     </span>
                                   </div>
                                 ))}
                                 {ln.lots.length > 3 ? (
-                                  <div className="muted mini">+{ln.lots.length - 3} lô khác</div>
+                                  <div className="issue-muted issue-mini">+{ln.lots.length - 3} lô khác</div>
                                 ) : null}
                               </div>
                             ) : (
-                              <span className="mini">Không có gợi ý</span>
+                              <span className="issue-mini">Không có gợi ý</span>
                             )}
                           </td>
                           <td className="text-right">
@@ -941,7 +957,7 @@ export default function IssuePage() {
                                 {status.ok ? "Sửa lô" : "Chọn lô"}
                               </button>
                             ) : (
-                              <span className="badge badge-ok">Tự động</span>
+                              <span className="ui-stock-badge is-ok">Tự động</span>
                             )}
                           </td>
                         </tr>
@@ -949,7 +965,7 @@ export default function IssuePage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="table-empty">
+                      <td colSpan={8} className="ui-empty">
                         Chưa có dữ liệu.
                       </td>
                     </tr>
@@ -959,14 +975,14 @@ export default function IssuePage() {
             </div>
 
             {createMsg.text ? (
-              <div className={`message ${createMsg.type === "error" ? "error" : "success"}`}>
+              <div className={`ui-alert ${createMsg.type === "error" ? "is-error" : "is-success"}`}>
                 {createMsg.text}
               </div>
             ) : null}
 
-            <div className="actions">
+            <div className="issue-actions">
               <button
-                className="btn btn-outline"
+                className="ui-btn ui-btn-secondary ui-btn-sm"
                 type="button"
                 onClick={() => {
                   setSelected(null);
@@ -982,7 +998,7 @@ export default function IssuePage() {
               </button>
 
               <button
-                className="btn btn-primary"
+                className="ui-btn ui-btn-primary ui-btn-sm"
                 type="button"
                 onClick={createIssue}
                 disabled={creating || !canCreateIssue}
@@ -993,12 +1009,12 @@ export default function IssuePage() {
             </div>
 
             {createdIssueId ? (
-              <div className="detail-card">
-                <div className="detail-head">
-                  <h3 className="detail-title">Chi tiết phiếu xuất</h3>
-                  <div className="detail-actions">
+              <div className="issue-detail-card">
+                <div className="issue-detail-head">
+                  <h3 className="issue-detail-title">Chi tiết phiếu xuất</h3>
+                  <div className="issue-inline-actions">
                     <button
-                      className="btn btn-outline"
+                      className="ui-btn ui-btn-secondary ui-btn-sm"
                       type="button"
                       onClick={() => loadIssueDetail(createdIssueId)}
                       disabled={loadingDetail}
@@ -1010,27 +1026,27 @@ export default function IssuePage() {
 
                 {issueDetail?.success ? (
                   <>
-                    <div className="detail-grid">
-                      <div className="req-item">
-                        <div className="req-label">Mã phiếu xuất</div>
-                        <div className="req-value mono">#{issueDetail?.header?.id}</div>
+                    <div className="issue-detail-grid">
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Mã phiếu xuất</div>
+                        <div className="issue-request-value issue-mono">#{issueDetail?.header?.id}</div>
                       </div>
-                      <div className="req-item">
-                        <div className="req-label">Ngày xuất</div>
-                        <div className="req-value mono">{issueDetail?.header?.issueDate}</div>
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Ngày xuất</div>
+                        <div className="issue-request-value issue-mono">{issueDetail?.header?.issueDate}</div>
                       </div>
-                      <div className="req-item">
-                        <div className="req-label">Người nhận</div>
-                        <div className="req-value">{issueDetail?.header?.receiverName || "-"}</div>
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Người nhận</div>
+                        <div className="issue-request-value">{issueDetail?.header?.receiverName || "-"}</div>
                       </div>
-                      <div className="req-item">
-                        <div className="req-label">Tổng tiền</div>
-                        <div className="req-value mono">{moneyFmt.format(toNumber(issueDetail?.header?.totalAmount))}</div>
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Tổng tiền</div>
+                        <div className="issue-request-value issue-mono">{moneyFmt.format(toNumber(issueDetail?.header?.totalAmount))}</div>
                       </div>
                     </div>
 
-                    <div className="table-container">
-                      <table className="issue-table small">
+                    <div className="ui-table-wrap">
+                      <table className="ui-table issue-table issue-table-sm">
                         <thead>
                           <tr>
                             <th>Tên vật tư</th>
@@ -1051,11 +1067,11 @@ export default function IssuePage() {
                           {(issueDetail?.details || []).map((d) => (
                             <tr key={d.id}>
                               <td>{d.name}</td>
-                              <td className="mono">{d.code}</td>
+                              <td className="issue-mono">{d.code}</td>
                               <td>{d.unitName || "-"}</td>
-                              <td className="text-right mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
-                              <td className="text-right mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
-                              <td className="text-right mono">{moneyFmt.format(toNumber(d.total))}</td>
+                              <td className="text-right issue-mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
+                              <td className="text-right issue-mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
+                              <td className="text-right issue-mono">{moneyFmt.format(toNumber(d.total))}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1063,7 +1079,7 @@ export default function IssuePage() {
                     </div>
                   </>
                 ) : (
-                  <div className="hint">Chưa có dữ liệu chi tiết.</div>
+                  <div className="ui-alert is-warning">Chưa có dữ liệu chi tiết.</div>
                 )}
               </div>
             ) : null}
@@ -1071,37 +1087,40 @@ export default function IssuePage() {
         )}
       </div>
 
+        </div>
+      </div>
+
       {/* MODAL CHỌN LÔ */}
       {modalOpen && modalLine
         ? createPortal(
-            <div className="modal-backdrop" onMouseDown={closeModal}>
-              <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-                <div className="modal-head">
+            <div className="issue-modal-backdrop" onMouseDown={closeModal}>
+              <div className="issue-modal" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="issue-modal-head">
                   <div>
-                    <div className="modal-title">Chọn lô (thủ công)</div>
-                    <div className="modal-subtitle">
+                    <div className="issue-modal-title">Chọn lô (thủ công)</div>
+                    <div className="issue-modal-subtitle">
                       {modalLine.code} - {modalLine.name}
                     </div>
                   </div>
-                  <button className="modal-x" onClick={closeModal} aria-label="close">
+                  <button className="issue-modal-close" onClick={closeModal} aria-label="close">
                     ×
                   </button>
                 </div>
 
-                {modalError ? <div className="message error">{modalError}</div> : null}
+                {modalError ? <div className="ui-alert is-error">{modalError}</div> : null}
 
-                <div className="modal-tools">
-                  <div className="mini muted">
+                <div className="issue-modal-tools">
+                  <div className="issue-mini issue-muted">
                     SL cần xuất:{" "}
-                    <b className="mono">{qtyFmt.format(toNumber(modalLine.qtyToIssue ?? modalLine.qtyRequested))}</b>
-                    {"  "} | Đã chọn: <b className="mono">{qtyFmt.format(sumLotDraft(modalDraft))}</b>
+                    <b className="issue-mono">{qtyFmt.format(toNumber(modalLine.qtyToIssue ?? modalLine.qtyRequested))}</b>
+                    {"  "} | Đã chọn: <b className="issue-mono">{qtyFmt.format(sumLotDraft(modalDraft))}</b>
                   </div>
-                  <div className="modal-btns">
-                    <button className="btn btn-outline" type="button" onClick={fillFEFOSuggestion}>
+                  <div className="issue-modal-buttons">
+                    <button className="ui-btn ui-btn-secondary ui-btn-sm" type="button" onClick={fillFEFOSuggestion}>
                       Tự điền theo gợi ý
                     </button>
                     <button
-                      className="btn btn-outline"
+                      className="ui-btn ui-btn-secondary ui-btn-sm"
                       type="button"
                       onClick={() => {
                         const next = { ...(modalDraft || {}) };
@@ -1114,8 +1133,8 @@ export default function IssuePage() {
                   </div>
                 </div>
 
-                <div className="table-container modal-table">
-                  <table className="issue-table">
+                <div className="ui-table-wrap issue-modal-table">
+                  <table className="ui-table issue-table">
                     <thead>
                       <tr>
                         <th style={{ minWidth: 160 }}>Số lô</th>
@@ -1131,7 +1150,7 @@ export default function IssuePage() {
                     <tbody>
                       {modalLoading ? (
                         <tr>
-                          <td colSpan={4} className="table-empty">
+                          <td colSpan={4} className="ui-empty">
                             Đang tải...
                           </td>
                         </tr>
@@ -1143,12 +1162,12 @@ export default function IssuePage() {
 
                           return (
                             <tr key={lot}>
-                              <td className="mono">{lot}</td>
-                              <td className="mono">{l?.expDate || "-"}</td>
-                              <td className="text-right mono">{qtyFmt.format(avail)}</td>
+                              <td className="issue-mono">{lot}</td>
+                              <td className="issue-mono">{l?.expDate || "-"}</td>
+                              <td className="text-right issue-mono">{qtyFmt.format(avail)}</td>
                               <td className="text-right">
                                 <input
-                                  className="table-input number-input"
+                                  className="ui-input issue-number-input"
                                   value={val}
                                   onChange={(e) => {
                                     const next = { ...(modalDraft || {}) };
@@ -1163,7 +1182,7 @@ export default function IssuePage() {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={4} className="table-empty">
+                          <td colSpan={4} className="ui-empty">
                             Không có lô còn tồn.
                           </td>
                         </tr>
@@ -1172,11 +1191,11 @@ export default function IssuePage() {
                   </table>
                 </div>
 
-                <div className="modal-actions">
-                  <button className="btn btn-outline" type="button" onClick={closeModal}>
+                <div className="issue-modal-actions">
+                  <button className="ui-btn ui-btn-secondary ui-btn-sm" type="button" onClick={closeModal}>
                     Đóng
                   </button>
-                  <button className="btn btn-primary" type="button" onClick={saveModalAllocation}>
+                  <button className="ui-btn ui-btn-primary ui-btn-sm" type="button" onClick={saveModalAllocation}>
                     Lưu
                   </button>
                 </div>

@@ -1,102 +1,23 @@
-.inventory-page {
-  padding: 20px;
-  background: #f4f6f8;
-}
+/* =========================================================
+   EQUIPMENT LIST PAGE
+   File này chỉ giữ lại style đặc thù của riêng trang EquipmentList.
+   Những style chung đã chuyển sang dashboard-ui.css.
+========================================================= */
 
-.card {
-  background: #fff;
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-/* ADD FORM */
-.add-form .form-row {
-  display: flex;
-  gap: 10px;
-}
-
-.add-form input {
-  flex: 1;
-  padding: 8px;
-}
-
-.btn.primary {
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-}
-
-/* MAIN CONTENT */
-.inventory-content {
-  display: grid;
-  grid-template-columns: 3fr 1fr;
-  gap: 20px;
-}
-
-/* LIST */
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.search {
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-}
-
-table {
+.eq-page {
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
 }
 
-th, td {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+.eq-page-header {
+  margin-bottom: 0;
 }
 
-/* SUMMARY */
-.stock-summary p {
-  margin: 10px 0;
+/* Ô nút submit trong form thêm vật tư */
+.eq-submit-field {
+  justify-content: flex-end;
 }
 
-.warn {
-  color: #ca8a04;
-}
-
-.danger {
-  color: #dc2626;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-}
-
-.field input,
-.field select,
-.field.submit button {
-  height: 40px;
-}
-
-.field.submit {
-  justify-content: flex-start;
-}
-
-.field small {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 2px;
+/* Khi toolbar bị xuống dòng, giữ input không quá ngắn */
+.eq-toolbar .ui-toolbar-actions {
+  min-width: min(100%, 320px);
 }

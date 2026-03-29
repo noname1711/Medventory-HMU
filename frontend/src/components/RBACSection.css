@@ -1,44 +1,41 @@
-/* Thêm vào file Admin.css */
-.admin-perm-special {
-  background-color: #fef3c7 !important; /* Màu vàng nhạt */
-  border-left: 4px solid #f59e0b !important;
-}
+/* =========================================================
+   RBAC SECTION - CSS riêng cho trang phân quyền
+   Chỉ giữ phần đặc thù của RBAC.
+   Form / button / card / table cơ bản dùng từ dashboard-ui.css
+========================================================= */
 
-.admin-perm-special-badge {
-  display: inline-block;
-  background-color: #f59e0b;
-  color: #7c2d12;
-  font-size: 0.75rem;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  margin-left: 0.5rem;
-  font-weight: 600;
-}
-
-.admin-perm-special input[type="checkbox"] {
-  cursor: not-allowed;
-  opacity: 0.5;
+.rbac-page-frame {
+  max-width: 1180px;
 }
 
 .rbac-tabs {
   display: flex;
   gap: 10px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
 }
 
 .rbac-tab {
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  padding: 10px 14px;
+  min-height: 42px;
+  padding: 10px 16px;
   border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 800;
   cursor: pointer;
-  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.rbac-tab:hover {
+  background: #f9fafb;
 }
 
 .rbac-tab.active {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
 }
 
 .rbac-tab:disabled {
@@ -46,26 +43,191 @@
   cursor: not-allowed;
 }
 
-.rbac-badge-special {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #111827;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+.rbac-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.rbac-badge-normal {
-  display: inline-block;
-  padding: 3px 8px;
+.rbac-mini-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rbac-stat-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.45rem;
+}
+
+.rbac-inner-section {
+  padding: 18px;
+}
+
+.rbac-top-grid {
+  margin-bottom: 14px;
+}
+
+.rbac-summary-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 14px 16px;
+  color: #374151;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rbac-summary-line {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.rbac-summary-label {
+  font-weight: 800;
+  color: #111827;
+}
+
+.rbac-summary-codes {
+  color: #6b7280;
+  word-break: break-word;
+}
+
+.rbac-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
   border-radius: 999px;
   background: #e5e7eb;
   color: #111827;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
-.rbac-user-debug {
+.rbac-mode-badge.is-special {
+  background: #111827;
+  color: #ffffff;
+}
+
+.rbac-tools-row {
+  margin-bottom: 16px;
+}
+
+.rbac-perm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rbac-perm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.rbac-perm-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.rbac-perm-card.is-checked {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.rbac-perm-card.is-special {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.rbac-perm-card-top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rbac-perm-card-top input[type="checkbox"] {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.rbac-perm-card.is-special input[type="checkbox"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rbac-perm-card-title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.rbac-perm-card-name {
+  color: #111827;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.rbac-perm-card-code {
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.rbac-inline-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #7c2d12;
+  font-size: 0.74rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.rbac-perm-card-desc {
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.rbac-footnote {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rbac-debug-box {
   margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(217, 119, 6, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .rbac-mini-stats,
+  .rbac-perm-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rbac-tools-row {
+    align-items: stretch;
+  }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
+import "./dashboard-ui.css";
 import "./CreateIssueRequest.css";
 import { createPortal } from 'react-dom';
 
@@ -38,7 +39,7 @@ const MaterialSearch = ({ value, onChange, onSelect, materials = [], placeholder
     const handleClickOutside = (event) => {
       if (
         inputRef.current && !inputRef.current.contains(event.target) &&
-        !document.getElementById('material-dropdown')?.contains(event.target)
+        !document.getElementById('create-issue-material-dropdown')?.contains(event.target)
       ) {
         setIsOpen(false);
       }
@@ -96,10 +97,11 @@ const MaterialSearch = ({ value, onChange, onSelect, materials = [], placeholder
         onChange={e => { setSearchValue(e.target.value); onChange(e.target.value); }}
         onFocus={() => setIsOpen(true)}
         autoComplete="off"
+        className="ui-input table-input"
       />
 
       {isOpen && createPortal(
-        <div id="material-dropdown" style={dropdownStyle}>
+        <div id="create-issue-material-dropdown" style={dropdownStyle}>
           {filteredMaterials.length > 0 ? filteredMaterials.map(m => (
             <div
               key={m.id}
@@ -112,7 +114,7 @@ const MaterialSearch = ({ value, onChange, onSelect, materials = [], placeholder
         </div>,
         document.body
       )}
-    </div>
+      </div>
   );
 };
 
@@ -801,8 +803,14 @@ export default function CreateIssueRequest() {
   };
 
   return (
-    <div className="create-issue-request">
-      <h1 className="page-title">Phiếu Xin Lĩnh</h1>
+    <div className="ui-page">
+      <div className="ui-page-frame create-issue-request">
+        <div className="ui-page-head">
+          <div>
+            <h1 className="page-title">Phiếu Xin Lĩnh</h1>
+            <p className="page-subtitle">Tạo phiếu xin lĩnh và theo dõi lịch sử gửi phiếu trên cùng một giao diện thống nhất.</p>
+          </div>
+        </div>
 
       {/* Tab Navigation */}
       <div className="tab-navigation">
@@ -869,7 +877,7 @@ export default function CreateIssueRequest() {
               <textarea
                 value={formData.note || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-                className="form-textarea"
+                className="ui-textarea form-textarea"
                 placeholder="Nhập ghi chú cho phiếu xin lĩnh"
                 rows={3}
                 required
@@ -883,8 +891,8 @@ export default function CreateIssueRequest() {
               <h3 className="section-title">Danh sách vật tư xin lĩnh</h3>
             </div>
 
-            <div className="table-container">
-              <table className="issue-table">
+            <div className="ui-table-wrap table-container">
+              <table className="ui-table issue-table">
                 <thead>
                   <tr>
                     <th width="50">TT</th>
@@ -909,7 +917,7 @@ export default function CreateIssueRequest() {
                           value={detail.proposedCode || ""}
                           onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
                           onBlur={(e) => handleCodeBlur(index, e.target.value)}
-                          className="table-input"
+                          className="ui-input table-input"
                           placeholder="Nhập mã code"
                           required
                         />
@@ -933,7 +941,7 @@ export default function CreateIssueRequest() {
                           type="text"
                           value={detail.spec || ""}
                           onChange={(e) => handleDetailChange(index, "spec", e.target.value)}
-                          className="table-input"
+                          className="ui-input table-input"
                           placeholder="Quy cách"
                           required
                           disabled={!isNewMaterial(detail)}
@@ -943,7 +951,7 @@ export default function CreateIssueRequest() {
                         <select
                           value={detail.unitId || ""}
                           onChange={(e) => handleDetailChange(index, "unitId", e.target.value)}
-                          className="table-select"
+                          className="ui-select table-select"
                           required
                           disabled={!isNewMaterial(detail)}
                         >
@@ -960,7 +968,7 @@ export default function CreateIssueRequest() {
                           type="text"
                           value={detail.qtyRequested || ""}
                           onChange={(e) => handleQtyChange(index, e.target.value)}
-                          className="table-input number-input"
+                          className="ui-input table-input number-input"
                           placeholder="0"
                           required
                           inputMode="numeric"
@@ -973,7 +981,7 @@ export default function CreateIssueRequest() {
                           type="text"
                           value={detail.proposedManufacturer || ""}
                           onChange={(e) => handleDetailChange(index, "proposedManufacturer", e.target.value)}
-                          className="table-input"
+                          className="ui-input table-input"
                           placeholder="Hãng sản xuất"
                           required
                           disabled={!isNewMaterial(detail)}
@@ -983,7 +991,7 @@ export default function CreateIssueRequest() {
                         <select
                           value={detail.category || ""}
                           onChange={(e) => handleCategoryChange(index, e.target.value)}
-                          className="table-select category-select"
+                          className="ui-select table-select category-select"
                           required
                           disabled={!isNewMaterial(detail)} // CHỈ CHO PHÉP THAY ĐỔI KHI LÀ VẬT TƯ MỚI
                         >
@@ -1004,7 +1012,7 @@ export default function CreateIssueRequest() {
                         <button
                           type="button"
                           onClick={() => removeRow(index)}
-                          className="btn-remove-row"
+                          className="ui-btn ui-btn-danger ui-btn-sm btn-remove-row"
                           disabled={formData.details.length <= 1}
                           title="Xóa hàng này"
                         >
@@ -1032,7 +1040,7 @@ export default function CreateIssueRequest() {
              <button
               type="button"
               onClick={addNewRow}
-              className="btn-add-row"
+              className="ui-btn ui-btn-primary btn-add-row"
               disabled={loading}
             >
               Thêm hàng
@@ -1040,7 +1048,7 @@ export default function CreateIssueRequest() {
             <button
               type="button"
               onClick={resetForm}
-              className="btn-cancel"
+              className="ui-btn ui-btn-secondary btn-cancel"
               disabled={loading}
             >
               Làm mới
@@ -1048,7 +1056,7 @@ export default function CreateIssueRequest() {
             <button
               type="submit"
               disabled={loading || !currentUser?.departmentId}
-              className="btn-submit"
+              className="ui-btn ui-btn-primary btn-submit"
             >
               {loading ? "Đang tạo..." : "Gửi Phiếu Xin Lĩnh"}
             </button>
@@ -1065,7 +1073,7 @@ export default function CreateIssueRequest() {
               <button
                 type="button"
                 onClick={fetchRequestHistory}
-                className="btn-refresh"
+                className="ui-btn ui-btn-secondary ui-btn-sm btn-refresh"
                 disabled={historyLoading}
               >
                 {historyLoading ? "Đang tải..." : "Làm mới"}
@@ -1080,8 +1088,8 @@ export default function CreateIssueRequest() {
               <p>Chưa có phiếu xin lĩnh nào được gửi</p>
             </div>
           ) : (
-            <div className="table-container">
-              <table className="history-table">
+            <div className="ui-table-wrap table-container">
+              <table className="ui-table history-table">
                 <thead>
                   <tr>
                     <th width="80">Mã phiếu</th>
@@ -1108,7 +1116,7 @@ export default function CreateIssueRequest() {
                         <button
                           type="button"
                           onClick={() => showRequestDetails(request)}
-                          className="btn-view-details"
+                          className="ui-btn ui-btn-secondary ui-btn-sm btn-view-details"
                           title="Xem chi tiết"
                         >
                           Xem chi tiết
@@ -1160,8 +1168,8 @@ export default function CreateIssueRequest() {
 
               <div className="details-section">
                 <h4>Danh sách vật tư ({selectedRequest.details?.length || 0} vật tư)</h4>
-                <div className="table-container">
-                  <table className="details-table">
+                <div className="ui-table-wrap table-container">
+                  <table className="ui-table details-table">
                     <thead>
                       <tr>
                         <th width="50">TT</th>
@@ -1195,13 +1203,14 @@ export default function CreateIssueRequest() {
               </div>
             </div>
             <div className="modal-footer">
-              <button onClick={closeRequestDetails} className="btn-close-modal">
+              <button onClick={closeRequestDetails} className="ui-btn ui-btn-secondary btn-close-modal">
                 Đóng
               </button>
             </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

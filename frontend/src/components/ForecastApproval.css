@@ -1,44 +1,292 @@
-/* ForecastApproval.css - CSS riêng cho component duyệt dự trù */
-.forecast-approval-container {
-  grid-column: 1 / -1;
-  margin-top: 2rem;
+/* =========================================================
+   FORECAST APPROVAL - CSS riêng cho trang duyệt dự trù
+   Dùng chung với dashboard-ui.css để đồng bộ toàn dashboard.
+========================================================= */
+
+.fa-page-frame {
+  max-width: 1180px;
 }
 
-.forecast-approval-header {
+.fa-stat-grid {
+  margin-bottom: 18px;
+}
+
+.fa-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 6px;
+  border: 1px solid var(--ui-border);
+  background: #f8fafc;
+  border-radius: 14px;
+}
+
+.fa-tab {
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.fa-tab:hover {
+  background: #eef2ff;
+  color: var(--ui-primary);
+}
+
+.fa-tab.is-active {
+  background: var(--ui-primary);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+}
+
+.fa-loading-box {
+  min-height: 240px;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ui-text-soft);
+}
+
+.fa-loading-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 3px solid #dbeafe;
+  border-top-color: var(--ui-primary);
+  animation: fa-spin 0.8s linear infinite;
+}
+
+@keyframes fa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fa-table {
+  min-width: 920px;
+}
+
+.fa-action-group {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fa-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.fa-status-badge.pending {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: rgba(217, 119, 6, 0.18);
+}
+
+.fa-status-badge.approved {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: rgba(22, 163, 74, 0.18);
+}
+
+.fa-status-badge.rejected {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.fa-status-badge.unknown {
+  color: #475569;
+  background: #f8fafc;
+  border-color: var(--ui-border);
+}
+
+.fa-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 9999;
+}
+
+.fa-modal {
+  width: min(1080px, 100%);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.2);
+}
+
+.fa-modal-header {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #e5e7eb;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--ui-border);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
-.forecast-approval-header h3 {
-  color: #1f2937;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.forecast-count-badge {
+.fa-modal-header-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: linear-gradient(135deg, #0284c7, #06b6d4);
-  color: white;
-  padding: 0.6rem 1rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+  gap: 12px;
 }
 
-.forecast-count-number {
-  font-size: 1.4rem;
+.fa-modal-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 900;
+  color: var(--ui-text);
+}
+
+.fa-modal-subtitle {
+  margin: 6px 0 0;
+  color: var(--ui-text-soft);
+  font-size: 0.9rem;
+}
+
+.fa-modal-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fa-modal-close:hover {
+  background: #f9fafb;
+}
+
+.fa-modal-content {
+  padding: 18px 20px;
+  overflow: auto;
+}
+
+.fa-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fa-info-card {
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+}
+
+.fa-info-label {
+  display: block;
+  color: var(--ui-text-soft);
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
-.forecast-count-text {
-  font-size: 0.9rem;
-  opacity: 0.9;
+.fa-info-value {
+  display: block;
+  margin-top: 6px;
+  color: var(--ui-text);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
+.fa-note-box {
+  margin-top: 14px;
+}
+
+.fa-detail-block {
+  margin-top: 18px;
+}
+
+.fa-detail-head {
+  margin-bottom: 12px;
+}
+
+.fa-detail-table {
+  min-width: 760px;
+}
+
+.fa-strong-cell {
+  font-weight: 800;
+  color: var(--ui-primary);
+}
+
+.fa-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--ui-border);
+  background: #fbfdff;
+}
+
+@media (max-width: 900px) {
+  .fa-info-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .fa-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fa-action-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fa-modal-header,
+  .fa-modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .fa-modal-content {
+    padding: 16px;
+  }
+
+  .fa-modal-header {
+    flex-direction: column;
+  }
+
+  .fa-modal-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .fa-info-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
-import "./ReplenishmentRequest.css";
+import React, { useEffect, useState } from "react";
 import Swal from "sweetalert2";
+import "./dashboard-ui.css";
+import "./ReplenishmentRequest.css";
 
 export default function ReplenishmentRequest() {
   const UNIT_MAP = {
@@ -12,12 +13,12 @@ export default function ReplenishmentRequest() {
     6: "g",
     7: "Viên",
     8: "kg",
-    9: "Bộ"
+    9: "Bộ",
   };
 
-  // 🟢 Dòng mẫu (emptyRow)
-  const emptyRow = {
-    rowId: "",           // key nội bộ UI
+  /* Tạo một dòng trống dùng chung để tránh lặp code */
+  const createEmptyRow = () => ({
+    rowId: crypto.randomUUID(),
     materialId: "",
     materialName: "",
     specification: "",
@@ -27,48 +28,47 @@ export default function ReplenishmentRequest() {
     qtyRequested: "",
     materialCode: "",
     manufacturer: "",
-    reason: ""
-  };
+    reason: "",
+  });
 
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([createEmptyRow()]);
   const [materials, setMaterials] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
 
-  const handleSelectMaterial = (index, e) => {
-    const id = e.target.value;
-    const material = materials.find(m => m.materialId === Number(id));
-
-    if (material) {
-      changeItem(index, { target: { name: "materialId", value: material.materialId } });
-      changeItem(index, { target: { name: "materialName", value: material.materialName } });
-      changeItem(index, { target: { name: "specification", value: material.specification } });
-      changeItem(index, { target: { name: "unitId", value: material.unitId } });
-      changeItem(index, { target: { name: "materialCode", value: material.materialCode } });
-      changeItem(index, { target: { name: "manufacturer", value: material.manufacturer } });
-    } else {
-      changeItem(index, { target: { name: "materialId", value: "" } });
-    }
-  };
-
-  // 🟢 changeItem tránh mutate object trực tiếp
   function changeItem(index, e) {
     const { name, value } = e.target;
-    setItems(prev => {
+    setItems((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [name]: value };
       return updated;
     });
   }
 
-  // 🟢 Add row – chỉ tạo rowId uuid, materialId = ""
-  function addRow() {
-    setItems(prev => [...prev, { ...emptyRow, rowId: crypto.randomUUID() }]);
+  function handleSelectMaterial(index, e) {
+    const id = e.target.value;
+    const material = materials.find((m) => m.materialId === Number(id));
+
+    if (!material) {
+      changeItem(index, { target: { name: "materialId", value: "" } });
+      return;
+    }
+
+    changeItem(index, { target: { name: "materialId", value: material.materialId } });
+    changeItem(index, { target: { name: "materialName", value: material.materialName } });
+    changeItem(index, { target: { name: "specification", value: material.specification } });
+    changeItem(index, { target: { name: "unitId", value: material.unitId } });
+    changeItem(index, { target: { name: "materialCode", value: material.materialCode } });
+    changeItem(index, { target: { name: "manufacturer", value: material.manufacturer } });
   }
 
-  // 🟢 Delete row dùng rowId
+  function addRow() {
+    setItems((prev) => [...prev, createEmptyRow()]);
+  }
+
   function deleteRow(rowId) {
-    setItems(prev => prev.filter(i => i.rowId !== rowId));
+    if (items.length === 1) return;
+    setItems((prev) => prev.filter((item) => item.rowId !== rowId));
   }
 
   async function submit(e) {
@@ -80,49 +80,44 @@ export default function ReplenishmentRequest() {
       academicYear: "2025-2026",
       departmentId: selectedDept ? Number(selectedDept) : null,
       createdByEmail: currentUser?.email || null,
-      items: items.map(it => ({
-        materialId: it.materialId ? Number(it.materialId) : null,
-        currentStock: Number(it.qtyAvailable || 0),
-        prevYearQty: Number(it.qtyLastYear || 0),
-        thisYearQty: Number(it.qtyRequested || 0),
-        proposedCode: it.materialCode || null,
-        proposedManufacturer: it.manufacturer || null,
-        justification: it.reason || null
-      }))
+      items: items.map((item) => ({
+        materialId: item.materialId ? Number(item.materialId) : null,
+        currentStock: Number(item.qtyAvailable || 0),
+        prevYearQty: Number(item.qtyLastYear || 0),
+        thisYearQty: Number(item.qtyRequested || 0),
+        proposedCode: item.materialCode || null,
+        proposedManufacturer: item.manufacturer || null,
+        justification: item.reason || null,
+      })),
     };
 
     try {
       const res = await fetch("http://localhost:8080/api/supp-forecast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
-      if (res.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Đã gửi phiếu",
-          text: data.message || "Tạo phiếu thành công",
-          timer: 1800,
-          showConfirmButton: false
-        });
-
-        setItems([{ ...emptyRow, rowId: crypto.randomUUID() }]);
-
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "Gửi thất bại",
-          text: data.message || "Lỗi server"
-        });
+      if (!res.ok) {
+        throw new Error(data.message || "Lỗi server");
       }
-    } catch (err) {
+
+      Swal.fire({
+        icon: "success",
+        title: "Đã gửi phiếu",
+        text: data.message || "Tạo phiếu thành công",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+
+      setItems([createEmptyRow()]);
+    } catch (error) {
       Swal.fire({
         icon: "error",
-        title: "Lỗi kết nối",
-        text: err.message
+        title: "Gửi thất bại",
+        text: error.message,
       });
     }
   }
@@ -141,13 +136,13 @@ export default function ReplenishmentRequest() {
           icon: "info",
           title: "Không có dữ liệu dự trù năm trước",
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         return;
       }
 
-      const mapped = data.map(item => ({
-        rowId: crypto.randomUUID(),        // 🔥 Tạo key riêng cho UI
+      const mapped = data.map((item) => ({
+        rowId: crypto.randomUUID(),
         materialId: item.materialId,
         materialName: item.materialName,
         specification: item.specification,
@@ -157,42 +152,43 @@ export default function ReplenishmentRequest() {
         qtyRequested: Number(item.thisYearQty || 0),
         materialCode: item.materialCode,
         manufacturer: item.manufacturer,
-        reason: "Tự động tạo dự trù"
+        reason: "Tự động tạo dự trù",
       }));
 
       setItems(mapped);
 
       Swal.fire({
         icon: "success",
-        title: "Đã load dự trù năm trước",
+        title: "Đã tải dự trù năm trước",
         timer: 1200,
-        showConfirmButton: false
+        showConfirmButton: false,
       });
-
-    } catch (err) {
-      Swal.fire("Lỗi", err.message, "error");
+    } catch (error) {
+      Swal.fire("Lỗi", error.message, "error");
     }
   }
 
-  const fetchDepartments = async () => {
+  async function fetchDepartments() {
     try {
       const res = await fetch("http://localhost:8080/api/departments");
       const data = await res.json();
-      setDepartments(data);
-    } catch (err) {
-      console.error("Lỗi khi lấy departments:", err);
+      setDepartments(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Lỗi khi lấy departments:", error);
+      setDepartments([]);
     }
-  };
+  }
 
-  const fetchMaterials = async () => {
+  async function fetchMaterials() {
     try {
-      const response = await fetch("http://localhost:8080/api/materials");
-      const data = await response.json();
-      setMaterials(data);
+      const res = await fetch("http://localhost:8080/api/materials");
+      const data = await res.json();
+      setMaterials(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Lỗi khi lấy materials:", error);
+      setMaterials([]);
     }
-  };
+  }
 
   useEffect(() => {
     fetchMaterials();
@@ -200,133 +196,200 @@ export default function ReplenishmentRequest() {
   }, []);
 
   return (
-    <div className="req-root card">
-      <div className="req-header">
-        <h3>Phiếu Dự Trù Bổ Sung Hàng Hoá</h3>
+    <div className="ui-page req-page">
+      <div className="ui-page-frame">
+        <div className="ui-page-stack">
+          <div className="ui-card-header req-page-header">
+            <div>
+              <h3 className="ui-card-title">Phiếu dự trù bổ sung hàng hóa</h3>
+              <p className="ui-card-subtitle">
+                Trang này dùng cùng khung trắng, cùng giới hạn chiều ngang và cùng hệ điều khiển với trang danh sách vật tư.
+              </p>
+            </div>
+          </div>
+
+          <section className="ui-section req-card">
+            <form className="req-form" onSubmit={submit}>
+              <div className="req-topbar">
+                <div className="ui-field req-department-field">
+                  <label className="ui-label">Chọn bộ môn lập dự trù</label>
+                  <select
+                    className="ui-select"
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Chọn bộ môn --</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="req-top-actions">
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-secondary"
+                    onClick={loadPreviousForecast}
+                  >
+                    Tải dự trù năm trước
+                  </button>
+                </div>
+              </div>
+
+              <div className="ui-table-wrap">
+                <table className="ui-table req-table">
+                  <thead>
+                    <tr>
+                      <th className="text-center">STT</th>
+                      <th>Tên vật tư</th>
+                      <th>Quy cách</th>
+                      <th>ĐVT</th>
+                      <th>SL hiện có</th>
+                      <th>Năm trước</th>
+                      <th>Dự trù</th>
+                      <th>Mã code</th>
+                      <th>Hãng SX</th>
+                      <th>Lý do</th>
+                      <th className="text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {items.length > 0 ? (
+                      items.map((item, index) => (
+                        <tr key={item.rowId}>
+                          <td className="text-center">{index + 1}</td>
+
+                          <td>
+                            <select
+                              className="ui-select"
+                              name="materialId"
+                              value={item.materialId || ""}
+                              onChange={(e) => handleSelectMaterial(index, e)}
+                            >
+                              <option value="">Chọn vật tư</option>
+                              {materials.map((material) => (
+                                <option key={material.materialId} value={material.materialId}>
+                                  {material.materialName}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              name="specification"
+                              value={item.specification || ""}
+                              readOnly
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              name="unitId"
+                              value={UNIT_MAP[item.unitId] || ""}
+                              readOnly
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              type="number"
+                              name="qtyAvailable"
+                              value={item.qtyAvailable || ""}
+                              onChange={(e) => changeItem(index, e)}
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              type="number"
+                              name="qtyLastYear"
+                              value={item.qtyLastYear || ""}
+                              onChange={(e) => changeItem(index, e)}
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              type="number"
+                              name="qtyRequested"
+                              value={item.qtyRequested || ""}
+                              onChange={(e) => changeItem(index, e)}
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              name="materialCode"
+                              value={item.materialCode || ""}
+                              readOnly
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              name="manufacturer"
+                              value={item.manufacturer || ""}
+                              readOnly
+                            />
+                          </td>
+
+                          <td>
+                            <input
+                              className="ui-input"
+                              name="reason"
+                              value={item.reason || ""}
+                              onChange={(e) => changeItem(index, e)}
+                            />
+                          </td>
+
+                          <td className="text-center">
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-danger ui-btn-sm"
+                              onClick={() => deleteRow(item.rowId)}
+                              disabled={items.length === 1}
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="11" className="ui-empty">
+                          Không có dữ liệu
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="req-actions">
+                <button type="button" className="ui-btn ui-btn-secondary" onClick={addRow}>
+                  + Thêm dòng
+                </button>
+
+                <button type="submit" className="ui-btn ui-btn-primary">
+                  Gửi phiếu
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
       </div>
-
-      {/* 🟢 Sửa lại chỗ này */}
-      <form className="req-form" onSubmit={submit}>
-
-        <div className="req-field half">
-          <label>Chọn bộ môn lập dự trù</label>
-          <select
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
-            required
-          >
-            <option value="">-- Chọn bộ môn --</option>
-            {departments.map((dept) => (
-              <option key={dept.id} value={dept.id}>
-                {dept.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="req-actions" style={{ marginBottom: "12px" }}>
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={loadPreviousForecast}
-          >
-            🔄 Load dự trù năm trước
-          </button>
-        </div>
-
-        <div className="req-table-wrap">
-          <table className="req-table">
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Tên vật tư</th>
-                <th>Quy cách</th>
-                <th>ĐVT</th>
-                <th>SL hiện có</th>
-                <th>Năm trước</th>
-                <th>Dự trù</th>
-                <th>Mã Code</th>
-                <th>Hãng SX</th>
-                <th>Lý do</th>
-                <th></th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {items.length > 0 ? items.map((item, index) => (
-                <tr key={item.rowId}>
-                  <td className="text-center">{index + 1}</td>
-
-                  <td>
-                    <select
-                      name="materialId"
-                      value={item.materialId || ""}
-                      onChange={(e) => handleSelectMaterial(index, e)}
-                    >
-                      <option value="">Chọn vật tư</option>
-                      {materials.map((m) => (
-                        <option key={m.materialId} value={m.materialId}>
-                          {m.materialName}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-
-                  <td>
-                    <input name="specification" value={item.specification || ""} readOnly />
-                  </td>
-
-                  <td>
-                    <input name="unitId" value={UNIT_MAP[item.unitId] || ""} readOnly />
-                  </td>
-
-                  <td>
-                    <input type="number" name="qtyAvailable" value={item.qtyAvailable || ""} onChange={(e) => changeItem(index, e)} />
-                  </td>
-
-                  <td>
-                    <input type="number" name="qtyLastYear" value={item.qtyLastYear || ""} onChange={(e) => changeItem(index, e)} />
-                  </td>
-
-                  <td>
-                    <input type="number" name="qtyRequested" value={item.qtyRequested || ""} onChange={(e) => changeItem(index, e)} />
-                  </td>
-
-                  <td>
-                    <input name="materialCode" value={item.materialCode || ""} readOnly />
-                  </td>
-
-                  <td>
-                    <input name="manufacturer" value={item.manufacturer || ""} readOnly />
-                  </td>
-
-                  <td>
-                    <input name="reason" value={item.reason || ""} onChange={(e) => changeItem(index, e)} />
-                  </td>
-
-                  <td>
-                    <button type="button" className="link danger" onClick={() => deleteRow(item.rowId)}>
-                      Xóa
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="11" style={{ textAlign: "center", padding: 20 }}>
-                    Không có dữ liệu
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="req-actions">
-          <button type="button" className="btn secondary" onClick={addRow}>+ Thêm dòng</button>
-          <button type="submit" className="btn primary">Gửi phiếu</button>
-        </div>
-
-      </form>
     </div>
   );
 }

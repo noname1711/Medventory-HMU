@@ -1,21 +1,9 @@
 import React, { useEffect, useState } from "react";
+import "./dashboard-ui.css";
 import "./EquipmentList.css";
 
 export default function InventoryPage() {
-  const UNIT_MAP = {
-    1: "Chai",
-    2: "Lọ",
-    3: "Hộp",
-    4: "Cái",
-    5: "ml",
-    6: "g",
-    7: "Viên",
-    8: "kg",
-    9: "Bộ"
-  };
-  
   /* ================= STATE ================= */
-  const [products, setProducts] = useState([]);
   const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState("");
   const [stockItems, setStockItems] = useState([]);
@@ -26,245 +14,272 @@ export default function InventoryPage() {
     specification: "",
     unitId: "",
     manufacturer: "",
-    category: "C"
+    category: "C",
   });
 
   /* ================= LOAD DATA ================= */
-  // Load units
   useEffect(() => {
-    fetch("http://localhost:8080/api/units")
-      .then(res => res.json())
-      .then(setUnits);
+    fetchUnits();
+    fetchStockItems();
   }, []);
 
-  // Load materials
-  useEffect(() => {
-    fetch("http://localhost:8080/api/materials")
-      .then(res => res.json())
-      .then(setProducts);
-  }, []);
+  async function fetchUnits() {
+    try {
+      const res = await fetch("http://localhost:8080/api/units");
+      const data = await res.json();
+      setUnits(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Load units error", error);
+      setUnits([]);
+    }
+  }
 
-  // Load inventory stock summary
-useEffect(() => {
-  fetch("http://localhost:8080/api/inventory/materials")
-    .then(res => res.json())
-    .then(setStockItems)
-    .catch(err => console.error("Load stock error", err));
-}, []);
+  async function fetchStockItems() {
+    try {
+      const res = await fetch("http://localhost:8080/api/inventory/materials");
+      const data = await res.json();
+      setStockItems(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Load stock error", error);
+      setStockItems([]);
+    }
+  }
 
-  /* ================= FILTER ================= */
-
-  const filteredProducts = products.filter(p =>
-    p.materialName.toLowerCase().includes(keyword.toLowerCase()) ||
-    p.materialCode.toLowerCase().includes(keyword.toLowerCase())
-  );
-
-  const filteredStockItems = stockItems.filter(p =>
-  p.materialName.toLowerCase().includes(keyword.toLowerCase()) ||
-  p.materialCode.toLowerCase().includes(keyword.toLowerCase())
-  );
+  /* ================= COMPUTED DATA ================= */
+  const filteredStockItems = stockItems.filter((item) => {
+    const code = String(item.materialCode || "").toLowerCase();
+    const name = String(item.materialName || "").toLowerCase();
+    const search = keyword.toLowerCase();
+    return code.includes(search) || name.includes(search);
+  });
 
   const totalItems = stockItems.length;
-
   const lowStockItems = stockItems.filter(
-  item => item.closingStock > 0 && item.closingStock < 10
+    (item) => Number(item.closingStock) > 0 && Number(item.closingStock) < 10
   ).length;
-
   const outOfStockItems = stockItems.filter(
-  item => item.closingStock <= 0
+    (item) => Number(item.closingStock) <= 0
   ).length;
 
-  /* ================= SUBMIT ================= */
-
+  /* ================= ACTIONS ================= */
   async function handleSubmit() {
     try {
       const res = await fetch("http://localhost:8080/api/materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(form),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Không thể thêm vật tư");
 
       alert("Thêm vật tư thành công");
 
-      // reload list
-      setProducts(prev => [...prev, data]);
-
-      // reset form
       setForm({
         materialCode: "",
         materialName: "",
         specification: "",
         unitId: "",
         manufacturer: "",
-        category: "C"
+        category: "C",
       });
 
-    } catch (e) {
-      alert(e.message);
+      fetchStockItems();
+    } catch (error) {
+      alert(error.message);
     }
   }
 
-  /* ================= RENDER ================= */
+  function getStockClass(stock) {
+    const value = Number(stock || 0);
+    if (value <= 0) return "ui-stock-badge is-zero";
+    if (value < 10) return "ui-stock-badge is-low";
+    return "ui-stock-badge is-ok";
+  }
 
   return (
-    <div className="inventory-page">
-
-      {/* ADD PRODUCT */}
-      <div className="card add-form">
-        <h3>➕ Thêm hàng hoá mới</h3>
-
-        <div className="form-grid">
-
-          <div className="field">
-            <input
-              placeholder="Mã VT"
-              value={form.materialCode}
-              onChange={e => setForm({...form, materialCode: e.target.value})}
-            />
-            <small>Mã vật tư</small>
+    <div className="ui-page eq-page">
+      <div className="ui-page-frame">
+        <div className="ui-page-stack">
+          <div className="ui-card-header eq-page-header">
+            <div>
+              <h3 className="ui-card-title">Danh sách vật tư</h3>
+              <p className="ui-card-subtitle">
+                Toàn bộ nội dung của trang được đặt trong một khung trắng thống nhất để giống với
+                trang dự trù và tránh bị kéo quá dài trên màn hình lớn.
+              </p>
+            </div>
           </div>
 
-          <div className="field">
-            <input
-              placeholder="Tên VT"
-              value={form.materialName}
-              onChange={e => setForm({...form, materialName: e.target.value})}
-            />
-            <small>Tên vật tư</small>
+          {/* Dải KPI nằm ngang theo kiểu dashboard nhưng vẫn nằm trong cùng một khung trắng */}
+          <div className="ui-stat-grid eq-stat-grid">
+            <div className="ui-stat-card is-primary">
+              <p className="ui-stat-label">Tổng mặt hàng</p>
+              <p className="ui-stat-value">{totalItems}</p>
+              <p className="ui-stat-note">Số lượng mã vật tư đang có trong kho</p>
+            </div>
+
+            <div className="ui-stat-card is-warning">
+              <p className="ui-stat-label">Sắp hết hàng</p>
+              <p className="ui-stat-value">{lowStockItems}</p>
+              <p className="ui-stat-note">Các mã có tồn kho lớn hơn 0 và nhỏ hơn 10</p>
+            </div>
+
+            <div className="ui-stat-card is-danger">
+              <p className="ui-stat-label">Hết hàng</p>
+              <p className="ui-stat-value">{outOfStockItems}</p>
+              <p className="ui-stat-note">Các mã vật tư hiện không còn tồn kho</p>
+            </div>
           </div>
 
-          <div className="field">
-            <input
-              placeholder="QC"
-              value={form.specification}
-              onChange={e => setForm({...form, specification: e.target.value})}
-            />
-            <small>Quy cách đóng gói</small>
-          </div>
+          {/* Form thêm vật tư */}
+          <section className="ui-section">
+            <div className="ui-card-header">
+              <div>
+                <h3 className="ui-card-title">Thêm vật tư mới</h3>
+                <p className="ui-card-subtitle">
+                  Form này dùng cùng hệ giao diện với trang dự trù để về sau tái sử dụng dễ hơn.
+                </p>
+              </div>
+            </div>
 
-          <div className="field">
-            <select
-              value={form.unitId}
-              onChange={e => setForm({...form, unitId: Number(e.target.value)})}
-            >
-              <option value="">ĐVT</option>
-              {units.map(u => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-            <small>Đơn vị tính</small>
-          </div>
+            <div className="ui-form-grid cols-7">
+              <div className="ui-field">
+                <label className="ui-label">Mã vật tư</label>
+                <input
+                  className="ui-input"
+                  placeholder="VD: VT001"
+                  value={form.materialCode}
+                  onChange={(e) => setForm({ ...form, materialCode: e.target.value })}
+                />
+              </div>
 
-          <div className="field">
-            <input
-              placeholder="NSX"
-              value={form.manufacturer}
-              onChange={e => setForm({...form, manufacturer: e.target.value})}
-            />
-            <small>Hãng sản xuất</small>
-          </div>
+              <div className="ui-field">
+                <label className="ui-label">Tên vật tư</label>
+                <input
+                  className="ui-input"
+                  placeholder="Nhập tên vật tư"
+                  value={form.materialName}
+                  onChange={(e) => setForm({ ...form, materialName: e.target.value })}
+                />
+              </div>
 
-          <div className="field">
-            <select
-              value={form.category}
-              onChange={e => setForm({...form, category: e.target.value})}
-            >
-              <option value="A">A – Quan trọng</option>
-              <option value="B">B – Thiết yếu</option>
-              <option value="C">C – Thông dụng</option>
-              <option value="D">D – Ít quan trọng</option>
-            </select>
-            <small>Phân loại vật tư</small>
-          </div>
+              <div className="ui-field">
+                <label className="ui-label">Quy cách đóng gói</label>
+                <input
+                  className="ui-input"
+                  placeholder="VD: Hộp 50 chiếc"
+                  value={form.specification}
+                  onChange={(e) => setForm({ ...form, specification: e.target.value })}
+                />
+              </div>
 
-          <div className="field submit">
-            <button className="btn primary" onClick={handleSubmit}>
-              Thêm
-            </button>
-            <small>&nbsp;</small>
-          </div>
+              <div className="ui-field">
+                <label className="ui-label">Đơn vị tính</label>
+                <select
+                  className="ui-select"
+                  value={form.unitId}
+                  onChange={(e) => setForm({ ...form, unitId: Number(e.target.value) })}
+                >
+                  <option value="">Chọn đơn vị</option>
+                  {units.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ui-field">
+                <label className="ui-label">Hãng sản xuất</label>
+                <input
+                  className="ui-input"
+                  placeholder="Nhập hãng sản xuất"
+                  value={form.manufacturer}
+                  onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
+                />
+              </div>
+
+              <div className="ui-field">
+                <label className="ui-label">Phân loại</label>
+                <select
+                  className="ui-select"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  <option value="A">A – Quan trọng</option>
+                  <option value="B">B – Thiết yếu</option>
+                  <option value="C">C – Thông dụng</option>
+                  <option value="D">D – Ít quan trọng</option>
+                </select>
+              </div>
+
+              <div className="ui-field eq-submit-field">
+                <label className="ui-label">Thao tác</label>
+                <button type="button" className="ui-btn ui-btn-primary" onClick={handleSubmit}>
+                  Thêm vật tư
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Bảng danh sách */}
+          <section className="ui-section">
+            <div className="ui-toolbar eq-toolbar">
+              <div>
+                <h3 className="ui-card-title">Danh sách vật tư tồn kho</h3>
+                <p className="ui-card-subtitle">
+                  Bảng dùng cùng style với bảng trong trang dự trù để đồng bộ toàn hệ thống.
+                </p>
+              </div>
+
+              <div className="ui-toolbar-actions">
+                <input
+                  className="ui-input ui-search"
+                  placeholder="Tìm theo mã hoặc tên vật tư..."
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="ui-table-wrap">
+              <table className="ui-table">
+                <thead>
+                  <tr>
+                    <th>Mã vật tư</th>
+                    <th>Tên vật tư</th>
+                    <th>Đơn vị tính</th>
+                    <th className="text-right">Tồn kho</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredStockItems.length > 0 ? (
+                    filteredStockItems.map((item) => (
+                      <tr key={item.materialId}>
+                        <td>{item.materialCode}</td>
+                        <td>{item.materialName}</td>
+                        <td>{item.unitName}</td>
+                        <td className="text-right">
+                          <span className={getStockClass(item.closingStock)}>
+                            {item.closingStock}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="ui-empty">
+                        Không có dữ liệu
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
-      </div>
-
-      {/* MAIN CONTENT */}
-      <div className="inventory-content">
-
-        {/* PRODUCT LIST */}
-        <div className="card product-list">
-          <div className="list-header">
-            <h3>📦 Danh sách hàng hoá</h3>
-            <input
-              className="search"
-              placeholder="🔍 Tìm theo mã hoặc tên..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </div>
-
-<table>
-  <thead>
-    <tr>
-      <th>Mã</th>
-      <th>Tên hàng</th>
-      <th>ĐVT</th>
-      <th style={{ textAlign: "right" }}>Tồn</th>
-    </tr>
-  </thead>
-
-  <tbody>
-    {filteredStockItems.length > 0 ? (
-      filteredStockItems.map(item => (
-        <tr key={item.materialId}>
-          <td>{item.materialCode}</td>
-          <td>{item.materialName}</td>
-          <td>{item.unitName}</td>
-          <td style={{ textAlign: "right" }}>
-            <span
-              className={
-                item.closingStock <= 0
-                  ? "stock-zero"
-                  : item.closingStock < 10
-                  ? "stock-low"
-                  : "stock-ok"
-              }
-            >
-              {item.closingStock}
-            </span>
-          </td>
-        </tr>
-      ))
-    ) : (
-      <tr>
-        <td colSpan="4" style={{ textAlign: "center" }}>
-          Không có dữ liệu
-        </td>
-      </tr>
-    )}
-  </tbody>
-</table>
-        </div>
-
-        {/* STOCK SUMMARY (placeholder) */}
-<div className="card stock-summary">
-  <h3>📊 Tồn kho</h3>
-
-  <p>
-    <b>Tổng mặt hàng:</b> {totalItems}
-  </p>
-
-  <p className="warn">
-    ⚠️ Sắp hết hàng: {lowStockItems} 
-  </p>
-
-  <p className="danger">
-    ❌ Hết hàng: {outOfStockItems} 
-  </p>
-</div>
-
-
       </div>
     </div>
   );

@@ -771,3 +771,104 @@
   font-size: 13px;
   color: #6b7280;
 }
+
+/* ===== FIX OVERFLOW / WIDTH FOR AUTH FORM ===== */
+/* Chỉ scope trong trang đăng nhập để không ảnh hưởng các trang đã đồng bộ trước đó */
+.auth-page,
+.auth-page *,
+.auth-page *::before,
+.auth-page *::after {
+    box-sizing: border-box;
+}
+
+.auth-wrapper {
+    width: min(380px, calc(100vw - 24px));
+    max-width: 380px;
+    overflow: hidden;
+}
+
+.form-container,
+.auth-form,
+.grid-2,
+.department-section,
+.department-search-container,
+.input-group,
+.password-input-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.grid-2 > * {
+    min-width: 0;
+}
+
+.auth-form > input,
+.auth-form > select,
+.auth-form .grid-2 input,
+.auth-form .grid-2 select,
+.auth-form .department-input,
+.auth-form .department-select,
+.auth-form .role-select,
+.auth-form .submit-btn {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-group input,
+.password-input-wrapper input {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-right: 45px;
+}
+
+.department-search-container {
+    position: relative;
+}
+
+.department-input {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.department-suggestions {
+    width: 100%;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+}
+
+.remember-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.remember-row a,
+.remember-row label {
+    min-width: 0;
+}
+
+@media (max-width: 480px) {
+    .auth-wrapper {
+        padding: 24px 18px;
+        border-radius: 18px;
+    }
+
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
