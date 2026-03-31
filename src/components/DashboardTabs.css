@@ -1,0 +1,98 @@
+/* =============== DASHBOARD TABS =============== */
+.dt-nav {
+  display: flex;
+  gap: 12px;
+  margin: 20px auto;
+  padding: 0 24px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  animation: fadeSlideDown 0.6s ease forwards;
+}
+
+/* Tab item */
+.dt-tab {
+  position: relative;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: transparent;
+  color: #4b5563;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+/* Hover effect */
+.dt-tab:hover {
+  color: #1e40af;
+  transform: translateY(-2px);
+}
+
+/* Active tab */
+.dt-tab.active {
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Ripple effect khi click */
+.dt-tab::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dt-tab:active::after {
+  width: 220%;
+  height: 220%;
+  opacity: 1;
+  transition: 0s;
+}
+
+/* Animation khi toàn bộ nav xuất hiện */
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hiệu ứng highlight trượt dưới chân tab */
+.dt-tab::before {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 0%;
+  height: 3px;
+  background: #2563eb;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: width 0.25s ease;
+  opacity: 0.8;
+}
+
+.dt-tab:hover::before {
+  width: 60%;
+}
+
+.dt-tab.active::before {
+  width: 80%;
+  background: white;
+}

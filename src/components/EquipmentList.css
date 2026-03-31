@@ -1,0 +1,21 @@
+.el-root{ overflow:hidden; }
+.el-header{ display:flex; align-items:center; justify-content:space-between; padding:16px; border-bottom:1px solid #eef2ff; }
+.el-actions{ display:flex; gap:12px; align-items:center; }
+.el-export{ background:#059669; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
+.el-filter{ padding:8px; border-radius:8px; border:1px solid #e5e7eb; }
+
+.el-table-wrap{ overflow-x:auto; }
+.el-table{ width:100%; border-collapse:collapse; }
+.el-table thead th{ background:#f9fafb; text-align:left; padding:12px 16px; color:#6b7280; font-size:12px; text-transform:uppercase; }
+.el-table td{ padding:12px 16px; border-top:1px solid #f3f4f6; color:#111827; vertical-align:middle; }
+.el-actions-col{ display:flex; gap:10px; }
+
+.link{ background:transparent; border:none; color:#2563eb; cursor:pointer; font-weight:600; }
+.link.danger{ color:#ef4444; }
+
+/* status badges */
+.st-badge{ padding:6px 10px; border-radius:999px; font-weight:600; font-size:12px; display:inline-block; }
+.st-badge.green{ background:#ecfdf5; color:#065f46; }
+.st-badge.yellow{ background:#fffbeb; color:#92400e; }
+.st-badge.red{ background:#fff1f2; color:#7f1d1d; }
+.st-badge.gray{ background:#f3f4f6; color:#374151; }

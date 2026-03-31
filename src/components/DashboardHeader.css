@@ -1,0 +1,533 @@
+/* ============================================================
+   1. HEADER LAYOUT & BRANDING
+   ============================================================ */
+.dh-header {
+  background: white;
+  border-bottom: 1px solid #e5e7eb; /* Đổi sang viền mỏng tinh tế hơn */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 64px;
+}
+
+.dh-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.dh-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dh-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.dh-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dh-brand h1 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.dh-brand .dh-sub {
+  margin: 0;
+  color: #6b7280; /* Màu xám chuyên nghiệp hơn */
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.dh-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ============================================================
+   2. USER INFO & AVATAR
+   ============================================================ */
+.dh-userinfo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.dh-userinfo:hover {
+  background-color: #f3f4f6;
+}
+
+.dh-usertext {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+}
+
+.dh-username {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.875rem;
+}
+
+.dh-userrole {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Avatar Style (Gradient) */
+.dh-avatar {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dh-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dh-avatar-text {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ============================================================
+   3. DROPDOWN MENU
+   ============================================================ */
+.dh-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  z-index: 100;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dh-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dh-dropdown-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #4b5563;
+}
+.dh-dropdown-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.dh-dropdown-userinfo { flex: 1; min-width: 0; }
+.dh-dropdown-name { font-weight: 600; color: #111827; font-size: 0.9rem; }
+.dh-dropdown-role { color: #6b7280; font-size: 0.75rem; }
+
+.dh-dropdown-divider { height: 1px; background: #e5e7eb; margin: 0; }
+
+.dh-dropdown-menu { padding: 4px 0; }
+
+.dh-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  color: #374151;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.dh-dropdown-item:hover { background-color: #f3f4f6; }
+.dh-dropdown-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+
+.dh-dropdown-logout { color: #dc2626; }
+.dh-dropdown-logout:hover { background-color: #fef2f2; }
+
+/* ============================================================
+   4. NOTIFICATION SYSTEM
+   ============================================================ */
+.dh-noti {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dh-noti-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%; /* Tròn đẹp hơn */
+  background: white;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: #4b5563;
+}
+
+.dh-noti-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.dh-noti-icon {
+  font-size: 20px;
+}
+
+.dh-noti-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+.dh-noti-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: -10px; /* Căn chỉnh lại một chút cho đẹp */
+  width: 360px;
+  max-height: 500px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+/* Mũi tên nhỏ trỏ lên chuông */
+.dh-noti-panel::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: 22px;
+    width: 12px;
+    height: 12px;
+    background: white;
+    transform: rotate(45deg);
+    border-top: 1px solid #e5e7eb;
+    border-left: 1px solid #e5e7eb;
+}
+
+.dh-noti-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.dh-noti-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.dh-noti-mark-all {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.dh-noti-mark-all:hover { text-decoration: underline; }
+
+.dh-noti-content {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.dh-noti-empty {
+  padding: 32px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.dh-noti-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.dh-noti-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dh-noti-item:hover { background: #f9fafb; }
+
+/* Item chưa đọc: nền xanh nhạt */
+.dh-noti-item.unread { background: #eff6ff; }
+.dh-noti-item.unread:hover { background: #e0e7ff; }
+
+/* Dòng trên cùng: Tiêu đề + Chấm xanh */
+.dh-noti-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.dh-noti-item-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.dh-noti-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #2563eb;
+    border-radius: 50%;
+    margin-left: 8px;
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+
+.dh-noti-item-body {
+  color: #4b5563;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dh-noti-item-time {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+/* ============================================================
+   5. PROFILE MODAL
+   ============================================================ */
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999; /* Cao nhất */
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.profile-modal {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.profile-modal-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.profile-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: color 0.2s;
+}
+.profile-modal-close:hover { color: #1f2937; }
+
+.profile-modal-content {
+  padding: 0;
+}
+
+.profile-avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid white;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-avatar-text { font-size: 1.5rem; font-weight: bold; color: #0284c7; }
+
+.profile-basic-info h3 { margin: 0 0 4px 0; font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+.profile-role { margin: 0; color: #64748b; font-weight: 500; }
+
+.profile-details {
+  padding: 24px;
+}
+
+.profile-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.profile-detail-row:last-child { border-bottom: none; }
+
+.profile-detail-label { font-weight: 600; color: #475569; }
+.profile-detail-value { color: #1e293b; text-align: right; }
+
+/* Status Colors */
+.status-approved { color: #16a34a; font-weight: 600; }
+.status-pending { color: #d97706; font-weight: 600; }
+.status-rejected { color: #dc2626; font-weight: 600; }
+
+.profile-modal-footer {
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.profile-modal-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  background: white;
+  transition: all 0.2s;
+}
+
+.profile-modal-btn-close:hover { background: #f1f5f9; }
+.profile-modal-btn-primary {
+  background: #2563eb;
+  color: white;
+  border: 1px solid #2563eb;
+}
+.profile-modal-btn-primary:hover { background: #1d4ed8; }
+
+/* ============================================================
+   6. RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .dh-inner { padding: 0 16px; }
+  .dh-usertext { display: none; }
+  .dh-dropdown { width: 260px; right: -10px; }
+  .dh-noti-panel { width: 300px; right: -50px; }
+  .dh-noti-panel::before { right: 62px; }
+}

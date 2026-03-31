@@ -1,0 +1,71 @@
+/* Thêm vào file Admin.css */
+.admin-perm-special {
+  background-color: #fef3c7 !important; /* Màu vàng nhạt */
+  border-left: 4px solid #f59e0b !important;
+}
+
+.admin-perm-special-badge {
+  display: inline-block;
+  background-color: #f59e0b;
+  color: #7c2d12;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  margin-left: 0.5rem;
+  font-weight: 600;
+}
+
+.admin-perm-special input[type="checkbox"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rbac-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.rbac-tab {
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.rbac-tab.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.rbac-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rbac-badge-special {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rbac-badge-normal {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rbac-user-debug {
+  margin-top: 10px;
+}
