@@ -34,44 +34,23 @@
 }
 
 /* User info */
-.create-issue-request .user-info-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 1.25rem;
-  margin-bottom: 1.5rem;
-}
-
-.create-issue-request .user-info-card h4 {
-  color: #1e40af;
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-}
-
-
-.create-issue-request .user-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
-
-.create-issue-request .user-info-item {
+.cir-sender-strip {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+  color: #475569;
 }
 
-.create-issue-request .user-info-item label {
-  color: #64748b;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.create-issue-request .user-info-value {
+.cir-sender-name {
+  font-weight: 700;
   color: #1e293b;
-  font-weight: 600;
-  font-size: 1rem;
+}
+
+.cir-sender-dot {
+  color: #cbd5e1;
 }
 
 

@@ -152,35 +152,16 @@
   flex-wrap: wrap;
 }
 
-.receipt-total-box {
-  min-width: 320px;
-  padding: 16px 18px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
-}
-
-.receipt-total-label {
+.receipt-total-inline {
   margin: 0;
-  color: #64748b;
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-.receipt-total-value {
-  margin: 8px 0 0;
-  color: #1d4ed8;
-  font-size: 1.65rem;
-  line-height: 1.1;
-  font-weight: 900;
+  font-size: 0.95rem;
+  color: #475569;
   font-variant-numeric: tabular-nums;
 }
 
-.receipt-total-hint {
-  margin: 8px 0 0;
-  color: #64748b;
-  font-size: 0.86rem;
-  line-height: 1.5;
+.receipt-total-inline strong {
+  color: #1d4ed8;
+  font-weight: 800;
 }
 
 .receipt-actions {
@@ -297,7 +278,6 @@
     align-items: stretch;
   }
 
-  .receipt-total-box,
   .receipt-history-search {
     min-width: 100%;
   }

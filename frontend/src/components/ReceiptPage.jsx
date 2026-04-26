@@ -924,13 +924,9 @@ export default function ReceiptPage() {
 
               {/* Footer chính: tổng tiền + nút hành động quan trọng */}
               <div className="receipt-footer-bar">
-                <div className="receipt-total-box">
-                  <p className="receipt-total-label">Tổng chi phí phiếu nhập</p>
-                  <p className="receipt-total-value">{moneyFmt.format(totals.grand)}</p>
-                  <p className="receipt-total-hint">
-                    Tự động tính từ số lượng thực nhập × đơn giá mỗi dòng.
-                  </p>
-                </div>
+                <p className="receipt-total-inline">
+                  Tổng chi phí: <strong>{moneyFmt.format(totals.grand)}</strong>
+                </p>
 
                 <div className="receipt-primary-actions">
                   <button
