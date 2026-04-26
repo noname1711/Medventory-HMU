@@ -30,7 +30,7 @@ const cookieManager = {
 
   clearAllAuthCookies: () => {
     const cookiesToDelete = [
-      "rememberedEmail", "rememberedPassword", "rememberMe"
+      "rememberedEmail", "rememberMe"
     ];
     cookiesToDelete.forEach(cookieName => {
       cookieManager.deleteCookie(cookieName);
@@ -199,7 +199,6 @@ export default function AuthForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [isAutoLogging, setIsAutoLogging] = useState(false);
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
   
   // STATE CHO CÁC TRƯỜNG ĐĂNG KÝ
@@ -249,60 +248,15 @@ export default function AuthForm() {
     fetchDepartments();
   }, []);
 
-  // AUTO LOGIN
+  // PRE-FILL EMAIL khi "Ghi nhớ đăng nhập" đã được bật trước đó
   useEffect(() => {
-    const attemptAutoLogin = async () => {
-      const savedEmail = cookieManager.getCookie("rememberedEmail");
-      const savedPassword = cookieManager.getCookie("rememberedPassword");
-      const savedRememberMe = cookieManager.getCookie("rememberMe") === "true";
-      
-      if (savedRememberMe && savedEmail && savedPassword) {
-        setIsAutoLogging(true);
-        
-        try {
-          const response = await fetch(API_ENDPOINTS.LOGIN, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              email: savedEmail, 
-              password: savedPassword 
-            }),
-          });
-
-          const data = await response.json();
-
-          if (data.success) {
-            if (data.user) {
-              localStorage.setItem('currentUser', JSON.stringify(data.user));
-            }
-            setTimeout(() => navigate("/dashboard"), 500);
-          } else {
-            setEmail(savedEmail);
-            setRememberMe(true);
-          }
-        } catch (error) {
-          setEmail(savedEmail);
-          setRememberMe(true);
-        } finally {
-          setIsAutoLogging(false);
-        }
-      } else if (savedRememberMe && savedEmail) {
-        setEmail(savedEmail);
-        setRememberMe(true);
-        
-        setTimeout(() => {
-          const passwordInput = document.querySelector('input[type="password"]');
-          if (passwordInput) {
-            passwordInput.focus();
-          }
-        }, 500);
-      }
-    };
-
-    attemptAutoLogin();
-  }, [navigate]);
+    const savedEmail = cookieManager.getCookie("rememberedEmail");
+    const savedRememberMe = cookieManager.getCookie("rememberMe") === "true";
+    if (savedRememberMe && savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   // Clear timeout khi component unmount
   useEffect(() => {
@@ -335,7 +289,6 @@ export default function AuthForm() {
     
     if (!isChecked) {
       cookieManager.deleteCookie("rememberedEmail");
-      cookieManager.deleteCookie("rememberedPassword");
       cookieManager.deleteCookie("rememberMe");
     }
   };
@@ -350,10 +303,9 @@ export default function AuthForm() {
         return;
       }
 
-      // XỬ LÝ GHI NHỚ ĐĂNG NHẬP
+      // XỬ LÝ GHI NHỚ ĐĂNG NHẬP (chỉ lưu email, không lưu mật khẩu)
       if (rememberMe) {
         cookieManager.setCookie("rememberedEmail", email, 30);
-        cookieManager.setCookie("rememberedPassword", password, 30);
         cookieManager.setCookie("rememberMe", "true", 30);
       } else {
         cookieManager.clearAllAuthCookies();
@@ -378,9 +330,6 @@ export default function AuthForm() {
           setTimeout(() => navigate("/dashboard"), 800);
         } else {
           toast.error(data.message);
-          if (rememberMe) {
-            cookieManager.deleteCookie("rememberedPassword");
-          }
         }
       } catch (error) {
         toast.error("Lỗi kết nối đến server!");
@@ -475,19 +424,7 @@ export default function AuthForm() {
     }
   };
 
-  // LOADING KHI AUTO LOGIN 
-  if (isAutoLogging) {
-    return (
-      <div className="auth-page">
-        <div className="auth-wrapper">
-          <div className="auto-login-loading">
-            <div className="loading-spinner"></div>
-            <p>Đang tải...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="auth-page">

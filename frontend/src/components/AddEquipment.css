@@ -90,32 +90,6 @@
   margin-top: 2rem;
 }
 
-.btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.btn.primary {
-  background: #2563eb;
-  color: white;
-}
-.btn.primary:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
-}
-
-.btn.cancel {
-  background: transparent;
-  border: 1px solid #d1d5db;
-  color: #374151;
-}
-.btn.cancel:hover {
-  background: #f3f4f6;
-}
 
 /* RESPONSIVE */
 @media (max-width: 600px) {
