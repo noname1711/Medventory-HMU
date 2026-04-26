@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import "./AddEquipment.css";
+import "./dashboard-ui.css";
 
+/* Trang thêm vật tư y tế mới vào danh sách quản lý (demo – chưa kết nối API). */
 export default function AddEquipment({ onAdd }) {
   const [form, setForm] = useState({
     code: "", name: "", department: "", status: "", date: "", value: "", notes: ""
@@ -14,7 +15,6 @@ export default function AddEquipment({ onAdd }) {
   function submit(e) {
     e.preventDefault();
     if (!form.code || !form.name || !form.department || !form.status || !form.date || !form.value) {
-      alert("Vui lòng điền đủ thông tin bắt buộc");
       return;
     }
     onAdd({
@@ -34,61 +34,124 @@ export default function AddEquipment({ onAdd }) {
   }
 
   return (
-    <div className="ae-root card">
-      <h3>Thêm Vật tư Y tế mới</h3>
-      <form className="ae-form" onSubmit={submit}>
-        <div className="ae-grid">
-          <div className="ae-field">
-            <label>Mã vật tư</label>
-            <input id="code" value={form.code} onChange={handleChange} required />
-          </div>
-          <div className="ae-field">
-            <label>Tên vật tư</label>
-            <input id="name" value={form.name} onChange={handleChange} required />
-          </div>
-          <div className="ae-field">
-            <label>Khoa phòng</label>
-            <select id="department" value={form.department} onChange={handleChange} required>
-              <option value="">Chọn khoa phòng</option>
-              <option value="Khoa Nội">Khoa Nội</option>
-              <option value="Khoa Ngoại">Khoa Ngoại</option>
-              <option value="Khoa Sản">Khoa Sản</option>
-              <option value="Khoa Nhi">Khoa Nhi</option>
-              <option value="Khoa Cấp cứu">Khoa Cấp cứu</option>
-              <option value="Khoa Xét nghiệm">Khoa Xét nghiệm</option>
-            </select>
-          </div>
-
-          <div className="ae-field">
-            <label>Trạng thái</label>
-            <select id="status" value={form.status} onChange={handleChange} required>
-              <option value="">Chọn trạng thái</option>
-              <option value="Hoạt động tốt">Hoạt động tốt</option>
-              <option value="Cần bảo trì">Cần bảo trì</option>
-              <option value="Hỏng hóc">Hỏng hóc</option>
-            </select>
-          </div>
-
-          <div className="ae-field">
-            <label>Ngày mua</label>
-            <input id="date" type="date" value={form.date} onChange={handleChange} required />
-          </div>
-          <div className="ae-field">
-            <label>Giá trị (VNĐ)</label>
-            <input id="value" type="number" value={form.value} onChange={handleChange} required />
+    <div className="ui-page">
+      <div className="ui-page-frame">
+        {/* Page header */}
+        <div className="ui-page-head">
+          <div>
+            <h1 className="ui-page-title">Thêm vật tư y tế</h1>
+            <p className="ui-page-subtitle">
+              Nhập đầy đủ thông tin để ghi nhận vật tư mới vào danh sách quản lý.
+            </p>
           </div>
         </div>
 
-        <div className="ae-field full">
-          <label>Ghi chú</label>
-          <textarea id="notes" rows="3" value={form.notes} onChange={handleChange}></textarea>
-        </div>
+        <div className="ui-section">
+          <form onSubmit={submit}>
+            {/* Thông tin cơ bản */}
+            <div className="ui-form-grid cols-2">
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="code">Mã vật tư <span style={{ color: "#dc2626" }}>*</span></label>
+                <input
+                  id="code"
+                  className="ui-input"
+                  placeholder="VD: TB001"
+                  value={form.code}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
 
-        <div className="ae-actions">
-          <button type="button" className="btn cancel" onClick={reset}>Hủy</button>
-          <button type="submit" className="btn primary">Thêm vật tư</button>
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="name">Tên vật tư / thiết bị <span style={{ color: "#dc2626" }}>*</span></label>
+                <input
+                  id="name"
+                  className="ui-input"
+                  placeholder="VD: Máy đo huyết áp"
+                  value={form.name}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="department">Khoa / Phòng <span style={{ color: "#dc2626" }}>*</span></label>
+                <select id="department" className="ui-select" value={form.department} onChange={handleChange} required>
+                  <option value="">Chọn khoa phòng</option>
+                  <option value="Khoa Nội">Khoa Nội</option>
+                  <option value="Khoa Ngoại">Khoa Ngoại</option>
+                  <option value="Khoa Sản">Khoa Sản</option>
+                  <option value="Khoa Nhi">Khoa Nhi</option>
+                  <option value="Khoa Cấp cứu">Khoa Cấp cứu</option>
+                  <option value="Khoa Xét nghiệm">Khoa Xét nghiệm</option>
+                  <option value="Khoa Tim mạch">Khoa Tim mạch</option>
+                  <option value="Khoa Thần kinh">Khoa Thần kinh</option>
+                </select>
+              </div>
+
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="status">Tình trạng <span style={{ color: "#dc2626" }}>*</span></label>
+                <select id="status" className="ui-select" value={form.status} onChange={handleChange} required>
+                  <option value="">Chọn tình trạng</option>
+                  <option value="Hoạt động tốt">Hoạt động tốt</option>
+                  <option value="Cần bảo trì">Cần bảo trì</option>
+                  <option value="Hỏng hóc">Hỏng hóc</option>
+                  <option value="Ngừng sử dụng">Ngừng sử dụng</option>
+                </select>
+              </div>
+
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="date">Ngày nhập / ngày mua <span style={{ color: "#dc2626" }}>*</span></label>
+                <input
+                  id="date"
+                  className="ui-input"
+                  type="date"
+                  value={form.date}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="ui-field">
+                <label className="ui-label" htmlFor="value">Giá trị (VNĐ) <span style={{ color: "#dc2626" }}>*</span></label>
+                <input
+                  id="value"
+                  className="ui-input"
+                  type="number"
+                  min="0"
+                  placeholder="VD: 5000000"
+                  value={form.value}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Ghi chú */}
+            <div className="ui-field" style={{ marginTop: 14 }}>
+              <label className="ui-label" htmlFor="notes">Ghi chú thêm</label>
+              <textarea
+                id="notes"
+                className="ui-textarea"
+                rows="3"
+                placeholder="Nhập mô tả, nhà sản xuất, số serial hoặc thông tin liên quan khác..."
+                value={form.notes}
+                onChange={handleChange}
+              />
+            </div>
+
+            {/* Nút hành động */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
+              <button type="button" className="ui-btn ui-btn-secondary" onClick={reset}>
+                Nhập lại
+              </button>
+              <button type="submit" className="ui-btn ui-btn-primary">
+                Thêm vật tư
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

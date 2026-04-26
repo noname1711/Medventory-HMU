@@ -32,9 +32,9 @@
 
 /* Active tab */
 .dt-tab.active {
-  background: #2563eb;
+  background: var(--ui-primary);
   color: white;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 6px 18px rgba(30, 64, 175, 0.2);
   transform: translateY(-2px);
 }
 
@@ -71,6 +71,34 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Trạng thái đang đồng bộ quyền */
+.dt-perm-loading {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dt-perm-loading::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  border-top-color: #6b7280;
+  animation: dtPermSpin 0.8s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes dtPermSpin {
+  to { transform: rotate(360deg); }
 }
 
 /* Hiệu ứng highlight trượt dưới chân tab */

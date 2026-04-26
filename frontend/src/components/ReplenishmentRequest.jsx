@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import "./dashboard-ui.css";
 import "./ReplenishmentRequest.css";
+import MaterialSearchInput from "./MaterialSearchInput";
 
 export default function ReplenishmentRequest() {
   const UNIT_MAP = {
@@ -45,21 +46,20 @@ export default function ReplenishmentRequest() {
     });
   }
 
-  function handleSelectMaterial(index, e) {
-    const id = e.target.value;
-    const material = materials.find((m) => m.materialId === Number(id));
-
-    if (!material) {
-      changeItem(index, { target: { name: "materialId", value: "" } });
-      return;
-    }
-
-    changeItem(index, { target: { name: "materialId", value: material.materialId } });
-    changeItem(index, { target: { name: "materialName", value: material.materialName } });
-    changeItem(index, { target: { name: "specification", value: material.specification } });
-    changeItem(index, { target: { name: "unitId", value: material.unitId } });
-    changeItem(index, { target: { name: "materialCode", value: material.materialCode } });
-    changeItem(index, { target: { name: "manufacturer", value: material.manufacturer } });
+  function handleSelectMaterial(index, material) {
+    setItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        materialId: material.materialId,
+        materialName: material.materialName,
+        specification: material.specification || "",
+        unitId: material.unitId || "",
+        materialCode: material.materialCode || "",
+        manufacturer: material.manufacturer || "",
+      };
+      return updated;
+    });
   }
 
   function addRow() {
@@ -152,7 +152,7 @@ export default function ReplenishmentRequest() {
         qtyRequested: Number(item.thisYearQty || 0),
         materialCode: item.materialCode,
         manufacturer: item.manufacturer,
-        reason: "Tự động tạo dự trù",
+        reason: "Tải từ dự trù năm trước",
       }));
 
       setItems(mapped);
@@ -195,15 +195,26 @@ export default function ReplenishmentRequest() {
     fetchDepartments();
   }, []);
 
+  // Adapter array for MaterialSearchInput (id, materialName, materialCode, unitName)
+  const materialSearchItems = useMemo(
+    () => materials.map((m) => ({
+      id: m.materialId,
+      materialName: m.materialName,
+      materialCode: m.materialCode || '',
+      unitName: UNIT_MAP[m.unitId] || '',
+    })),
+    [materials]
+  );
+
   return (
     <div className="ui-page req-page">
       <div className="ui-page-frame">
         <div className="ui-page-stack">
           <div className="ui-card-header req-page-header">
             <div>
-              <h3 className="ui-card-title">Phiếu dự trù bổ sung hàng hóa</h3>
+              <h3 className="ui-card-title">Tạo phiếu dự trù bổ sung vật tư</h3>
               <p className="ui-card-subtitle">
-                Trang này dùng cùng khung trắng, cùng giới hạn chiều ngang và cùng hệ điều khiển với trang danh sách vật tư.
+                Lập danh sách vật tư cần bổ sung cho năm tới. Sau khi gửi, phiếu sẽ được chuyển đến lãnh đạo để phê duyệt.
               </p>
             </div>
           </div>
@@ -264,19 +275,24 @@ export default function ReplenishmentRequest() {
                           <td className="text-center">{index + 1}</td>
 
                           <td>
-                            <select
-                              className="ui-select"
-                              name="materialId"
-                              value={item.materialId || ""}
-                              onChange={(e) => handleSelectMaterial(index, e)}
-                            >
-                              <option value="">Chọn vật tư</option>
-                              {materials.map((material) => (
-                                <option key={material.materialId} value={material.materialId}>
-                                  {material.materialName}
-                                </option>
-                              ))}
-                            </select>
+                            <MaterialSearchInput
+                              value={item.materialName || ""}
+                              onChange={(text) =>
+                                setItems((prev) => {
+                                  const u = [...prev];
+                                  u[index] = { ...u[index], materialName: text };
+                                  return u;
+                                })
+                              }
+                              onSelect={(selectedItem) => {
+                                const original = materials.find(
+                                  (m) => m.materialId === selectedItem.id
+                                );
+                                if (original) handleSelectMaterial(index, original);
+                              }}
+                              items={materialSearchItems}
+                              placeholder="Chọn vật tư"
+                            />
                           </td>
 
                           <td>

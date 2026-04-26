@@ -103,10 +103,9 @@ export default function InventoryPage() {
         <div className="ui-page-stack">
           <div className="ui-card-header eq-page-header">
             <div>
-              <h3 className="ui-card-title">Danh sách vật tư</h3>
+              <h3 className="ui-card-title">Quản lý vật tư kho</h3>
               <p className="ui-card-subtitle">
-                Toàn bộ nội dung của trang được đặt trong một khung trắng thống nhất để giống với
-                trang dự trù và tránh bị kéo quá dài trên màn hình lớn.
+                Theo dõi tình trạng tồn kho, thêm vật tư mới và tra cứu theo mã hoặc tên vật tư.
               </p>
             </div>
           </div>
@@ -138,7 +137,7 @@ export default function InventoryPage() {
               <div>
                 <h3 className="ui-card-title">Thêm vật tư mới</h3>
                 <p className="ui-card-subtitle">
-                  Form này dùng cùng hệ giao diện với trang dự trù để về sau tái sử dụng dễ hơn.
+                  Nhập thông tin vật tư để đưa vào danh mục kho. Mã vật tư phải là duy nhất trong hệ thống.
                 </p>
               </div>
             </div>
@@ -229,7 +228,7 @@ export default function InventoryPage() {
               <div>
                 <h3 className="ui-card-title">Danh sách vật tư tồn kho</h3>
                 <p className="ui-card-subtitle">
-                  Bảng dùng cùng style với bảng trong trang dự trù để đồng bộ toàn hệ thống.
+                  Tìm theo mã hoặc tên vật tư. Tồn kho được tổng hợp từ các phiếu nhập và xuất kho.
                 </p>
               </div>
 
@@ -271,7 +270,9 @@ export default function InventoryPage() {
                   ) : (
                     <tr>
                       <td colSpan="4" className="ui-empty">
-                        Không có dữ liệu
+                        {keyword
+                          ? `Không tìm thấy vật tư phù hợp với "${keyword}"`
+                          : "Chưa có vật tư nào trong kho. Sử dụng form phía trên để thêm vật tư đầu tiên."}
                       </td>
                     </tr>
                   )}

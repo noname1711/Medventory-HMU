@@ -596,7 +596,7 @@ export default function IssuePage() {
           <div className="ui-page-head">
             <div>
               <h1 className="ui-page-title">Xuất kho</h1>
-              <p className="ui-page-subtitle">Tạo phiếu xuất từ các phiếu xin lĩnh đã đủ điều kiện.</p>
+              <p className="ui-page-subtitle">Tạo phiếu xuất kho từ các phiếu xin lĩnh đã được phê duyệt và đủ điều kiện tồn kho.</p>
             </div>
           </div>
           <div className="ui-alert is-error">{bootError}</div>
@@ -632,43 +632,12 @@ export default function IssuePage() {
           <div className={`ui-alert ${listMsg.type === "error" ? "is-error" : "is-success"}`}>{listMsg.text}</div>
         ) : null}
 
-        <div className="issue-filter-grid">
-          <div className="ui-field">
-            <label className="ui-label">Lọc theo Khoa (ID)</label>
-            <input
-              className="ui-input"
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              placeholder="Ví dụ: 1"
-            />
-          </div>
-
-          <div className="ui-field">
-            <label className="ui-label">Lọc theo Bộ môn (ID)</label>
-            <input
-              className="ui-input"
-              value={subDepartmentId}
-              onChange={(e) => setSubDepartmentId(e.target.value)}
-              placeholder="Ví dụ: 3"
-            />
-          </div>
-
-          <div className="ui-field">
-            <label className="ui-label">Số phiếu hiển thị</label>
-            <input
-              className="ui-input"
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-              placeholder="80"
-            />
-          </div>
-        </div>
-
         {summary ? (
           <div className="issue-summary-grid">
-            <div className="ui-stat-card">
+            <div className="ui-stat-card is-success">
               <p className="ui-stat-label">Đã kiểm tra</p>
               <p className="ui-stat-value">{summary.checked ?? "-"}</p>
+              <p className="ui-stat-note">Tổng phiếu đã xét</p>
             </div>
             <div className="ui-stat-card is-primary">
               <p className="ui-stat-label">Đủ điều kiện</p>
@@ -682,6 +651,38 @@ export default function IssuePage() {
             </div>
           </div>
         ) : null}
+
+        <div className="issue-filter-grid">
+          <div className="ui-field">
+            <label className="ui-label">Khoa / Phòng</label>
+            <input
+              className="ui-input"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              placeholder="ID khoa, để trống = tất cả"
+            />
+          </div>
+
+          <div className="ui-field">
+            <label className="ui-label">Bộ môn</label>
+            <input
+              className="ui-input"
+              value={subDepartmentId}
+              onChange={(e) => setSubDepartmentId(e.target.value)}
+              placeholder="ID bộ môn, để trống = tất cả"
+            />
+          </div>
+
+          <div className="ui-field">
+            <label className="ui-label">Số phiếu hiển thị</label>
+            <input
+              className="ui-input"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              placeholder="80"
+            />
+          </div>
+        </div>
 
         <div className="ui-table-wrap">
           <table className="ui-table issue-table">

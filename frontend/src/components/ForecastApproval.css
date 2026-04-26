@@ -3,47 +3,10 @@
    Dùng chung với dashboard-ui.css để đồng bộ toàn dashboard.
 ========================================================= */
 
-.fa-page-frame {
-  max-width: 1180px;
-}
-
 .fa-stat-grid {
   margin-bottom: 18px;
 }
 
-.fa-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 6px;
-  border: 1px solid var(--ui-border);
-  background: #f8fafc;
-  border-radius: 14px;
-}
-
-.fa-tab {
-  border: none;
-  background: transparent;
-  color: #4b5563;
-  min-height: 38px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
-}
-
-.fa-tab:hover {
-  background: #eef2ff;
-  color: var(--ui-primary);
-}
-
-.fa-tab.is-active {
-  background: var(--ui-primary);
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
-}
 
 .fa-loading-box {
   min-height: 240px;
@@ -81,41 +44,6 @@
   flex-wrap: wrap;
 }
 
-.fa-status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 800;
-  border: 1px solid transparent;
-}
-
-.fa-status-badge.pending {
-  color: #b45309;
-  background: #fffbeb;
-  border-color: rgba(217, 119, 6, 0.18);
-}
-
-.fa-status-badge.approved {
-  color: #166534;
-  background: #f0fdf4;
-  border-color: rgba(22, 163, 74, 0.18);
-}
-
-.fa-status-badge.rejected {
-  color: #b91c1c;
-  background: #fef2f2;
-  border-color: rgba(220, 38, 38, 0.18);
-}
-
-.fa-status-badge.unknown {
-  color: #475569;
-  background: #f8fafc;
-  border-color: var(--ui-border);
-}
 
 .fa-modal-overlay {
   position: fixed;

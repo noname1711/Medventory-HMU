@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import Chart from "chart.js/auto";
+import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import "./dashboard-ui.css";
@@ -19,8 +18,6 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("pending");
   const [adminInfo, setAdminInfo] = useState(null);
 
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
   const navigate = useNavigate();
 
   const availableRoles = [
@@ -167,57 +164,6 @@ export default function Admin() {
   const pendingCount = useMemo(() => users.filter((u) => u.statusValue === 0).length, [users]);
   const totalCount = users.length;
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const ctx = chartRef.current?.getContext("2d");
-    if (!ctx) return;
-
-    if (chartInstance.current) chartInstance.current.destroy();
-
-    chartInstance.current = new Chart(ctx, {
-      type: "doughnut",
-      data: {
-        labels: ["Đã duyệt", "Chờ duyệt"],
-        datasets: [
-          {
-            data: [approvedCount, pendingCount],
-            backgroundColor: ["#16a34a", "#d97706"],
-            borderColor: "#ffffff",
-            borderWidth: 4,
-          },
-        ],
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: {
-              usePointStyle: true,
-              padding: 18,
-              font: { size: 12, weight: 700 },
-            },
-          },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const label = ctx.label || "";
-                const value = ctx.parsed;
-                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const percent = total ? ((value / total) * 100).toFixed(1) : 0;
-                return `${label}: ${value} tài khoản (${percent}%)`;
-              },
-            },
-          },
-        },
-        cutout: "62%",
-      },
-    });
-
-    return () => {
-      if (chartInstance.current) chartInstance.current.destroy();
-    };
-  }, [approvedCount, pendingCount, isAuthenticated]);
 
   const approveUser = async (id) => {
     try {
@@ -393,7 +339,7 @@ export default function Admin() {
           </div>
         </div>
 
-        <div className="ui-stat-grid admin-stat-grid">
+        <div className="ui-stat-grid">
           <div className="ui-stat-card is-primary">
             <p className="ui-stat-label">Tổng tài khoản</p>
             <p className="ui-stat-value">{totalCount}</p>
@@ -411,20 +357,7 @@ export default function Admin() {
           </div>
         </div>
 
-        <div className="admin-layout-grid">
-          <section className="ui-section admin-chart-section">
-            <div className="ui-section-head">
-              <div>
-                <h2 className="ui-section-title">Thống kê trạng thái</h2>
-                <p className="ui-section-subtitle">Biểu đồ tổng quan theo tình trạng phê duyệt tài khoản.</p>
-              </div>
-            </div>
-            <div className="admin-chart-wrap">
-              <canvas ref={chartRef}></canvas>
-            </div>
-          </section>
-
-          <section className="ui-section admin-table-section">
+        <section className="ui-section admin-table-section">
             <div className="ui-section-head">
               <div>
                 <h2 className="ui-section-title">Danh sách tài khoản</h2>
@@ -433,16 +366,16 @@ export default function Admin() {
               <div className="admin-count-chip">{filteredUsers.length} tài khoản</div>
             </div>
 
-            <div className="admin-tabs">
+            <div className="ui-tabs">
               <button
-                className={`admin-tab ${activeTab === "pending" ? "active" : ""}`}
+                className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`}
                 onClick={() => setActiveTab("pending")}
                 type="button"
               >
                 Chờ duyệt ({pendingCount})
               </button>
               <button
-                className={`admin-tab ${activeTab === "approved" ? "active" : ""}`}
+                className={`ui-tab ${activeTab === "approved" ? "is-active" : ""}`}
                 onClick={() => setActiveTab("approved")}
                 type="button"
               >
@@ -515,8 +448,7 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
-          </section>
-        </div>
+        </section>
       </div>
 
       {editingUser && (

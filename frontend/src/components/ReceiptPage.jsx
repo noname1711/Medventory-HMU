@@ -76,9 +76,9 @@ function MaterialSearch({
 
     const rect = inputRef.current.getBoundingClientRect();
     setDropdownStyle({
-      position: "absolute",
-      top: rect.bottom + window.scrollY + 4,
-      left: rect.left + window.scrollX,
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
       width: rect.width,
       maxHeight: 280,
       overflowY: "auto",
@@ -92,11 +92,11 @@ function MaterialSearch({
     updatePosition();
     const handleMove = () => updatePosition();
     window.addEventListener("resize", handleMove);
-    window.addEventListener("scroll", handleMove, true);
+    document.addEventListener("scroll", handleMove, true);
 
     return () => {
       window.removeEventListener("resize", handleMove);
-      window.removeEventListener("scroll", handleMove, true);
+      document.removeEventListener("scroll", handleMove, true);
     };
   }, [open]);
 
@@ -118,24 +118,19 @@ function MaterialSearch({
 
   async function doSearch(query) {
     const keyword = query.trim();
-    if (!keyword) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       const data = await fetchMaterials(keyword);
       let list = Array.isArray(data) ? data : [];
-      const search = keyword.toLowerCase();
 
-      if (mode === "name") {
-        list = list.filter((item) => item?.name && item.name.toLowerCase().includes(search));
-      }
-
-      if (mode === "code") {
-        list = list.filter((item) => item?.code && item.code.toLowerCase().includes(search));
+      if (keyword) {
+        const search = keyword.toLowerCase();
+        if (mode === "name") {
+          list = list.filter((item) => item?.name && item.name.toLowerCase().includes(search));
+        }
+        if (mode === "code") {
+          list = list.filter((item) => item?.code && item.code.toLowerCase().includes(search));
+        }
       }
 
       setItems(list.slice(0, 12));
@@ -697,8 +692,7 @@ export default function ReceiptPage() {
           <div>
             <h1 className="ui-page-title">Nhập kho</h1>
             <p className="ui-page-subtitle">
-              Trang nhập kho đã được đưa về cùng khung trắng, cùng giới hạn chiều ngang,
-              cùng hệ button, form và bảng với các trang trước.
+              Ghi nhận vật tư, thiết bị nhận mới từ nhà cung cấp vào kho. Kiểm tra kỹ số lô và hạn dùng trước khi lưu phiếu.
             </p>
           </div>
 
@@ -796,18 +790,16 @@ export default function ReceiptPage() {
                 <table className="ui-table receipt-table">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 250 }}>Tên vật tư</th>
-                      <th style={{ minWidth: 150 }}>Mã vật tư</th>
-                      <th style={{ minWidth: 180 }}>Quy cách</th>
-                      <th style={{ minWidth: 90 }}>ĐVT</th>
-                      <th style={{ minWidth: 120 }} className="text-right">SL chứng từ</th>
-                      <th style={{ minWidth: 120 }} className="text-right">SL thực nhập</th>
-                      <th style={{ minWidth: 130 }} className="text-right">Đơn giá</th>
-                      <th style={{ minWidth: 150 }}>Số lô</th>
-                      <th style={{ minWidth: 130 }}>Ngày SX</th>
-                      <th style={{ minWidth: 130 }}>Hạn dùng</th>
-                      <th style={{ minWidth: 130 }} className="text-right">Thành tiền</th>
-                      <th style={{ width: 100 }} className="text-center">Thao tác</th>
+                      <th style={{ minWidth: 220 }}>Tên vật tư</th>
+                      <th style={{ minWidth: 76 }}>ĐVT</th>
+                      <th style={{ minWidth: 90 }} className="text-right">SL chứng từ</th>
+                      <th style={{ minWidth: 90 }} className="text-right">SL thực nhập</th>
+                      <th style={{ minWidth: 110 }} className="text-right">Đơn giá</th>
+                      <th style={{ minWidth: 120 }}>Số lô</th>
+                      <th style={{ minWidth: 120 }}>Ngày SX</th>
+                      <th style={{ minWidth: 120 }}>Hạn dùng</th>
+                      <th style={{ minWidth: 110 }} className="text-right">Thành tiền</th>
+                      <th style={{ width: 72 }} className="text-center">Xóa</th>
                     </tr>
                   </thead>
 
@@ -837,31 +829,9 @@ export default function ReceiptPage() {
                               placeholder="Gõ tên vật tư..."
                               isDuplicate={isNameDuplicate}
                             />
-                          </td>
-
-                          <td>
-                            <MaterialSearch
-                              mode="code"
-                              value={row.code}
-                              onChange={(value) =>
-                                setRow(row.key, {
-                                  code: value,
-                                  materialId: null,
-                                  name: "",
-                                  spec: "",
-                                  unitId: "",
-                                  unitName: "",
-                                })
-                              }
-                              onPick={(material) => pickMaterial(row.key, material)}
-                              fetchMaterials={fetchMaterials}
-                              placeholder="Gõ mã vật tư..."
-                              isDuplicate={isCodeDuplicate}
-                            />
-                          </td>
-
-                          <td>
-                            <input className="ui-input receipt-table-input" value={row.spec} disabled />
+                            {row.code ? (
+                              <span className="receipt-code-badge">{row.code}</span>
+                            ) : null}
                           </td>
 
                           <td>
@@ -945,19 +915,24 @@ export default function ReceiptPage() {
                 </table>
               </div>
 
-              <div className="receipt-controls-row">
+              {/* Hàng phụ: thêm dòng (hành động nhỏ, nằm sát bảng) */}
+              <div className="receipt-add-row-bar">
+                <button type="button" className="ui-btn ui-btn-secondary ui-btn-sm" onClick={addRow}>
+                  + Thêm dòng
+                </button>
+              </div>
+
+              {/* Footer chính: tổng tiền + nút hành động quan trọng */}
+              <div className="receipt-footer-bar">
                 <div className="receipt-total-box">
                   <p className="receipt-total-label">Tổng chi phí phiếu nhập</p>
                   <p className="receipt-total-value">{moneyFmt.format(totals.grand)}</p>
                   <p className="receipt-total-hint">
-                    Giá trị này được cộng tự động từ số lượng thực nhập và đơn giá của từng dòng.
+                    Tự động tính từ số lượng thực nhập × đơn giá mỗi dòng.
                   </p>
                 </div>
 
-                <div className="receipt-actions">
-                  <button type="button" className="ui-btn ui-btn-secondary" onClick={addRow}>
-                    + Thêm dòng
-                  </button>
+                <div className="receipt-primary-actions">
                   <button
                     type="button"
                     className="ui-btn ui-btn-secondary"
@@ -972,7 +947,7 @@ export default function ReceiptPage() {
                   </button>
                   <button
                     type="button"
-                    className="ui-btn ui-btn-primary"
+                    className="ui-btn ui-btn-primary receipt-save-btn"
                     onClick={submit}
                     disabled={loading}
                   >

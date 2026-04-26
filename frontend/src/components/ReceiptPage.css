@@ -55,7 +55,18 @@
 }
 
 .receipt-table {
-  min-width: 1360px;
+  min-width: 900px;
+}
+
+.receipt-code-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .receipt-table td,
@@ -95,6 +106,44 @@
   color: #dc2626;
 }
 
+/* Hàng nhỏ ngay dưới bảng: chỉ chứa "+ Thêm dòng" */
+.receipt-add-row-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 0;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0;
+}
+
+/* Footer chính: tổng tiền + nút Làm mới / Lưu phiếu nhập */
+.receipt-footer-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  margin: 0 -18px -18px;           /* âm margin để khớp padding của ui-section */
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0 0 12px 12px;
+}
+
+.receipt-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Nút Lưu phiếu nhập nổi bật hơn */
+.receipt-save-btn {
+  min-width: 148px;
+  font-size: 1rem;
+}
+
+/* Giữ lại class cũ cho history toolbar (không bị ảnh hưởng) */
 .receipt-controls-row {
   display: flex;
   align-items: stretch;
@@ -173,21 +222,27 @@
 }
 
 .receipt-dropdown {
-  border-radius: 12px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  min-width: 280px;
 }
 
 .receipt-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   border: none;
   background: #ffffff;
   cursor: pointer;
-  padding: 10px 12px;
+  padding: 8px 10px;
   text-align: left;
-  border-bottom: 1px solid #eff6ff;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease;
 }
 
 .receipt-dropdown-item:last-child {
@@ -195,33 +250,37 @@
 }
 
 .receipt-dropdown-item:hover {
-  background: #f8fbff;
+  background: #f0f9ff;
 }
 
 .receipt-dropdown-name {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.875rem;
+  flex: 1;
   gap: 8px;
-  font-weight: 800;
-  color: #111827;
 }
 
 .receipt-dropdown-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #eff6ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #dbeafe;
   color: #1d4ed8;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .receipt-dropdown-empty {
-  padding: 12px;
+  padding: 10px;
   text-align: center;
-  color: #6b7280;
-  font-size: 0.9rem;
+  color: #94a3b8;
+  font-size: 0.875rem;
 }
 
 @media (max-width: 980px) {
