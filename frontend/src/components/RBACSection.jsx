@@ -838,51 +838,40 @@ export default function RBACSection({ adminInfo }) {
             </span>
           </div>
 
-          <div className="ui-toolbar rbac-tools-row">
-            <input
-              className="ui-input ui-search"
-              type="text"
-              placeholder="Tìm theo code / tên / mô tả quyền..."
-              value={permSearch}
-              onChange={(e) => setPermSearch(e.target.value)}
-              disabled={rbacLoading}
-            />
-
-            <div className="ui-toolbar-actions">
-              <button
-                className="ui-btn ui-btn-secondary ui-btn-sm"
-                onClick={() => selectAllFilteredRolePermissions(filteredPermissionsForRole)}
-                disabled={
-                  rbacLoading ||
-                  rbacSaving ||
-                  !selectedRoleCode ||
-                  String(selectedRoleCode).toUpperCase() === "BGH" ||
-                  filteredPermissionsForRole.filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length === 0
-                }
-              >
-                Chọn tất cả (lọc)
-              </button>
-              <button
-                className="ui-btn ui-btn-secondary ui-btn-sm"
-                onClick={() => clearAllFilteredRolePermissions(filteredPermissionsForRole)}
-                disabled={
-                  rbacLoading ||
-                  rbacSaving ||
-                  !selectedRoleCode ||
-                  String(selectedRoleCode).toUpperCase() === "BGH" ||
-                  filteredPermissionsForRole.filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length === 0
-                }
-              >
-                Bỏ chọn (lọc)
-              </button>
-            </div>
+          <div className="ui-toolbar-actions rbac-grid-actions">
+            <button
+              className="ui-btn ui-btn-secondary ui-btn-sm"
+              onClick={() => selectAllFilteredRolePermissions(filteredPermissionsForRole)}
+              disabled={
+                rbacLoading ||
+                rbacSaving ||
+                !selectedRoleCode ||
+                String(selectedRoleCode).toUpperCase() === "BGH" ||
+                filteredPermissionsForRole.filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length === 0
+              }
+            >
+              Chọn tất cả
+            </button>
+            <button
+              className="ui-btn ui-btn-secondary ui-btn-sm"
+              onClick={() => clearAllFilteredRolePermissions(filteredPermissionsForRole)}
+              disabled={
+                rbacLoading ||
+                rbacSaving ||
+                !selectedRoleCode ||
+                String(selectedRoleCode).toUpperCase() === "BGH" ||
+                filteredPermissionsForRole.filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length === 0
+              }
+            >
+              Bỏ chọn tất cả
+            </button>
           </div>
 
           <div className="rbac-perm-grid">
             {rbacLoading && <div className="ui-empty">Đang tải dữ liệu phân quyền...</div>}
 
             {!rbacLoading && filteredPermissionsForRole.length === 0 && (
-              <div className="ui-empty">Không có quyền nào khớp từ khóa tìm kiếm.</div>
+              <div className="ui-empty">Không có quyền nào khả dụng.</div>
             )}
 
             {!rbacLoading &&
@@ -985,32 +974,21 @@ export default function RBACSection({ adminInfo }) {
             </span>
           </div>
 
-          <div className="ui-toolbar rbac-tools-row">
-            <input
-              className="ui-input ui-search"
-              type="text"
-              placeholder="Tìm theo code / tên / mô tả quyền..."
-              value={userPermSearch}
-              onChange={(e) => setUserPermSearch(e.target.value)}
-              disabled={userLoading}
-            />
-
-            <div className="ui-toolbar-actions">
-              <button
-                className="ui-btn ui-btn-secondary ui-btn-sm"
-                onClick={() => selectAllFilteredUserPermissions(filteredPermissionsForUser)}
-                disabled={userLoading || userSaving || !selectedUserId || filteredPermissionsForUser.length === 0}
-              >
-                Chọn tất cả (lọc)
-              </button>
-              <button
-                className="ui-btn ui-btn-secondary ui-btn-sm"
-                onClick={() => clearAllFilteredUserPermissions(filteredPermissionsForUser)}
-                disabled={userLoading || userSaving || !selectedUserId || filteredPermissionsForUser.length === 0}
-              >
-                Bỏ chọn (lọc)
-              </button>
-            </div>
+          <div className="ui-toolbar-actions rbac-grid-actions">
+            <button
+              className="ui-btn ui-btn-secondary ui-btn-sm"
+              onClick={() => selectAllFilteredUserPermissions(filteredPermissionsForUser)}
+              disabled={userLoading || userSaving || !selectedUserId || filteredPermissionsForUser.length === 0}
+            >
+              Chọn tất cả
+            </button>
+            <button
+              className="ui-btn ui-btn-secondary ui-btn-sm"
+              onClick={() => clearAllFilteredUserPermissions(filteredPermissionsForUser)}
+              disabled={userLoading || userSaving || !selectedUserId || filteredPermissionsForUser.length === 0}
+            >
+              Bỏ chọn tất cả
+            </button>
           </div>
 
           <div className="rbac-perm-grid">

@@ -59,8 +59,9 @@
   color: #ffffff;
 }
 
-.rbac-tools-row {
-  margin-bottom: 16px;
+.rbac-grid-actions {
+  margin-top: 16px;
+  margin-bottom: 14px;
 }
 
 .rbac-perm-grid {
