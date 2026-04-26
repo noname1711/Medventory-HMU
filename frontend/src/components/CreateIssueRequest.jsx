@@ -44,6 +44,7 @@ export default function CreateIssueRequest() {
   const [requestHistory, setRequestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Lấy thông tin user và dữ liệu
   useEffect(() => {
@@ -739,10 +740,8 @@ export default function CreateIssueRequest() {
       {/* Tab Tạo Phiếu Xin Lĩnh */}
       {activeTab === "create" && (
         <form onSubmit={handleSubmit} className="issue-form">
-          {/* Thông tin chung */}
+          {/* Form gộp: thông tin + bảng vật tư */}
           <div className="ui-section">
-            <div className="ui-section-head"><div><h2 className="ui-section-title">Thông tin chung</h2></div></div>
-
             {/* Thông tin người xin lĩnh */}
             <div className="user-info-card">
               <h4>Thông tin người xin lĩnh</h4>
@@ -783,11 +782,9 @@ export default function CreateIssueRequest() {
                 required
               />
             </div>
-          </div>
 
-          {/* Bảng vật tư */}
-          <div className="ui-section">
-            <div className="ui-section-head"><div><h2 className="ui-section-title">Danh sách vật tư xin lĩnh</h2></div></div>
+            <hr className="cir-divider" />
+            <p className="cir-sub-label">Danh sách vật tư xin lĩnh</p>
 
             <div className="ui-table-wrap table-container">
               <table className="ui-table issue-table">
@@ -926,14 +923,25 @@ export default function CreateIssueRequest() {
               </table>
             </div>
 
-            <div className="table-note">
-              <p><strong>Hướng dẫn sử dụng:</strong></p>
-              <p>• <strong>Nhập mã code</strong>: Hệ thống tự động điền thông tin nếu mã tồn tại trong danh mục (bao gồm cả loại)</p>
-              <p>• <strong>Nhập tên vật tư</strong>: Click vào ô để mở cửa sổ tìm kiếm thông minh (chỉ tìm theo tên)</p>
-              <p>• <strong>Vật tư có sẵn</strong>: Thông tin được khóa, chỉ nhập số lượng, loại không thể thay đổi</p>
-              <p>• <strong>Vật tư mới</strong>: Cần nhập đầy đủ tất cả thông tin</p>
-              <p>• <strong>Loại vật tư</strong>: Tự động điền khi chọn vật tư có sẵn, không thể thay đổi</p>
-              <p>• <strong>Số lượng</strong>: Chỉ nhập số nguyên</p>
+            <div className="cir-help">
+              <button
+                type="button"
+                className="cir-help-toggle"
+                onClick={() => setShowHelp((v) => !v)}
+              >
+                <span>? Hướng dẫn nhập bảng</span>
+                <span className="cir-help-chevron">{showHelp ? "▲" : "▼"}</span>
+              </button>
+              {showHelp && (
+                <ul className="cir-help-list">
+                  <li><strong>Nhập mã code</strong>: Hệ thống tự động điền thông tin nếu mã tồn tại trong danh mục</li>
+                  <li><strong>Nhập tên vật tư</strong>: Click vào ô để mở cửa sổ tìm kiếm thông minh</li>
+                  <li><strong>Vật tư có sẵn</strong>: Thông tin được khóa, chỉ nhập số lượng</li>
+                  <li><strong>Vật tư mới</strong>: Cần nhập đầy đủ tất cả thông tin</li>
+                  <li><strong>Loại vật tư</strong>: Tự động điền khi chọn vật tư có sẵn, không thể thay đổi</li>
+                  <li><strong>Số lượng</strong>: Chỉ nhập số nguyên dương</li>
+                </ul>
+              )}
             </div>
           </div>
 
