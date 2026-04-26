@@ -802,9 +802,9 @@ export default function RBACSection({ adminInfo }) {
               <span className="ui-help">Vai trò Ban Giám Hiệu (BGH) được bảo vệ, không cho phép chỉnh sửa.</span>
             </div>
 
-            <div className="rbac-summary-box">
-              <div>
-                <strong>So với mặc định:</strong>{" "}
+            <div className="ui-field">
+              <label className="ui-label">So với mặc định</label>
+              <div className="rbac-summary-value">
                 {addedVsDefault.length === 0 && removedVsDefault.length === 0
                   ? "Đúng mặc định"
                   : `+${addedVsDefault.length} thêm / −${removedVsDefault.length} bỏ`}
@@ -944,11 +944,22 @@ export default function RBACSection({ adminInfo }) {
               </select>
             </div>
 
-            <div className="rbac-summary-box">
-              <div><strong>Role hiện tại:</strong> {selectedUserInfo?.roleCode ? `${selectedUserInfo.roleCode}${selectedUserInfo?.roleName ? ` (${selectedUserInfo.roleName})` : ""}` : "-"}</div>
-              <div className="rbac-summary-line">
-                <span className="rbac-summary-label">Chế độ:</span>
-                <span>{userSpecial ? <span className="rbac-mode-badge is-special">User đặc biệt</span> : <span className="rbac-mode-badge">Theo role</span>}</span>
+            <div className="ui-field">
+              <label className="ui-label">Thông tin</label>
+              <div className="rbac-summary-value">
+                <span>
+                  Role:{" "}
+                  {selectedUserInfo?.roleCode
+                    ? `${selectedUserInfo.roleCode}${selectedUserInfo?.roleName ? ` (${selectedUserInfo.roleName})` : ""}`
+                    : "—"}
+                </span>
+                <span className="rbac-info-sep">·</span>
+                <span>
+                  Chế độ:{" "}
+                  {userSpecial
+                    ? <span className="rbac-mode-badge is-special">User đặc biệt</span>
+                    : <span className="rbac-mode-badge">Theo role</span>}
+                </span>
               </div>
             </div>
           </div>
@@ -1026,26 +1037,24 @@ export default function RBACSection({ adminInfo }) {
           </div>
         </div>
 
-        <div className="ui-section">
-          <div className="ui-tabs">
-            <button
-              className={`ui-tab ${activeTab === TAB_ROLE ? "is-active" : ""}`}
-              onClick={() => setActiveTab(TAB_ROLE)}
-              disabled={rbacLoading || rbacSaving || userSaving}
-            >
-              Phân quyền theo role
-            </button>
-            <button
-              className={`ui-tab ${activeTab === TAB_USER ? "is-active" : ""}`}
-              onClick={() => setActiveTab(TAB_USER)}
-              disabled={rbacLoading || rbacSaving || userSaving}
-            >
-              Phân quyền theo user
-            </button>
-          </div>
-
-          {activeTab === TAB_ROLE ? renderRoleTab() : renderUserTab()}
+        <div className="ui-tabs">
+          <button
+            className={`ui-tab ${activeTab === TAB_ROLE ? "is-active" : ""}`}
+            onClick={() => setActiveTab(TAB_ROLE)}
+            disabled={rbacLoading || rbacSaving || userSaving}
+          >
+            Phân quyền theo role
+          </button>
+          <button
+            className={`ui-tab ${activeTab === TAB_USER ? "is-active" : ""}`}
+            onClick={() => setActiveTab(TAB_USER)}
+            disabled={rbacLoading || rbacSaving || userSaving}
+          >
+            Phân quyền theo user
+          </button>
         </div>
+
+        {activeTab === TAB_ROLE ? renderRoleTab() : renderUserTab()}
       </div>
     </div>
   );
