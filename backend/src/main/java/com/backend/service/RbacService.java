@@ -169,6 +169,11 @@ public class RbacService {
         requirePermission(u, permCode, errorMessage);
     }
 
+    public void requirePermissionFromAuth(String authorizationHeader, String permCode, String errorMessage) {
+        Long actorId = parseUserIdFromAuth(authorizationHeader);
+        requirePermission(actorId, permCode, errorMessage);
+    }
+
     public void requireAnyPermission(Long userId, String errorMessage, String... permCodes) {
         User u = requireApprovedUser(userId);
         if (!hasAnyPermission(u, permCodes)) {

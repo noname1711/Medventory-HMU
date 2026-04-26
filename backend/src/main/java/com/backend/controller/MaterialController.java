@@ -1,22 +1,19 @@
 package com.backend.controller;
 
+import com.backend.dto.MaterialDTO;
+import com.backend.dto.MaterialFeedResponseDTO;
 import com.backend.entity.Material;
 import com.backend.repository.MaterialRepository;
+import com.backend.service.MaterialService;
+import com.backend.service.RbacService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.backend.dto.MaterialDTO;
-import com.backend.service.MaterialService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-import com.backend.dto.MaterialFeedResponseDTO;
 
 @RestController
 @RequestMapping("/api/materials")
@@ -26,6 +23,7 @@ public class MaterialController {
 
     private final MaterialRepository materialRepository;
     private final MaterialService materialService;
+    private final RbacService rbacService;
 
     // GET /api/materials (using service DTO)
     @GetMapping
@@ -80,9 +78,15 @@ public class MaterialController {
     }
 
     @PostMapping
-    public ResponseEntity<?> addMaterial(@RequestBody MaterialDTO dto) {
+    public ResponseEntity<?> addMaterial(
+            @RequestBody MaterialDTO dto,
+            @RequestHeader("X-User-Id") Long userId
+    ) {
         try {
+            rbacService.requirePermission(userId, RbacService.PERM_MATERIAL_MANAGE, "Ban khong co quyen them vat tu");
             return ResponseEntity.ok(materialService.addMaterial(dto));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity
                     .badRequest()

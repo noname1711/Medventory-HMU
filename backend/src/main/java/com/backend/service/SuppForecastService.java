@@ -137,6 +137,22 @@ public class SuppForecastService {
         }
     }
 
+    public Map<String, Object> getForecastDetail(Long forecastId, Long userId) {
+        User actor = rbacService.requireApprovedUser(userId);
+        SuppForecastHeader forecast = headerRepository.findById(forecastId)
+                .orElseThrow(() -> new RuntimeException("Du tru khong ton tai"));
+
+        boolean isCreator = forecast.getCreatedBy() != null
+                && forecast.getCreatedBy().getId() != null
+                && forecast.getCreatedBy().getId().equals(actor.getId());
+
+        if (!isCreator && !rbacService.hasPermission(actor, RbacService.PERM_SUPP_FORECAST_APPROVE)) {
+            throw new SecurityException("Ban khong co quyen xem du tru nay");
+        }
+
+        return convertToForecastDTO(forecast);
+    }
+
     @Transactional
     public SuppForecastHeader createForecast(SuppForecastRequestDTO dto) {
         // Enforce permission theo user tạo (đang có createdByEmail trong DTO)
