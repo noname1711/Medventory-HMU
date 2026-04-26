@@ -47,32 +47,18 @@
   margin-bottom: 14px;
 }
 
-.rbac-summary-box {
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  padding: 14px 16px;
-  color: #374151;
+.rbac-summary-value {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rbac-summary-line {
-  display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.rbac-summary-label {
-  font-weight: 800;
-  color: #111827;
-}
-
-.rbac-summary-codes {
-  color: #6b7280;
-  word-break: break-word;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #374151;
+  min-height: 42px;
 }
 
 .rbac-mode-badge {
