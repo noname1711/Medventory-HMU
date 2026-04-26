@@ -213,9 +213,6 @@ export default function ReplenishmentRequest() {
           <div className="ui-card-header req-page-header">
             <div>
               <h3 className="ui-card-title">Tạo phiếu dự trù bổ sung vật tư</h3>
-              <p className="ui-card-subtitle">
-                Lập danh sách vật tư cần bổ sung cho năm tới. Sau khi gửi, phiếu sẽ được chuyển đến lãnh đạo để phê duyệt.
-              </p>
             </div>
           </div>
 

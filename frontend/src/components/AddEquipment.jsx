@@ -40,9 +40,6 @@ export default function AddEquipment({ onAdd }) {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Thêm vật tư y tế</h1>
-            <p className="ui-page-subtitle">
-              Nhập đầy đủ thông tin để ghi nhận vật tư mới vào danh sách quản lý.
-            </p>
           </div>
         </div>
 

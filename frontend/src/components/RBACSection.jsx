@@ -754,7 +754,6 @@ export default function RBACSection({ adminInfo }) {
           <div className="ui-section-head">
             <div>
               <h3 className="ui-section-title">Phân quyền theo role</h3>
-              <p className="ui-section-subtitle">Chọn vai trò, lọc danh sách quyền rồi lưu thay đổi cho role đó.</p>
             </div>
             <div className="ui-toolbar-actions">
               <button
@@ -920,7 +919,6 @@ export default function RBACSection({ adminInfo }) {
           <div className="ui-section-head">
             <div>
               <h3 className="ui-section-title">Phân quyền theo user</h3>
-              <p className="ui-section-subtitle">User đặc biệt sẽ dùng bộ quyền riêng và không còn phụ thuộc role cho tới khi quay về theo role.</p>
             </div>
             <div className="ui-toolbar-actions">
               <button className="ui-btn ui-btn-secondary" onClick={discardUserPermissionChanges} disabled={userLoading || userSaving || !dirtyUser}>
@@ -1046,9 +1044,6 @@ export default function RBACSection({ adminInfo }) {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Phân quyền vai trò</h1>
-            <p className="ui-page-subtitle">
-              Cấu hình quyền truy cập theo vai trò (Role) hoặc tùy chỉnh riêng cho từng tài khoản người dùng.
-            </p>
           </div>
         </div>
 

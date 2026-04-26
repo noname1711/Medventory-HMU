@@ -330,9 +330,6 @@ export default function Admin() {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Quản lý người dùng</h1>
-            <p className="ui-page-subtitle">
-              Duyệt tài khoản, theo dõi trạng thái truy cập và thay đổi vai trò trong cùng một giao diện thống nhất.
-            </p>
           </div>
           <div className="admin-page-meta">
             <div className="admin-page-user">{adminInfo?.fullName || "Quản trị viên"}</div>
@@ -361,7 +358,6 @@ export default function Admin() {
             <div className="ui-section-head">
               <div>
                 <h2 className="ui-section-title">Danh sách tài khoản</h2>
-                <p className="ui-section-subtitle">Duyệt, từ chối hoặc cập nhật vai trò người dùng.</p>
               </div>
               <div className="admin-count-chip">{filteredUsers.length} tài khoản</div>
             </div>

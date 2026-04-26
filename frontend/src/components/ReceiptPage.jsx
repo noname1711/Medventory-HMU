@@ -691,9 +691,6 @@ export default function ReceiptPage() {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Nhập kho</h1>
-            <p className="ui-page-subtitle">
-              Ghi nhận vật tư, thiết bị nhận mới từ nhà cung cấp vào kho. Kiểm tra kỹ số lô và hạn dùng trước khi lưu phiếu.
-            </p>
           </div>
 
           <div className="receipt-tabs">
@@ -726,9 +723,6 @@ export default function ReceiptPage() {
               <div className="ui-section-head">
                 <div>
                   <h2 className="ui-section-title">Thông tin phiếu nhập</h2>
-                  <p className="ui-section-subtitle">
-                    Nhập thông tin chung của phiếu trước khi thêm danh sách vật tư.
-                  </p>
                 </div>
               </div>
 
@@ -769,9 +763,6 @@ export default function ReceiptPage() {
               <div className="ui-section-head">
                 <div>
                   <h2 className="ui-section-title">Danh sách vật tư nhập</h2>
-                  <p className="ui-section-subtitle">
-                    Có thể gõ tên hoặc mã vật tư để tìm nhanh. Các dòng trùng sẽ được tô nhạt để tránh nhập lặp.
-                  </p>
                 </div>
               </div>
 
@@ -958,9 +949,6 @@ export default function ReceiptPage() {
             <div className="ui-section-head">
               <div>
                 <h2 className="ui-section-title">Lịch sử phiếu nhập</h2>
-                <p className="ui-section-subtitle">
-                  Tra cứu các phiếu nhập bạn đã tạo trước đó và xem lại chi tiết từng phiếu.
-                </p>
               </div>
             </div>
 

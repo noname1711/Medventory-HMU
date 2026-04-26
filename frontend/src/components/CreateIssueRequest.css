@@ -34,35 +34,28 @@
 }
 
 /* User info */
-.cir-sender-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 16px;
+.cir-sender-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 14px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-}
-
-.cir-sender-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  font-size: 0.875rem;
+  color: #1e293b;
 }
 
 .cir-sender-label {
-  font-size: 0.78rem;
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
 }
 
-.cir-sender-value {
-  font-size: 0.88rem;
-  color: #1e293b;
-  font-weight: 600;
+.cir-sender-sep {
+  color: #cbd5e1;
+  user-select: none;
 }
 
 

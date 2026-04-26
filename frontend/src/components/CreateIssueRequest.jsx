@@ -711,7 +711,6 @@ export default function CreateIssueRequest() {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Tạo phiếu xin lĩnh</h1>
-            <p className="ui-page-subtitle">Tạo phiếu xin lĩnh và theo dõi lịch sử gửi phiếu trên cùng một giao diện thống nhất.</p>
           </div>
         </div>
 
@@ -742,30 +741,17 @@ export default function CreateIssueRequest() {
         <form onSubmit={handleSubmit} className="issue-form">
           {/* Form gộp: thông tin + bảng vật tư */}
           <div className="ui-section">
-            {/* Thông tin người xin lĩnh — compact grid */}
-            <div className="cir-sender-grid">
-              <div className="cir-sender-item">
-                <span className="cir-sender-label">Họ và tên</span>
-                <span className="cir-sender-value">{currentUser?.fullName || "—"}</span>
-              </div>
-              <div className="cir-sender-item">
-                <span className="cir-sender-label">Khoa / Phòng</span>
-                <span className="cir-sender-value">{currentUser?.departmentName || "—"}</span>
-              </div>
-              <div className="cir-sender-item">
-                <span className="cir-sender-label">Bộ môn</span>
-                <span className="cir-sender-value">
-                  {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || "—"}
-                </span>
-              </div>
-              <div className="cir-sender-item">
-                <span className="cir-sender-label">Email</span>
-                <span className="cir-sender-value">{currentUser?.email || "—"}</span>
-              </div>
-              <div className="cir-sender-item">
-                <span className="cir-sender-label">Chức vụ</span>
-                <span className="cir-sender-value">{currentUser?.role || "Cán bộ"}</span>
-              </div>
+            {/* Thông tin người xin lĩnh — hàng ngang */}
+            <div className="cir-sender-row">
+              <span><span className="cir-sender-label">Họ và tên:</span> {currentUser?.fullName || "—"}</span>
+              <span className="cir-sender-sep">|</span>
+              <span><span className="cir-sender-label">Khoa / Phòng:</span> {currentUser?.departmentName || "—"}</span>
+              <span className="cir-sender-sep">|</span>
+              <span><span className="cir-sender-label">Bộ môn:</span> {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || "—"}</span>
+              <span className="cir-sender-sep">|</span>
+              <span><span className="cir-sender-label">Email:</span> {currentUser?.email || "—"}</span>
+              <span className="cir-sender-sep">|</span>
+              <span><span className="cir-sender-label">Chức vụ:</span> {currentUser?.role || "Cán bộ"}</span>
             </div>
 
             <div className="ui-field">
