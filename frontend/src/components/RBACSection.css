@@ -4,44 +4,6 @@
    Form / button / card / table cơ bản dùng từ dashboard-ui.css
 ========================================================= */
 
-.rbac-page-frame {
-  max-width: 1180px;
-}
-
-.rbac-tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-
-.rbac-tab {
-  min-height: 42px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #374151;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.rbac-tab:hover {
-  background: #f9fafb;
-}
-
-.rbac-tab.active {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
-}
-
-.rbac-tab:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 .rbac-panel-body {
   display: flex;

@@ -175,11 +175,11 @@ export default function ForecastApproval({ adminInfo }) {
       if (status.value !== undefined) {
         switch (status.value) {
           case 0:
-            return { text: "Chờ duyệt", className: "pending" };
+            return { text: "Chờ duyệt", className: "is-pending" };
           case 1:
-            return { text: "Đã duyệt", className: "approved" };
+            return { text: "Đã duyệt", className: "is-approved" };
           case 2:
-            return { text: "Đã từ chối", className: "rejected" };
+            return { text: "Đã từ chối", className: "is-rejected" };
           default:
             break;
         }
@@ -188,13 +188,13 @@ export default function ForecastApproval({ adminInfo }) {
       if (status.name) {
         const statusName = status.name.toLowerCase();
         if (statusName.includes("pending") || statusName.includes("chờ")) {
-          return { text: "Chờ duyệt", className: "pending" };
+          return { text: "Chờ duyệt", className: "is-pending" };
         }
         if (statusName.includes("approved") || statusName.includes("đã duyệt")) {
-          return { text: "Đã duyệt", className: "approved" };
+          return { text: "Đã duyệt", className: "is-approved" };
         }
         if (statusName.includes("rejected") || statusName.includes("từ chối")) {
-          return { text: "Đã từ chối", className: "rejected" };
+          return { text: "Đã từ chối", className: "is-rejected" };
         }
       }
     }
@@ -209,11 +209,11 @@ export default function ForecastApproval({ adminInfo }) {
     if (!Number.isNaN(statusNum)) {
       switch (statusNum) {
         case 0:
-          return { text: "Chờ duyệt", className: "pending" };
+          return { text: "Chờ duyệt", className: "is-pending" };
         case 1:
-          return { text: "Đã duyệt", className: "approved" };
+          return { text: "Đã duyệt", className: "is-approved" };
         case 2:
-          return { text: "Đã từ chối", className: "rejected" };
+          return { text: "Đã từ chối", className: "is-rejected" };
         default:
           break;
       }
@@ -222,17 +222,17 @@ export default function ForecastApproval({ adminInfo }) {
     if (typeof status === "string") {
       const statusLower = status.toLowerCase();
       if (statusLower.includes("pending") || statusLower.includes("chờ")) {
-        return { text: "Chờ duyệt", className: "pending" };
+        return { text: "Chờ duyệt", className: "is-pending" };
       }
       if (statusLower.includes("approved") || statusLower.includes("đã duyệt")) {
-        return { text: "Đã duyệt", className: "approved" };
+        return { text: "Đã duyệt", className: "is-approved" };
       }
       if (statusLower.includes("rejected") || statusLower.includes("từ chối")) {
-        return { text: "Đã từ chối", className: "rejected" };
+        return { text: "Đã từ chối", className: "is-rejected" };
       }
     }
 
-    return { text: "Không xác định", className: "unknown" };
+    return { text: "Không xác định", className: "is-info" };
   };
 
   const isPendingStatus = (status) => getStatusBadge(status).className === "pending";
@@ -250,7 +250,7 @@ export default function ForecastApproval({ adminInfo }) {
 
   return (
     <div className="ui-page">
-      <div className="ui-page-frame fa-page-frame">
+      <div className="ui-page-frame">
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">{pageTitle}</h1>
@@ -292,17 +292,17 @@ export default function ForecastApproval({ adminInfo }) {
             </div>
           </div>
 
-          <div className="fa-tabs">
+          <div className="ui-tabs">
             <button
               type="button"
-              className={`fa-tab ${activeForecastTab === "pending" ? "is-active" : ""}`}
+              className={`ui-tab ${activeForecastTab === "pending" ? "is-active" : ""}`}
               onClick={() => setActiveForecastTab("pending")}
             >
               Chờ duyệt
             </button>
             <button
               type="button"
-              className={`fa-tab ${activeForecastTab === "processed" ? "is-active" : ""}`}
+              className={`ui-tab ${activeForecastTab === "processed" ? "is-active" : ""}`}
               onClick={() => setActiveForecastTab("processed")}
             >
               Đã xử lý
@@ -344,7 +344,7 @@ export default function ForecastApproval({ adminInfo }) {
                               : "-"}
                           </td>
                           <td>
-                            <span className={`fa-status-badge ${status.className}`}>{status.text}</span>
+                            <span className={`ui-status-badge ${status.className}`}>{status.text}</span>
                           </td>
                           <td className="text-center">
                             <div className="fa-action-group">
@@ -403,7 +403,7 @@ export default function ForecastApproval({ adminInfo }) {
                 <p className="fa-modal-subtitle">Xem thông tin chung và danh sách vật tư của phiếu dự trù.</p>
               </div>
               <div className="fa-modal-header-right">
-                <span className={`fa-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
+                <span className={`ui-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
                   {getStatusBadge(selectedForecast.status).text}
                 </span>
                 <button type="button" className="fa-modal-close" onClick={closeForecastDetails}>

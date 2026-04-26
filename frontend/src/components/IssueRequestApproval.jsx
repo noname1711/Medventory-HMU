@@ -99,7 +99,7 @@ export default function IssueRequestApproval() {
 
       if (pendingRes.status === 403) {
         setAccessDenied(true);
-        setAccessDeniedMsg("Backend từ chối (403). User không có quyền phê duyệt phiếu xin lĩnh.");
+        setAccessDeniedMsg("Tài khoản không có quyền phê duyệt phiếu xin lĩnh.");
         setPendingRequests([]);
         setProcessedRequests([]);
         return;
@@ -118,7 +118,7 @@ export default function IssueRequestApproval() {
 
       if (processedRes.status === 403) {
         setAccessDenied(true);
-        setAccessDeniedMsg("Backend từ chối (403) khi lấy lịch sử phê duyệt.");
+        setAccessDeniedMsg("Không thể tải lịch sử phê duyệt. Tài khoản chưa được cấp quyền.");
         setPendingRequests(pendingData?.requests || []);
         setProcessedRequests([]);
         return;
@@ -153,7 +153,7 @@ export default function IssueRequestApproval() {
 
       if (response.status === 403) {
         setAccessDenied(true);
-        setAccessDeniedMsg("Backend từ chối (403) khi tải danh sách chờ duyệt.");
+        setAccessDeniedMsg("Không có quyền truy cập khi tải danh sách chờ duyệt.");
         setPendingRequests([]);
         return;
       }
@@ -175,7 +175,7 @@ export default function IssueRequestApproval() {
 
       if (response.status === 403) {
         setAccessDenied(true);
-        setAccessDeniedMsg("Backend từ chối (403) khi tải lịch sử phê duyệt.");
+        setAccessDeniedMsg("Không có quyền truy cập khi tải lịch sử phê duyệt.");
         setProcessedRequests([]);
         return;
       }
@@ -262,7 +262,7 @@ export default function IssueRequestApproval() {
       });
 
       if (response.status === 403) {
-        toast.error("Backend từ chối (403). Bạn không có quyền thực hiện thao tác này.");
+        toast.error("Không có quyền truy cập. Bạn không có quyền thực hiện thao tác này.");
         return;
       }
 
@@ -301,7 +301,7 @@ export default function IssueRequestApproval() {
     ({
       approve: "ui-btn ui-btn-primary",
       reject: "ui-btn ui-btn-danger",
-      adjust: "ui-btn ira-btn-adjust",
+      adjust: "ui-btn ui-btn-warning",
     }[action] || "ui-btn ui-btn-primary");
 
   const getStatusUiClass = (request) => {
@@ -358,10 +358,7 @@ export default function IssueRequestApproval() {
       <div className="ui-page issue-request-approval-page">
         <div className="ui-page-frame">
           <div className="ui-alert is-error">
-            <strong>Truy cập bị từ chối.</strong> {accessDeniedMsg || "Bạn không có quyền truy cập tính năng phê duyệt phiếu xin lĩnh."}
-            <div className="ira-access-meta">
-              User ID: {currentUser?.id ?? "-"} | roleCheck: {currentUser?.roleCheck ?? "-"} | role: {currentUser?.role ?? currentUser?.roleName ?? "-"}
-            </div>
+            <strong>Không có quyền truy cập.</strong> Tài khoản của bạn chưa được cấp quyền phê duyệt phiếu xin lĩnh. Liên hệ quản trị viên nếu cần hỗ trợ.
           </div>
         </div>
       </div>
@@ -397,11 +394,11 @@ export default function IssueRequestApproval() {
         </div>
 
         <div className="ui-section">
-          <div className="ira-tabs">
-            <button className={`ira-tab ${activeTab === "pending" ? "active" : ""}`} onClick={() => setActiveTab("pending")}>
+          <div className="ui-tabs">
+            <button className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`} onClick={() => setActiveTab("pending")}>
               Chờ phê duyệt ({pendingRequests.length})
             </button>
-            <button className={`ira-tab ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>
+            <button className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`} onClick={() => setActiveTab("history")}>
               Lịch sử ({processedRequests.length})
             </button>
           </div>
@@ -417,49 +414,55 @@ export default function IssueRequestApproval() {
               <p>Khi có phiếu xin lĩnh mới, chúng sẽ xuất hiện ở đây.</p>
             </div>
           ) : (
-            <div className="ira-card-list">
-              {currentRequests.map((request) => (
-                <div key={request.id} className="ira-request-card">
-                  <div className="ira-request-head">
-                    <div>
-                      <h3 className="ira-request-title">Phiếu #{request.id}</h3>
-                      <div className="ira-request-meta">
-                        <span><strong>Người gửi:</strong> {request.createdByName}</span>
-                        <span><strong>Đơn vị:</strong> {request.departmentName}</span>
-                        <span><strong>Thời gian:</strong> {new Date(request.requestedAt).toLocaleString()}</span>
-                      </div>
-                      {request.status === 2 && request.approvalNote && (
-                        <div className="ira-rejection-reason">
-                          <strong>Lý do từ chối:</strong> {request.approvalNote}
+            <div className="ui-table-wrap">
+              <table className="ui-table ira-table">
+                <thead>
+                  <tr>
+                    <th>Mã phiếu</th>
+                    <th>Người gửi</th>
+                    <th>Đơn vị</th>
+                    <th>Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentRequests.map((request) => (
+                    <tr key={request.id}>
+                      <td className="ira-cell-id">#{request.id}</td>
+                      <td>{request.createdByName}</td>
+                      <td>{request.departmentName}</td>
+                      <td>{new Date(request.requestedAt).toLocaleString("vi-VN")}</td>
+                      <td>
+                        <span className={`ui-status-badge ${getStatusUiClass(request)}`}>{request.statusName}</span>
+                        {request.status === 2 && request.approvalNote && (
+                          <div className="ira-rejection-note">{request.approvalNote}</div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="ira-action-group">
+                          <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => fetchRequestDetail(request.id)}>
+                            Xem
+                          </button>
+                          {activeTab === "pending" && (
+                            <>
+                              <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => openApprovalModal("approve", request)}>
+                                Duyệt
+                              </button>
+                              <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => openApprovalModal("reject", request)}>
+                                Từ chối
+                              </button>
+                              <button className="ui-btn ui-btn-warning ui-btn-sm" onClick={() => openApprovalModal("adjust", request)}>
+                                Điều chỉnh
+                              </button>
+                            </>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div>
-                      <span className={`ui-status-badge ${getStatusUiClass(request)}`}>{request.statusName}</span>
-                    </div>
-                  </div>
-
-                  <div className="ira-request-actions">
-                    <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => fetchRequestDetail(request.id)}>
-                      Xem chi tiết
-                    </button>
-
-                    {activeTab === "pending" && (
-                      <div className="ira-action-group">
-                        <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => openApprovalModal("approve", request)}>
-                          Duyệt
-                        </button>
-                        <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => openApprovalModal("reject", request)}>
-                          Từ chối
-                        </button>
-                        <button className="ui-btn ira-btn-adjust ui-btn-sm" onClick={() => openApprovalModal("adjust", request)}>
-                          Điều chỉnh
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -165,11 +165,12 @@ export default function Dashboard() {
   return (
     <div className="dashboard-page">
       <DashboardHeader userInfo={userInfo} />
+
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <DashboardTabs 
-          active={activeTab} 
-          setActive={setActiveTab} 
-          isAdmin={isAdmin} 
+        <DashboardTabs
+          active={activeTab}
+          setActive={setActiveTab}
+          isAdmin={isAdmin}
         />
 
         <div className="mt-4">

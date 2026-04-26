@@ -801,7 +801,7 @@ export default function RBACSection({ adminInfo }) {
                   );
                 })}
               </select>
-              <span className="ui-help">Role BGH bị backend khóa chỉnh sửa nên chỉ xem được.</span>
+              <span className="ui-help">Vai trò Ban Giám Hiệu (BGH) được bảo vệ, không cho phép chỉnh sửa.</span>
             </div>
 
             <div className="rbac-summary-box">
@@ -1042,12 +1042,12 @@ export default function RBACSection({ adminInfo }) {
   // =========================================================
   return (
     <div className="ui-page">
-      <div className="ui-page-frame rbac-page-frame">
+      <div className="ui-page-frame">
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Phân quyền vai trò</h1>
             <p className="ui-page-subtitle">
-              Quản lý quyền theo role hoặc theo từng user, đồng bộ cùng hệ giao diện dashboard hiện tại.
+              Cấu hình quyền truy cập theo vai trò (Role) hoặc tùy chỉnh riêng cho từng tài khoản người dùng.
             </p>
           </div>
         </div>
@@ -1071,16 +1071,16 @@ export default function RBACSection({ adminInfo }) {
         </div>
 
         <div className="ui-section">
-          <div className="rbac-tabs">
+          <div className="ui-tabs">
             <button
-              className={`rbac-tab ${activeTab === TAB_ROLE ? "active" : ""}`}
+              className={`ui-tab ${activeTab === TAB_ROLE ? "is-active" : ""}`}
               onClick={() => setActiveTab(TAB_ROLE)}
               disabled={rbacLoading || rbacSaving || userSaving}
             >
               Phân quyền theo role
             </button>
             <button
-              className={`rbac-tab ${activeTab === TAB_USER ? "active" : ""}`}
+              className={`ui-tab ${activeTab === TAB_USER ? "is-active" : ""}`}
               onClick={() => setActiveTab(TAB_USER)}
               disabled={rbacLoading || rbacSaving || userSaving}
             >

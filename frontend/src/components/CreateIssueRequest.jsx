@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Swal from "sweetalert2";
 import "./dashboard-ui.css";
 import "./CreateIssueRequest.css";
-import { createPortal } from 'react-dom';
+import MaterialSearchInput from "./MaterialSearchInput";
 
 // API Configuration
 const API_URL = 'http://localhost:8080/api';
@@ -12,110 +12,6 @@ const API_ENDPOINTS = {
   MATERIALS: `${API_URL}/materials`,
   SUB_DEPARTMENTS: `${API_URL}/departments/sub-departments`,
   ISSUE_REQUESTS: `${API_URL}/issue-requests`
-};
-
-const MaterialSearch = ({ value, onChange, onSelect, materials = [], placeholder = "Tên vật tư" }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState(value || "");
-  const [filteredMaterials, setFilteredMaterials] = useState([]);
-  const inputRef = useRef(null);
-
-  // Filter materials - CHỈ TÌM THEO TÊN
-  useEffect(() => {
-    const validMaterials = materials.filter(m => m && m.id && m.name);
-    if (!searchValue.trim()) {
-      setFilteredMaterials(validMaterials.slice(0, 10));
-    } else {
-      const terms = searchValue.toLowerCase().trim().split(/\s+/);
-      // CHỈ tìm theo tên vật tư, không tìm theo code
-      setFilteredMaterials(validMaterials.filter(m =>
-        terms.every(t => m.name.toLowerCase().includes(t))
-      ));
-    }
-  }, [searchValue, materials]);
-
-  // Click outside để đóng dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        inputRef.current && !inputRef.current.contains(event.target) &&
-        !document.getElementById('create-issue-material-dropdown')?.contains(event.target)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
-  // Dropdown position
-  const [dropdownStyle, setDropdownStyle] = useState({});
-  const updateDropdownPosition = () => {
-    if (!inputRef.current) return;
-    const rect = inputRef.current.getBoundingClientRect();
-    setDropdownStyle({
-      position: 'absolute',
-      top: rect.bottom + window.scrollY,
-      left: rect.left + window.scrollX,
-      width: rect.width,
-      maxHeight: 200,
-      overflowY: 'auto',
-      backgroundColor: '#fff',
-      border: '1px solid #ccc',
-      zIndex: 9999,
-      borderRadius: 4,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-    });
-  };
-
-  useEffect(() => {
-    if (isOpen) updateDropdownPosition();
-    const handleResize = () => { if (isOpen) updateDropdownPosition(); };
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleResize);
-    };
-  }, [isOpen]);
-
-  // Chọn vật tư
-  const handleSelect = (material) => {
-    onSelect(material);            // truyền material lên parent
-    setSearchValue(material.name); // hiện tên lên ô input
-    onChange(material.name);       // cập nhật giá trị input
-    setIsOpen(false);              // đóng dropdown
-  };
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder={placeholder}
-        value={searchValue}
-        onChange={e => { setSearchValue(e.target.value); onChange(e.target.value); }}
-        onFocus={() => setIsOpen(true)}
-        autoComplete="off"
-        className="ui-input table-input"
-      />
-
-      {isOpen && createPortal(
-        <div id="create-issue-material-dropdown" style={dropdownStyle}>
-          {filteredMaterials.length > 0 ? filteredMaterials.map(m => (
-            <div
-              key={m.id}
-              style={{ padding: 6, cursor: 'pointer' }}
-              onClick={() => handleSelect(m)}
-            >
-              <strong>{m.name}</strong> {m.code && <span style={{ color: '#666' }}>({m.code})</span>}
-            </div>
-          )) : <div style={{ padding: 6, color: '#666' }}>Vật tư mới</div>}
-        </div>,
-        document.body
-      )}
-      </div>
-  );
 };
 
 export default function CreateIssueRequest() {
@@ -148,11 +44,6 @@ export default function CreateIssueRequest() {
   const [requestHistory, setRequestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-
-  // Debug: log materials để kiểm tra
-  useEffect(() => {
-    console.log('Materials loaded:', materials);
-  }, [materials]);
 
   // Lấy thông tin user và dữ liệu
   useEffect(() => {
@@ -802,34 +693,45 @@ export default function CreateIssueRequest() {
     return detail.unitName || detail.unit?.name || units.find(u => u.id === detail.unitId)?.name || 'N/A';
   };
 
+  // Adapter array for MaterialSearchInput — maps raw materials to expected shape
+  const materialSearchItems = useMemo(
+    () => materials.map((m) => ({
+      id: m.id,
+      materialName: m.name,
+      materialCode: m.code || '',
+      unitName: units.find((u) => u.id === m.unitId)?.name || '',
+    })),
+    [materials, units]
+  );
+
   return (
     <div className="ui-page">
       <div className="ui-page-frame create-issue-request">
         <div className="ui-page-head">
           <div>
-            <h1 className="page-title">Phiếu Xin Lĩnh</h1>
-            <p className="page-subtitle">Tạo phiếu xin lĩnh và theo dõi lịch sử gửi phiếu trên cùng một giao diện thống nhất.</p>
+            <h1 className="ui-page-title">Tạo phiếu xin lĩnh</h1>
+            <p className="ui-page-subtitle">Tạo phiếu xin lĩnh và theo dõi lịch sử gửi phiếu trên cùng một giao diện thống nhất.</p>
           </div>
         </div>
 
       {/* Tab Navigation */}
-      <div className="tab-navigation">
+      <div className="ui-tabs">
         <button
-          className={`tab-button ${activeTab === "create" ? "active" : ""}`}
+          className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
           onClick={() => setActiveTab("create")}
         >
-          Tạo Phiếu Xin Lĩnh
+          Tạo phiếu xin lĩnh
         </button>
         <button
-          className={`tab-button ${activeTab === "history" ? "active" : ""}`}
+          className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
           onClick={() => setActiveTab("history")}
         >
-          Lịch Sử Phiếu Đã Gửi ({requestHistory.length})
+          Lịch sử đã gửi ({requestHistory.length})
         </button>
       </div>
 
       {message && (
-        <div className={`message ${message.includes("thành công") ? "success" : "error"}`}>
+        <div className={`ui-alert ${message.includes("thành công") ? "is-success" : "is-error"}`}>
           {message}
         </div>
       )}
@@ -838,8 +740,8 @@ export default function CreateIssueRequest() {
       {activeTab === "create" && (
         <form onSubmit={handleSubmit} className="issue-form">
           {/* Thông tin chung */}
-          <div className="form-section">
-            <h3 className="section-title">Thông tin chung</h3>
+          <div className="ui-section">
+            <div className="ui-section-head"><div><h2 className="ui-section-title">Thông tin chung</h2></div></div>
 
             {/* Thông tin người xin lĩnh */}
             <div className="user-info-card">
@@ -870,10 +772,8 @@ export default function CreateIssueRequest() {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">
-                Ghi chú
-              </label>
+            <div className="ui-field">
+              <label className="ui-label">Ghi chú</label>
               <textarea
                 value={formData.note || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
@@ -886,10 +786,8 @@ export default function CreateIssueRequest() {
           </div>
 
           {/* Bảng vật tư */}
-          <div className="form-section">
-            <div className="section-header">
-              <h3 className="section-title">Danh sách vật tư xin lĩnh</h3>
-            </div>
+          <div className="ui-section">
+            <div className="ui-section-head"><div><h2 className="ui-section-title">Danh sách vật tư xin lĩnh</h2></div></div>
 
             <div className="ui-table-wrap table-container">
               <table className="ui-table issue-table">
@@ -928,11 +826,14 @@ export default function CreateIssueRequest() {
                         )}
                       </td>
                       <td className="material-search-cell">
-                        <MaterialSearch
+                        <MaterialSearchInput
                           value={detail.materialName || ""}
-                          onChange={(value) => handleDetailChange(index, "materialName", value)}
-                          onSelect={(material) => handleMaterialSelect(material, index)}
-                          materials={materials}
+                          onChange={(text) => handleDetailChange(index, "materialName", text)}
+                          onSelect={(item) => {
+                            const original = materials.find((m) => m.id === item.id);
+                            if (original) handleMaterialSelect(original, index);
+                          }}
+                          items={materialSearchItems}
                           placeholder="Nhập tên vật tư để tìm kiếm..."
                         />
                       </td>
@@ -1066,10 +967,10 @@ export default function CreateIssueRequest() {
 
       {/* Tab Lịch Sử Phiếu Đã Gửi */}
       {activeTab === "history" && (
-        <div className="history-section">
-          <div className="section-header">
-            <h3 className="section-title">Lịch Sử Phiếu Xin Lĩnh Đã Gửi</h3>
-            <div className="section-actions">
+        <div className="ui-section history-section">
+          <div className="ui-section-head">
+            <div><h2 className="ui-section-title">Lịch sử phiếu xin lĩnh đã gửi</h2></div>
+            <div className="ui-toolbar-actions">
               <button
                 type="button"
                 onClick={fetchRequestHistory}

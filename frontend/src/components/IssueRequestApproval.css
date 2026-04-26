@@ -2,34 +2,6 @@
   width: 100%;
 }
 
-.ira-tabs {
-  display: flex;
-  gap: 10px;
-  border-bottom: 1px solid var(--ui-border);
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-
-.ira-tab {
-  border: none;
-  background: transparent;
-  color: var(--ui-text-soft);
-  font-weight: 700;
-  padding: 12px 14px;
-  border-bottom: 3px solid transparent;
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.ira-tab:hover {
-  color: var(--ui-text);
-  background: #f8fafc;
-}
-
-.ira-tab.active {
-  color: var(--ui-primary);
-  border-bottom-color: var(--ui-primary);
-}
 
 .ira-loading-state,
 .ira-empty-state {
@@ -59,74 +31,26 @@
   to { transform: rotate(360deg); }
 }
 
-.ira-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.ira-table {
+  min-width: 860px;
 }
 
-.ira-request-card {
-  border: 1px solid var(--ui-border);
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: var(--ui-shadow-soft);
-  padding: 18px;
-}
-
-.ira-request-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.ira-request-title {
-  margin: 0 0 10px;
-  color: var(--ui-text);
-  font-size: 1.1rem;
+.ira-cell-id {
   font-weight: 800;
-}
-
-.ira-request-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--ui-text-soft);
-  font-size: 0.92rem;
-}
-
-.ira-request-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  color: var(--ui-primary);
 }
 
 .ira-action-group {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
-.ira-btn-adjust {
-  background: #f59e0b;
-  color: #fff;
-}
-
-.ira-btn-adjust:hover {
-  background: #d97706;
-}
-
-.ira-rejection-reason {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-left: 4px solid #dc2626;
-  background: #fef2f2;
-  border-radius: 6px;
+.ira-rejection-note {
+  margin-top: 5px;
+  font-size: 0.8rem;
   color: #b91c1c;
-  font-size: 0.92rem;
 }
 
 .ira-access-meta {
@@ -334,10 +258,6 @@
 }
 
 @media (max-width: 640px) {
-  .ira-tabs {
-    flex-direction: column;
-  }
-
   .ira-modal-overlay {
     padding: 12px;
   }
