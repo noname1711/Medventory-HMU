@@ -75,7 +75,6 @@ export default function ExportEquipment({ equipmentData, onExport }) {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Xuất dữ liệu vật tư</h1>
-            <p className="ui-page-subtitle">Lọc và xuất danh sách vật tư y tế ra file CSV để lưu trữ hoặc báo cáo.</p>
           </div>
         </div>
 

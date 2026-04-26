@@ -105,9 +105,6 @@ export default function InventoryPage() {
           <div className="ui-card-header eq-page-header">
             <div>
               <h3 className="ui-card-title">Quản lý vật tư kho</h3>
-              <p className="ui-card-subtitle">
-                Theo dõi tình trạng tồn kho, thêm vật tư mới và tra cứu theo mã hoặc tên vật tư.
-              </p>
             </div>
           </div>
 
@@ -137,9 +134,6 @@ export default function InventoryPage() {
             <div className="ui-card-header">
               <div>
                 <h3 className="ui-card-title">Thêm vật tư mới</h3>
-                <p className="ui-card-subtitle">
-                  Nhập thông tin vật tư để đưa vào danh mục kho. Mã vật tư phải là duy nhất trong hệ thống.
-                </p>
               </div>
             </div>
 
@@ -228,9 +222,6 @@ export default function InventoryPage() {
             <div className="ui-toolbar eq-toolbar">
               <div>
                 <h3 className="ui-card-title">Danh sách vật tư tồn kho</h3>
-                <p className="ui-card-subtitle">
-                  Tìm theo mã hoặc tên vật tư. Tồn kho được tổng hợp từ các phiếu nhập và xuất kho.
-                </p>
               </div>
 
               <div className="ui-toolbar-actions">

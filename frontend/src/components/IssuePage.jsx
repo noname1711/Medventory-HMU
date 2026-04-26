@@ -596,7 +596,6 @@ export default function IssuePage() {
           <div className="ui-page-head">
             <div>
               <h1 className="ui-page-title">Xuất kho</h1>
-              <p className="ui-page-subtitle">Tạo phiếu xuất kho từ các phiếu xin lĩnh đã được phê duyệt và đủ điều kiện tồn kho.</p>
             </div>
           </div>
           <div className="ui-alert is-error">{bootError}</div>
@@ -611,7 +610,6 @@ export default function IssuePage() {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Xuất kho</h1>
-            <p className="ui-page-subtitle">Chọn phiếu xin lĩnh đủ điều kiện, xem trước phân bổ lô và tạo phiếu xuất kho.</p>
           </div>
         </div>
 

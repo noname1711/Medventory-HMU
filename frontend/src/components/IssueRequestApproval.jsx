@@ -371,7 +371,6 @@ export default function IssueRequestApproval() {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Phê duyệt Phiếu xin lĩnh</h1>
-            <p className="ui-page-subtitle">Lãnh đạo xem xét, phê duyệt, từ chối hoặc yêu cầu điều chỉnh các phiếu xin lĩnh đã gửi.</p>
           </div>
         </div>
 

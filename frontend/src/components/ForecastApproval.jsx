@@ -254,7 +254,6 @@ export default function ForecastApproval({ adminInfo }) {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">{pageTitle}</h1>
-            <p className="ui-page-subtitle">{pageSubtitle}</p>
           </div>
         </div>
 
@@ -280,9 +279,6 @@ export default function ForecastApproval({ adminInfo }) {
           <div className="ui-section-head">
             <div>
               <h2 className="ui-section-title">Danh sách dự trù</h2>
-              <p className="ui-section-subtitle">
-                Chuyển tab để xem phiếu đang chờ duyệt hoặc các phiếu đã được xử lý trước đó.
-              </p>
             </div>
 
             <div className="ui-toolbar-actions">
