@@ -11,15 +11,32 @@
   gap: 18px;
 }
 
-.rbac-mini-stats {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.rbac-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+  color: #1e293b;
 }
 
-.rbac-stat-truncate {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 1.45rem;
+.rbac-info-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.rbac-info-sep {
+  color: #cbd5e1;
+  user-select: none;
+}
+
+.rbac-info-dirty {
+  color: #d97706;
+  font-weight: 700;
 }
 
 .rbac-inner-section {
@@ -140,14 +157,6 @@
   line-height: 1.45;
 }
 
-.rbac-perm-card-code {
-  color: #2563eb;
-  font-size: 0.82rem;
-  font-weight: 800;
-  margin-top: 4px;
-  word-break: break-all;
-}
-
 .rbac-inline-badge {
   display: inline-flex;
   align-items: center;
@@ -173,18 +182,7 @@
   gap: 6px;
 }
 
-.rbac-debug-box {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(217, 119, 6, 0.28);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  word-break: break-word;
-}
-
 @media (max-width: 900px) {
-  .rbac-mini-stats,
   .rbac-perm-grid {
     grid-template-columns: 1fr;
   }

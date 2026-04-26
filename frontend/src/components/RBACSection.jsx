@@ -720,7 +720,6 @@ export default function RBACSection({ adminInfo }) {
               {perm?.name || code}
               {isSpecial && <span className="rbac-inline-badge">Chỉ dành cho BGH</span>}
             </div>
-            <div className="rbac-perm-card-code">{code}</div>
           </div>
         </div>
 
@@ -732,22 +731,22 @@ export default function RBACSection({ adminInfo }) {
   const renderRoleTab = () => {
     return (
       <div className="rbac-panel-body">
-        <div className="ui-stat-grid rbac-mini-stats">
-          <div className="ui-stat-card is-primary">
-            <p className="ui-stat-label">Role đang chọn</p>
-            <p className="ui-stat-value">{selectedRoleCode || "-"}</p>
-            <p className="ui-stat-note">{selectedRoleName || "Chưa có thông tin"}</p>
-          </div>
-          <div className="ui-stat-card">
-            <p className="ui-stat-label">Quyền đang tick</p>
-            <p className="ui-stat-value">{Array.from(editingPermSet || new Set()).length}</p>
-            <p className="ui-stat-note">/ {roleSelectablePermissionCount} quyền có thể gán</p>
-          </div>
-          <div className={`ui-stat-card ${dirtyRole ? "is-warning" : ""}`}>
-            <p className="ui-stat-label">Trạng thái</p>
-            <p className="ui-stat-value">{dirtyRole ? "Có" : "0"}</p>
-            <p className="ui-stat-note">{dirtyRole ? "Có thay đổi chưa lưu" : "Không có thay đổi"}</p>
-          </div>
+        <div className="rbac-info-row">
+          <span>
+            <span className="rbac-info-label">Role:</span>{" "}
+            {selectedRoleCode
+              ? `${selectedRoleCode}${selectedRoleName ? ` — ${selectedRoleName}` : ""}`
+              : "Chưa chọn"}
+          </span>
+          <span className="rbac-info-sep">|</span>
+          <span>
+            <span className="rbac-info-label">Quyền đã chọn:</span>{" "}
+            {Array.from(editingPermSet || new Set()).length} / {roleSelectablePermissionCount}
+          </span>
+          <span className="rbac-info-sep">|</span>
+          <span className={dirtyRole ? "rbac-info-dirty" : ""}>
+            {dirtyRole ? "Có thay đổi chưa lưu" : "Chưa thay đổi"}
+          </span>
         </div>
 
         <div className="ui-section rbac-inner-section">
@@ -804,19 +803,12 @@ export default function RBACSection({ adminInfo }) {
             </div>
 
             <div className="rbac-summary-box">
-              <div><strong>So với mặc định:</strong> {addedVsDefault.length === 0 && removedVsDefault.length === 0 ? "Đúng mặc định" : `+${addedVsDefault.length} / -${removedVsDefault.length}`}</div>
-              {addedVsDefault.length > 0 && (
-                <div className="rbac-summary-line">
-                  <span className="rbac-summary-label">Được thêm:</span>
-                  <span className="rbac-summary-codes">{addedVsDefault.join(", ")}</span>
-                </div>
-              )}
-              {removedVsDefault.length > 0 && (
-                <div className="rbac-summary-line">
-                  <span className="rbac-summary-label">Bị bỏ:</span>
-                  <span className="rbac-summary-codes">{removedVsDefault.join(", ")}</span>
-                </div>
-              )}
+              <div>
+                <strong>So với mặc định:</strong>{" "}
+                {addedVsDefault.length === 0 && removedVsDefault.length === 0
+                  ? "Đúng mặc định"
+                  : `+${addedVsDefault.length} thêm / −${removedVsDefault.length} bỏ`}
+              </div>
             </div>
           </div>
 
@@ -888,7 +880,7 @@ export default function RBACSection({ adminInfo }) {
         <div className="ui-alert is-warning rbac-footnote">
           <div><strong>Ghi chú:</strong></div>
           <div>1. Nếu không muốn phân quyền tùy chỉnh cho role, dùng nút <strong>Đặt về mặc định</strong>.</div>
-          <div>2. Hai quyền <strong>USERS.MANAGE</strong> và <strong>PERMISSIONS.MANAGE</strong> chỉ dành cho BGH, không được thêm vào role khác.</div>
+          <div>2. Quyền <strong>Quản lý người dùng</strong> và <strong>Phân quyền vai trò</strong> chỉ dành cho BGH, không thể thêm vào role khác.</div>
         </div>
       </div>
     );
@@ -897,22 +889,22 @@ export default function RBACSection({ adminInfo }) {
   const renderUserTab = () => {
     return (
       <div className="rbac-panel-body">
-        <div className="ui-stat-grid rbac-mini-stats">
-          <div className="ui-stat-card is-primary">
-            <p className="ui-stat-label">User đang chọn</p>
-            <p className="ui-stat-value rbac-stat-truncate">{selectedUserInfo?.fullName || "-"}</p>
-            <p className="ui-stat-note">{selectedUserInfo?.email || "Chưa chọn user"}</p>
-          </div>
-          <div className={`ui-stat-card ${userSpecial ? "is-warning" : ""}`}>
-            <p className="ui-stat-label">Cơ chế áp dụng</p>
-            <p className="ui-stat-value">{userSpecial ? "Riêng" : "Role"}</p>
-            <p className="ui-stat-note">{userSpecial ? "User đặc biệt" : "Theo quyền của role"}</p>
-          </div>
-          <div className={`ui-stat-card ${dirtyUser ? "is-warning" : ""}`}>
-            <p className="ui-stat-label">Quyền đang tick</p>
-            <p className="ui-stat-value">{Array.from(editingUserPermSet || new Set()).length}</p>
-            <p className="ui-stat-note">{dirtyUser ? "Có thay đổi chưa lưu" : "Không có thay đổi"}</p>
-          </div>
+        <div className="rbac-info-row">
+          <span>
+            <span className="rbac-info-label">User:</span>{" "}
+            {selectedUserInfo?.fullName
+              ? `${selectedUserInfo.fullName}${selectedUserInfo?.email ? ` (${selectedUserInfo.email})` : ""}`
+              : "Chưa chọn"}
+          </span>
+          <span className="rbac-info-sep">|</span>
+          <span>
+            <span className="rbac-info-label">Chế độ:</span>{" "}
+            {userSpecial ? "Quyền riêng" : "Theo role"}
+          </span>
+          <span className="rbac-info-sep">|</span>
+          <span className={dirtyUser ? "rbac-info-dirty" : ""}>
+            {dirtyUser ? "Có thay đổi chưa lưu" : "Chưa thay đổi"}
+          </span>
         </div>
 
         <div className="ui-section rbac-inner-section">
@@ -1017,19 +1009,6 @@ export default function RBACSection({ adminInfo }) {
           <div>2. Sau khi lưu, user sẽ thành “user đặc biệt” và không bị ảnh hưởng khi role thay đổi.</div>
           <div>3. Muốn quay về cơ chế theo role, dùng nút <strong>Quay về theo role</strong>.</div>
 
-          {(userRolePermCodes.length > 0 || userGrantedCodes.length > 0 || userRevokedCodes.length > 0) && (
-            <div className="rbac-debug-box">
-              {userRolePermCodes.length > 0 && (
-                <div><strong>Role perms:</strong> <span>{userRolePermCodes.join(", ")}</span></div>
-              )}
-              {userGrantedCodes.length > 0 && (
-                <div><strong>User GRANT:</strong> <span>{userGrantedCodes.join(", ")}</span></div>
-              )}
-              {userRevokedCodes.length > 0 && (
-                <div><strong>User REVOKE:</strong> <span>{userRevokedCodes.join(", ")}</span></div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     );
@@ -1044,24 +1023,6 @@ export default function RBACSection({ adminInfo }) {
         <div className="ui-page-head">
           <div>
             <h1 className="ui-page-title">Phân quyền vai trò</h1>
-          </div>
-        </div>
-
-        <div className="ui-stat-grid">
-          <div className="ui-stat-card is-primary">
-            <p className="ui-stat-label">Tổng role</p>
-            <p className="ui-stat-value">{roleCount}</p>
-            <p className="ui-stat-note">Danh mục vai trò hệ thống</p>
-          </div>
-          <div className="ui-stat-card">
-            <p className="ui-stat-label">Tổng permission</p>
-            <p className="ui-stat-value">{permissionCount}</p>
-            <p className="ui-stat-note">Danh mục quyền hiện có</p>
-          </div>
-          <div className="ui-stat-card">
-            <p className="ui-stat-label">Tổng user</p>
-            <p className="ui-stat-value">{userTotalCount}</p>
-            <p className="ui-stat-note">Có thể áp quyền riêng</p>
           </div>
         </div>
 
