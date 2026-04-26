@@ -353,11 +353,10 @@ table {
 .ui-table-wrap {
   background: var(--ui-white);
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: var(--ui-shadow-soft);
   border: 1px solid var(--ui-border);
   margin-bottom: 0;
-  overflow-x: auto;
 }
 
 .ui-table {
@@ -376,6 +375,9 @@ table {
   font-size: 0.875rem;
   border-bottom: none;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .ui-table tbody td {

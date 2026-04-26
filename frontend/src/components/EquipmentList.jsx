@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import "./dashboard-ui.css";
 import "./EquipmentList.css";
 
@@ -73,7 +74,7 @@ export default function InventoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Không thể thêm vật tư");
 
-      alert("Thêm vật tư thành công");
+      toast.success("Thêm vật tư thành công");
 
       setForm({
         materialCode: "",
@@ -86,7 +87,7 @@ export default function InventoryPage() {
 
       fetchStockItems();
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message);
     }
   }
 
