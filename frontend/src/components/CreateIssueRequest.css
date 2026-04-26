@@ -164,23 +164,66 @@
   text-align: center;
 }
 
-/* Notes / helpers */
-.create-issue-request .table-note {
+/* Section divider + sub-label */
+.cir-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 20px 0 16px;
+}
+
+.cir-sub-label {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #374151;
+}
+
+/* Help collapsible */
+.cir-help {
+  margin-top: 10px;
+}
+
+.cir-help-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.cir-help-toggle:hover {
+  color: #1e40af;
+}
+
+.cir-help-chevron {
+  font-size: 0.7rem;
+}
+
+.cir-help-list {
+  margin: 8px 0 0;
+  padding: 12px 14px 12px 28px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 1.25rem;
-  margin-top: 1rem;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
-.create-issue-request .table-note p {
-  margin: 0.5rem 0;
+.cir-help-list li {
   color: #475569;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 
-.create-issue-request .table-note strong {
+.cir-help-list strong {
   color: #1e40af;
 }
 
