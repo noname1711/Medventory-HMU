@@ -25,6 +25,7 @@ export default function RBACSection({ adminInfo }) {
   // =========================================================
   const [selectedRoleCode, setSelectedRoleCode] = useState("");
   const [selectedRoleName, setSelectedRoleName] = useState("");
+  const [roleInputVal, setRoleInputVal] = useState("");
   const [assignedPermCodes, setAssignedPermCodes] = useState([]);
   const [defaultPermCodes, setDefaultPermCodes] = useState([]);
   const [editingPermSet, setEditingPermSet] = useState(new Set());
@@ -39,6 +40,7 @@ export default function RBACSection({ adminInfo }) {
   const [userSaving, setUserSaving] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedUserInfo, setSelectedUserInfo] = useState(null);
+  const [userInputVal, setUserInputVal] = useState("");
   const [userSpecial, setUserSpecial] = useState(false);
   const [userRolePermCodes, setUserRolePermCodes] = useState([]);
   const [userAssignedEffectiveCodes, setUserAssignedEffectiveCodes] = useState([]);
@@ -697,6 +699,28 @@ export default function RBACSection({ adminInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, allUsers, selectedUserId]);
 
+  // Sync searchable input values when selection/catalog changes
+  useEffect(() => {
+    if (selectedRoleCode && rbacRoles.length > 0) {
+      const r = rbacRoles.find((r) => String(r.code) === String(selectedRoleCode));
+      const locked = r && String(r.code).toUpperCase() === "BGH";
+      setRoleInputVal(r ? `${r.code} - ${r.name}${locked ? " (khóa)" : ""}` : selectedRoleCode);
+    } else {
+      setRoleInputVal("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoleCode, rbacRoles]);
+
+  useEffect(() => {
+    if (selectedUserId && allUsers.length > 0) {
+      const u = allUsers.find((u) => String(u.id) === String(selectedUserId));
+      setUserInputVal(u ? `#${u.id} - ${u.fullName || u.name || u.email || "Unknown"}${u.email ? ` (${u.email})` : ""}` : selectedUserId);
+    } else {
+      setUserInputVal("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUserId, allUsers]);
+
   // =========================================================
   // RENDER HELPERS
   // =========================================================
@@ -779,37 +803,39 @@ export default function RBACSection({ adminInfo }) {
             </div>
           </div>
 
-          <div className="ui-form-grid cols-2 rbac-top-grid">
-            <div className="ui-field">
-              <label className="ui-label">Chọn vai trò</label>
-              <select
-                className="ui-select"
-                value={selectedRoleCode}
-                onChange={(e) => fetchRolePermissions(e.target.value)}
-                disabled={rbacLoading}
-              >
-                {rbacRoles.map((role) => {
-                  const code = String(role?.code || "");
+          <div className="ui-field">
+            <label className="ui-label">Chọn vai trò</label>
+            <input
+              className="ui-input"
+              list="rbac-roles-datalist"
+              placeholder="Gõ để tìm vai trò..."
+              value={roleInputVal}
+              onChange={(e) => {
+                const val = e.target.value;
+                setRoleInputVal(val);
+                const matched = rbacRoles.find((r) => {
+                  const code = String(r?.code || "");
                   const locked = code.toUpperCase() === "BGH";
-                  return (
-                    <option key={role.id || code} value={code}>
-                      {code} - {role?.name || ""}
-                      {locked ? " (khóa)" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-              <span className="ui-help">Vai trò Ban Giám Hiệu (BGH) được bảo vệ, không cho phép chỉnh sửa.</span>
-            </div>
-
-            <div className="ui-field">
-              <label className="ui-label">So với mặc định</label>
-              <div className="rbac-summary-value">
-                {addedVsDefault.length === 0 && removedVsDefault.length === 0
-                  ? "Đúng mặc định"
-                  : `+${addedVsDefault.length} thêm / −${removedVsDefault.length} bỏ`}
-              </div>
-            </div>
+                  return `${code} - ${r?.name || ""}${locked ? " (khóa)" : ""}` === val;
+                });
+                if (matched) fetchRolePermissions(String(matched.code));
+              }}
+              disabled={rbacLoading}
+            />
+            <datalist id="rbac-roles-datalist">
+              {rbacRoles.map((role) => {
+                const code = String(role?.code || "");
+                const locked = code.toUpperCase() === "BGH";
+                return <option key={role.id || code} value={`${code} - ${role?.name || ""}${locked ? " (khóa)" : ""}`} />;
+              })}
+            </datalist>
+            <span className="ui-help">
+              BGH được bảo vệ, không cho phép chỉnh sửa.
+              {" · So với mặc định: "}
+              {addedVsDefault.length === 0 && removedVsDefault.length === 0
+                ? "Đúng mặc định"
+                : `+${addedVsDefault.length} thêm / −${removedVsDefault.length} bỏ`}
+            </span>
           </div>
 
           <div className="ui-toolbar rbac-tools-row">
@@ -925,43 +951,38 @@ export default function RBACSection({ adminInfo }) {
             </div>
           </div>
 
-          <div className="ui-form-grid cols-2 rbac-top-grid">
-            <div className="ui-field">
-              <label className="ui-label">Chọn user</label>
-              <select
-                className="ui-select"
-                value={selectedUserId}
-                onChange={async (e) => {
-                  const userId = e.target.value;
+          <div className="ui-field">
+            <label className="ui-label">Chọn user</label>
+            <input
+              className="ui-input"
+              list="rbac-users-datalist"
+              placeholder="Gõ để tìm user..."
+              value={userInputVal}
+              onChange={(e) => {
+                const val = e.target.value;
+                setUserInputVal(val);
+                const matched = allUsers.find((u) => getUserOptionLabel(u) === val);
+                if (matched) {
+                  const userId = String(matched.id);
                   setSelectedUserId(userId);
-                  await fetchUserPermissions(userId);
-                }}
-                disabled={userLoading || userSaving}
-              >
-                {allUsers.map((user) => (
-                  <option key={user?.id} value={String(user?.id || "")}>{getUserOptionLabel(user)}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="ui-field">
-              <label className="ui-label">Thông tin</label>
-              <div className="rbac-summary-value">
-                <span>
-                  Role:{" "}
-                  {selectedUserInfo?.roleCode
-                    ? `${selectedUserInfo.roleCode}${selectedUserInfo?.roleName ? ` (${selectedUserInfo.roleName})` : ""}`
-                    : "—"}
-                </span>
-                <span className="rbac-info-sep">·</span>
-                <span>
-                  Chế độ:{" "}
-                  {userSpecial
-                    ? <span className="rbac-mode-badge is-special">User đặc biệt</span>
-                    : <span className="rbac-mode-badge">Theo role</span>}
-                </span>
-              </div>
-            </div>
+                  fetchUserPermissions(userId);
+                }
+              }}
+              disabled={userLoading || userSaving}
+            />
+            <datalist id="rbac-users-datalist">
+              {allUsers.map((user) => (
+                <option key={user?.id} value={getUserOptionLabel(user)} />
+              ))}
+            </datalist>
+            <span className="ui-help">
+              Role:{" "}
+              {selectedUserInfo?.roleCode
+                ? `${selectedUserInfo.roleCode}${selectedUserInfo?.roleName ? ` (${selectedUserInfo.roleName})` : ""}`
+                : "—"}
+              {" · Chế độ: "}
+              {userSpecial ? "Quyền riêng" : "Theo role"}
+            </span>
           </div>
 
           <div className="ui-toolbar rbac-tools-row">

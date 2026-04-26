@@ -43,24 +43,6 @@
   padding: 18px;
 }
 
-.rbac-top-grid {
-  margin-bottom: 14px;
-}
-
-.rbac-summary-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
-  background: #f9fafb;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  font-size: 0.95rem;
-  color: #374151;
-  min-height: 42px;
-}
-
 .rbac-mode-badge {
   display: inline-flex;
   align-items: center;
