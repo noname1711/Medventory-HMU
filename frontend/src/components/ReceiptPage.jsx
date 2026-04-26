@@ -693,17 +693,17 @@ export default function ReceiptPage() {
             <h1 className="ui-page-title">Nhập kho</h1>
           </div>
 
-          <div className="receipt-tabs">
+          <div className="ui-tabs" style={{ marginBottom: 0 }}>
             <button
               type="button"
-              className={`receipt-tab-btn ${activeTab === "create" ? "active" : ""}`}
+              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
               onClick={() => setActiveTab("create")}
             >
               Tạo phiếu nhập
             </button>
             <button
               type="button"
-              className={`receipt-tab-btn ${activeTab === "history" ? "active" : ""}`}
+              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
               onClick={() => setActiveTab("history")}
             >
               Lịch sử phiếu nhập
