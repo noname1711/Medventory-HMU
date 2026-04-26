@@ -61,6 +61,12 @@ table {
   padding: 24px;
 }
 
+/* Wrapper cho các trang dùng ui-card-header thay vì ui-page-head */
+.ui-page-stack {
+  display: flex;
+  flex-direction: column;
+}
+
 .ui-page-head {
   display: flex;
   align-items: flex-start;
