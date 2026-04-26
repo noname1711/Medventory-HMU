@@ -742,33 +742,15 @@ export default function CreateIssueRequest() {
         <form onSubmit={handleSubmit} className="issue-form">
           {/* Form gộp: thông tin + bảng vật tư */}
           <div className="ui-section">
-            {/* Thông tin người xin lĩnh */}
-            <div className="user-info-card">
-              <h4>Thông tin người xin lĩnh</h4>
-              <div className="user-info-grid">
-                <div className="user-info-item">
-                  <label>Họ và tên:</label>
-                  <span className="user-info-value">{currentUser?.fullName || "Chưa có thông tin"}</span>
-                </div>
-                <div className="user-info-item">
-                  <label>Khoa Phòng:</label>
-                  <span className="user-info-value">{currentUser?.departmentName || "Chưa có thông tin"}</span>
-                </div>
-                <div className="user-info-item">
-                  <label>Bộ môn trực thuộc:</label>
-                  <span className="user-info-value">
-                    {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || currentUser?.departmentName || "Chưa có thông tin"}
-                  </span>
-                </div>
-                <div className="user-info-item">
-                  <label>Email:</label>
-                  <span className="user-info-value">{currentUser?.email || "Chưa có thông tin"}</span>
-                </div>
-                <div className="user-info-item">
-                  <label>Chức vụ:</label>
-                  <span className="user-info-value">{currentUser?.role || "Cán bộ"}</span>
-                </div>
-              </div>
+            {/* Thông tin người xin lĩnh — dạng inline */}
+            <div className="cir-sender-strip">
+              <span className="cir-sender-name">{currentUser?.fullName || "—"}</span>
+              {currentUser?.departmentName && (
+                <><span className="cir-sender-dot">·</span><span>{currentUser.departmentName}</span></>
+              )}
+              {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name && (
+                <><span className="cir-sender-dot">·</span><span>{subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId).name}</span></>
+              )}
             </div>
 
             <div className="ui-field">
