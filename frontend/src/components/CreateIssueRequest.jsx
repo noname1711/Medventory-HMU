@@ -742,15 +742,30 @@ export default function CreateIssueRequest() {
         <form onSubmit={handleSubmit} className="issue-form">
           {/* Form gộp: thông tin + bảng vật tư */}
           <div className="ui-section">
-            {/* Thông tin người xin lĩnh — dạng inline */}
-            <div className="cir-sender-strip">
-              <span className="cir-sender-name">{currentUser?.fullName || "—"}</span>
-              {currentUser?.departmentName && (
-                <><span className="cir-sender-dot">·</span><span>{currentUser.departmentName}</span></>
-              )}
-              {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name && (
-                <><span className="cir-sender-dot">·</span><span>{subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId).name}</span></>
-              )}
+            {/* Thông tin người xin lĩnh — compact grid */}
+            <div className="cir-sender-grid">
+              <div className="cir-sender-item">
+                <span className="cir-sender-label">Họ và tên</span>
+                <span className="cir-sender-value">{currentUser?.fullName || "—"}</span>
+              </div>
+              <div className="cir-sender-item">
+                <span className="cir-sender-label">Khoa / Phòng</span>
+                <span className="cir-sender-value">{currentUser?.departmentName || "—"}</span>
+              </div>
+              <div className="cir-sender-item">
+                <span className="cir-sender-label">Bộ môn</span>
+                <span className="cir-sender-value">
+                  {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || "—"}
+                </span>
+              </div>
+              <div className="cir-sender-item">
+                <span className="cir-sender-label">Email</span>
+                <span className="cir-sender-value">{currentUser?.email || "—"}</span>
+              </div>
+              <div className="cir-sender-item">
+                <span className="cir-sender-label">Chức vụ</span>
+                <span className="cir-sender-value">{currentUser?.role || "Cán bộ"}</span>
+              </div>
             </div>
 
             <div className="ui-field">

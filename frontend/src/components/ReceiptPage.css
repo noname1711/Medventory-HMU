@@ -111,7 +111,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 0 0;
+  padding: 10px 0 14px;
   border-top: 1px solid #e2e8f0;
   margin-top: 0;
 }
@@ -154,13 +154,15 @@
 
 .receipt-total-inline {
   margin: 0;
-  font-size: 0.95rem;
-  color: #475569;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #374151;
   font-variant-numeric: tabular-nums;
 }
 
 .receipt-total-inline strong {
   color: #1d4ed8;
+  font-size: 1.25rem;
   font-weight: 800;
 }
 
