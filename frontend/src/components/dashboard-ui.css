@@ -698,4 +698,12 @@ table {
   .ui-table tbody td:not([data-label])::before {
     display: none;
   }
+
+  /* Khôi phục dividers cho card cuối (global rule tr:last-child xóa hết) */
+  .ui-table tbody tr:last-child td {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .ui-table tbody tr:last-child td:last-child {
+    border-bottom: 0;
+  }
 }
