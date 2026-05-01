@@ -356,6 +356,23 @@
   }
 }
 
+@media (max-width: 720px) {
+  .create-issue-request .issue-table,
+  .create-issue-request .history-table,
+  .create-issue-request .details-table {
+    min-width: 0;
+  }
+
+  .create-issue-request .issue-table th,
+  .create-issue-request .issue-table td,
+  .create-issue-request .history-table th,
+  .create-issue-request .history-table td,
+  .create-issue-request .details-table th,
+  .create-issue-request .details-table td {
+    white-space: normal;
+  }
+}
+
 /* Scrollbar */
 .create-issue-request ::-webkit-scrollbar {
   width: 6px;

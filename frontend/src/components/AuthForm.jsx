@@ -4,6 +4,11 @@ import toast from "react-hot-toast";
 import "./AuthForm.css";
 
 const API_URL = 'http://localhost:8080/api';
+const API_ENDPOINTS = {
+  LOGIN: `${API_URL}/auth/login`,
+  REGISTER: `${API_URL}/auth/register`,
+  DEPARTMENTS: `${API_URL}/auth/departments`
+};
 
 // COOKIE MANAGER UTILITIES
 const cookieManager = {
@@ -111,11 +116,27 @@ const DepartmentSearch = ({ value, onChange, onSelect, departments }) => {
     let highlightedText = text;
     
     searchTerms.forEach(term => {
-      const regex = new RegExp(`(${term})`, 'gi');
+      const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`(${safeTerm})`, 'gi');
       highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
     });
     
     return highlightedText;
+  };
+
+  const renderHighlightedText = (text, searchValue) => {
+    const html = highlightText(text, searchValue);
+    if (html === text) return text;
+    return html.split(/(<mark>|<\/mark>)/).reduce((parts, part, index, arr) => {
+      if (!part || part === "</mark>") return parts;
+      if (part === "<mark>") {
+        const value = arr[index + 1] || "";
+        if (value) parts.push(<mark key={`${value}-${index}`}>{value}</mark>);
+        return parts;
+      }
+      if (arr[index - 1] !== "<mark>") parts.push(part);
+      return parts;
+    }, []);
   };
 
   return (
@@ -144,11 +165,7 @@ const DepartmentSearch = ({ value, onChange, onSelect, departments }) => {
               onClick={() => handleSelectDepartment(dept)}
               onMouseDown={(e) => e.preventDefault()} // Ngăn blur khi click
             >
-              <span 
-                dangerouslySetInnerHTML={{ 
-                  __html: highlightText(dept.name, value) 
-                }} 
-              />
+              <span>{renderHighlightedText(dept.name, value)}</span>
             </div>
           ))}
         </div>
@@ -215,13 +232,6 @@ export default function AuthForm() {
   const passwordTimeoutRef = useRef(null);
   const confirmPasswordTimeoutRef = useRef(null);
 
-  // API endpoints
-  const API_ENDPOINTS = {
-    LOGIN: `${API_URL}/auth/login`,
-    REGISTER: `${API_URL}/auth/register`,
-    DEPARTMENTS: `${API_URL}/auth/departments`
-  };
-
   // LẤY DANH SÁCH KHOA TỪ BACKEND
   useEffect(() => {
     const fetchDepartments = async () => {
@@ -236,7 +246,7 @@ export default function AuthForm() {
           toast.error("Không thể tải danh sách khoa từ hệ thống");
           setDepartments([]);
         }
-      } catch (error) {
+      } catch {
         toast.error("Lỗi kết nối đến server khi tải danh sách khoa");
         setDepartments([]);
       } finally {
@@ -331,7 +341,7 @@ export default function AuthForm() {
         } else {
           toast.error(data.message);
         }
-      } catch (error) {
+      } catch {
         toast.error("Lỗi kết nối đến server!");
       }
     } else {
@@ -381,7 +391,7 @@ export default function AuthForm() {
         } else {
           toast.error(data.message);
         }
-      } catch (error) {
+      } catch {
         toast.error("Lỗi kết nối đến server!");
       }
     }
@@ -590,9 +600,13 @@ export default function AuthForm() {
                   /> 
                   Ghi nhớ đăng nhập
                 </label>
-                <a href="#" onClick={() => navigate("/forgot-password")}>
+                <button
+                  type="button"
+                  className="forgot-link"
+                  onClick={() => navigate("/forgot-password")}
+                >
                   Quên mật khẩu?
-                </a>
+                </button>
               </div>
             )}
 

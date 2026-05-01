@@ -183,6 +183,20 @@
   }
 }
 
+@media (max-width: 720px) {
+  .fa-table,
+  .fa-detail-table {
+    min-width: 0;
+  }
+
+  .fa-table th,
+  .fa-table td,
+  .fa-detail-table th,
+  .fa-detail-table td {
+    white-space: normal;
+  }
+}
+
 @media (max-width: 640px) {
   .fa-tabs {
     width: 100%;
@@ -191,8 +205,10 @@
   }
 
   .fa-action-group {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
   }
 
   .fa-modal-header,

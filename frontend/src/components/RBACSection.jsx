@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿﻿import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import "./dashboard-ui.css";
 import "./RBACSection.css";
 
 const API_URL = "http://localhost:8080/api";
+const SPECIAL_PERMISSIONS = ["USERS.MANAGE", "PERMISSIONS.MANAGE"];
 
 export default function RBACSection({ adminInfo }) {
   // =========================================================
@@ -42,15 +43,9 @@ export default function RBACSection({ adminInfo }) {
   const [selectedUserInfo, setSelectedUserInfo] = useState(null);
   const [userInputVal, setUserInputVal] = useState("");
   const [userSpecial, setUserSpecial] = useState(false);
-  const [userRolePermCodes, setUserRolePermCodes] = useState([]);
   const [userAssignedEffectiveCodes, setUserAssignedEffectiveCodes] = useState([]);
-  const [userGrantedCodes, setUserGrantedCodes] = useState([]);
-  const [userRevokedCodes, setUserRevokedCodes] = useState([]);
   const [editingUserPermSet, setEditingUserPermSet] = useState(new Set());
-  const [userPermSearch, setUserPermSearch] = useState("");
-
-  // Hai quyền này chỉ dành cho BGH, không cho thêm vào role thường.
-  const SPECIAL_PERMISSIONS = ["USERS.MANAGE", "PERMISSIONS.MANAGE"];
+  const [userPermSearch] = useState("");
 
   const API_ENDPOINTS = {
     USERS_ALL: `${API_URL}/admin/users/all`,
@@ -362,15 +357,9 @@ export default function RBACSection({ adminInfo }) {
       roleName: info?.roleName,
     });
 
-    const rolePerms = Array.isArray(info?.rolePermissionCodes) ? info.rolePermissionCodes : [];
-    const grants = Array.isArray(info?.userGrantedPermissionCodes) ? info.userGrantedPermissionCodes : [];
-    const revokes = Array.isArray(info?.userRevokedPermissionCodes) ? info.userRevokedPermissionCodes : [];
     const effective = Array.isArray(info?.effectivePermissionCodes) ? info.effectivePermissionCodes : [];
 
     setUserSpecial(!!info?.specialUser);
-    setUserRolePermCodes(rolePerms);
-    setUserGrantedCodes(grants);
-    setUserRevokedCodes(revokes);
     setUserAssignedEffectiveCodes(effective);
     setEditingUserPermSet(new Set(effective));
   };
@@ -623,9 +612,6 @@ export default function RBACSection({ adminInfo }) {
     return (rbacPermissions || []).filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length;
   }, [rbacPermissions]);
 
-  const userTotalCount = allUsers.length;
-  const roleCount = rbacRoles.length;
-  const permissionCount = rbacPermissions.length;
 
   // =========================================================
   // INITIAL LOAD
@@ -708,7 +694,6 @@ export default function RBACSection({ adminInfo }) {
     } else {
       setRoleInputVal("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoleCode, rbacRoles]);
 
   useEffect(() => {
@@ -718,7 +703,6 @@ export default function RBACSection({ adminInfo }) {
     } else {
       setUserInputVal("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, allUsers]);
 
   // =========================================================
@@ -836,6 +820,17 @@ export default function RBACSection({ adminInfo }) {
                 ? "Đúng mặc định"
                 : `+${addedVsDefault.length} thêm / −${removedVsDefault.length} bỏ`}
             </span>
+          </div>
+
+          <div className="ui-field rbac-search-field">
+            <label className="ui-label">Tìm quyền</label>
+            <input
+              className="ui-input"
+              value={permSearch}
+              onChange={(e) => setPermSearch(e.target.value)}
+              placeholder="Nhập mã, tên hoặc mô tả quyền..."
+              disabled={rbacLoading || rbacSaving}
+            />
           </div>
 
           <div className="ui-toolbar-actions rbac-grid-actions">

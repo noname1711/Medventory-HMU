@@ -95,7 +95,7 @@ export default function Admin() {
         setIsAuthenticated(true);
         setAdminInfo(userData);
         await fetchUsers();
-      } catch (e) {
+      } catch {
         if (userData?.isBanGiamHieu) {
           setIsAuthenticated(true);
           setAdminInfo(userData);
@@ -395,31 +395,27 @@ export default function Admin() {
                   {filteredUsers.length > 0 ? (
                     filteredUsers.map((u) => (
                       <tr key={u.id}>
-                        <td>
+                        <td data-label="Họ tên">
                           <div className="admin-cell-main">{u.fullName}</div>
                         </td>
-                        <td>{u.email}</td>
-                        <td>{u.department}</td>
-                        <td>
-                          <div className="admin-role-cell">
-                            <span>{u.role}</span>
-                            <button
-                              className="ui-btn ui-btn-secondary ui-btn-sm admin-inline-edit"
-                              onClick={() => openRoleChangeModal(u)}
-                              title="Thay đổi quyền"
-                              type="button"
-                            >
-                              Sửa
-                            </button>
-                          </div>
-                        </td>
-                        <td>
+                        <td data-label="Email">{u.email}</td>
+                        <td data-label="Phòng ban">{u.department}</td>
+                        <td data-label="Vai trò">{u.role}</td>
+                        <td data-label="Trạng thái">
                           <span className={`admin-status-pill ${u.statusValue === 1 ? "approved" : "pending"}`}>
                             {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
                           </span>
                         </td>
                         <td>
                           <div className="admin-row-actions">
+                            <button
+                              className="ui-btn ui-btn-secondary ui-btn-sm"
+                              onClick={() => openRoleChangeModal(u)}
+                              title="Thay đổi quyền"
+                              type="button"
+                            >
+                              Sửa
+                            </button>
                             {u.statusValue === 0 && (
                               <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => approveUser(u.id)} type="button">
                                 Duyệt

@@ -212,6 +212,17 @@
   background: #f9fafb;
 }
 
+@media (max-width: 720px) {
+  .admin-user-table {
+    min-width: 0;
+  }
+
+  .admin-user-table th,
+  .admin-user-table td {
+    white-space: normal;
+  }
+}
+
 @media (max-width: 768px) {
   .admin-modal-grid {
     grid-template-columns: 1fr;

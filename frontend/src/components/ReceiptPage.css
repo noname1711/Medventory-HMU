@@ -165,10 +165,11 @@
 
 .receipt-material-search {
   position: relative;
+  width: 100%;
 }
 
 .receipt-material-search .ui-input {
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.05), rgba(255, 255, 255, 1));
+  background: #ffffff;
 }
 
 .receipt-material-search .ui-input.is-duplicate {
@@ -253,5 +254,16 @@
 
   .receipt-history-search {
     min-width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .receipt-table {
+    min-width: 0;
+  }
+
+  .receipt-table th,
+  .receipt-table td {
+    white-space: normal;
   }
 }

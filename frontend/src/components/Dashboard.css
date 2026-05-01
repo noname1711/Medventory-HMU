@@ -2,11 +2,11 @@
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  min-height: 100dvh;
+  background: #f8fafc;
+  font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, sans-serif;
   color: #111827;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* Header luôn trên cùng */
@@ -22,6 +22,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   padding: 0;
   margin: 0;
@@ -32,15 +34,16 @@
   flex-shrink: 0;
   justify-content: center;
   padding: 1rem 1rem;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-bottom: 1px solid #dbeafe;
 }
 
 /* Nội dung tab có thể cuộn */
 .mt-4 {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1.5rem;
   scrollbar-width: thin;
   scrollbar-color: #93c5fd transparent;
@@ -87,20 +90,20 @@
   justify-content: center;
 }
 .stat-icon.blue {
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--ui-stat-blue-bg);
+  color: var(--ui-stat-blue);
 }
 .stat-icon.greenish {
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--ui-stat-green-bg);
+  color: var(--ui-stat-green);
 }
 .stat-icon.yellow {
-  background: #fffbeb;
-  color: #f59e0b;
+  background: var(--ui-stat-yellow-bg);
+  color: var(--ui-stat-yellow);
 }
 .stat-icon.red {
-  background: #fff1f2;
-  color: #ef4444;
+  background: var(--ui-stat-red-bg);
+  color: var(--ui-stat-red);
 }
 
 .muted {
@@ -206,5 +209,5 @@
 
 /* Toàn trang dashboard mờ dần xuất hiện */
 .dashboard-page {
-  animation: fadeSlideUp 0.8s ease forwards;
+  animation: fadeSlideUp 0.25s ease forwards;
 }

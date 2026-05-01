@@ -147,6 +147,8 @@ function MaterialSearch({
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => doSearch(value), 200);
     return () => clearTimeout(debounceRef.current);
+    // Debounced search intentionally follows only input visibility and value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, open]);
 
   function handlePick(material) {
@@ -801,7 +803,7 @@ export default function ReceiptPage() {
 
                       return (
                         <tr key={row.key} className={`receipt-row ${isDuplicate ? "duplicate-row" : ""}`}>
-                          <td>
+                          <td data-label="Tên vật tư">
                             <MaterialSearch
                               mode="name"
                               value={row.name}
@@ -825,11 +827,11 @@ export default function ReceiptPage() {
                             ) : null}
                           </td>
 
-                          <td>
+                          <td data-label="ĐVT">
                             <input className="ui-input receipt-table-input" value={row.unitName || ""} disabled />
                           </td>
 
-                          <td>
+                          <td data-label="SL chứng từ">
                             <input
                               className="ui-input receipt-table-input text-right"
                               value={row.qtyDoc}
@@ -838,7 +840,7 @@ export default function ReceiptPage() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="SL thực nhập">
                             <input
                               className="ui-input receipt-table-input text-right"
                               value={row.qtyActual}
@@ -847,7 +849,7 @@ export default function ReceiptPage() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Đơn giá">
                             <input
                               className="ui-input receipt-table-input text-right"
                               value={row.price}
@@ -856,7 +858,7 @@ export default function ReceiptPage() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Số lô">
                             <input
                               className="ui-input receipt-table-input"
                               value={row.lotNumber}
@@ -865,7 +867,7 @@ export default function ReceiptPage() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Ngày SX">
                             <input
                               className="ui-input receipt-table-input"
                               type="date"
@@ -874,7 +876,7 @@ export default function ReceiptPage() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Hạn dùng">
                             <input
                               className="ui-input receipt-table-input"
                               type="date"
@@ -883,7 +885,7 @@ export default function ReceiptPage() {
                             />
                           </td>
 
-                          <td className="text-right">
+                          <td className="text-right" data-label="Thành tiền">
                             <span className={`receipt-money ${isDuplicate ? "is-duplicate" : ""}`}>
                               {moneyFmt.format(totals.rowTotals[index] || 0)}
                             </span>
@@ -1000,11 +1002,11 @@ export default function ReceiptPage() {
 
                       return (
                         <tr key={id ?? Math.random()}>
-                          <td>#{id}</td>
-                          <td>{date}</td>
-                          <td>{from}</td>
-                          <td>{reason}</td>
-                          <td className="text-right">{moneyFmt.format(total)}</td>
+                          <td data-label="Mã phiếu">#{id}</td>
+                          <td data-label="Ngày nhập">{date}</td>
+                          <td data-label="Nhà cung cấp">{from}</td>
+                          <td data-label="Lý do">{reason}</td>
+                          <td className="text-right" data-label="Tổng tiền">{moneyFmt.format(total)}</td>
                           <td className="text-center">
                             <button
                               type="button"

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import "./dashboard-ui.css";
 import "./ForecastApproval.css";
@@ -39,7 +39,7 @@ export default function ForecastApproval({ adminInfo }) {
 
       const data = await response.json();
       setForecasts(data || []);
-    } catch (error) {
+    } catch {
       Swal.fire({
         title: "Lỗi!",
         text: "Không thể tải danh sách dự trù",
@@ -94,7 +94,7 @@ export default function ForecastApproval({ adminInfo }) {
           setSelectedForecast(null);
         }
         fetchForecasts();
-      } catch (error) {
+      } catch {
         Swal.fire({
           title: "Lỗi!",
           text: "Không thể phê duyệt dự trù",
@@ -154,7 +154,7 @@ export default function ForecastApproval({ adminInfo }) {
           setSelectedForecast(null);
         }
         fetchForecasts();
-      } catch (error) {
+      } catch {
         Swal.fire({
           title: "Lỗi!",
           text: "Không thể từ chối dự trù",
@@ -170,7 +170,7 @@ export default function ForecastApproval({ adminInfo }) {
   };
 
   // Hàm đọc trạng thái theo nhiều định dạng backend khác nhau.
-  const getStatusBadge = (status) => {
+  const getStatusBadge = useCallback((status) => {
     if (status && typeof status === "object") {
       if (status.value !== undefined) {
         switch (status.value) {
@@ -233,21 +233,18 @@ export default function ForecastApproval({ adminInfo }) {
     }
 
     return { text: "Không xác định", className: "is-info" };
-  };
+  }, []);
 
-  const isPendingStatus = (status) => getStatusBadge(status).className === "pending";
+  const isPendingStatus = useCallback((status) => getStatusBadge(status).className === "is-pending", [getStatusBadge]);
 
   const stats = useMemo(() => {
     const total = forecasts.length;
     const pending = forecasts.filter((item) => isPendingStatus(item.status)).length;
     const processed = total - pending;
     return { total, pending, processed };
-  }, [forecasts]);
+  }, [forecasts, isPendingStatus]);
 
   const pageTitle = "Phê duyệt dự trù";
-  const pageSubtitle =
-    "Theo dõi danh sách phiếu dự trù, xem chi tiết từng đề xuất và thực hiện phê duyệt hoặc từ chối ngay trên cùng một giao diện.";
-
   return (
     <div className="ui-page">
       <div className="ui-page-frame">
@@ -331,15 +328,15 @@ export default function ForecastApproval({ adminInfo }) {
 
                       return (
                         <tr key={forecast.id}>
-                          <td>{forecast.department?.name || "Không xác định"}</td>
-                          <td>{forecast.academicYear || "-"}</td>
-                          <td>{forecast.createdBy?.fullName || "Không xác định"}</td>
-                          <td>
+                          <td data-label="Khoa/Phòng">{forecast.department?.name || "Không xác định"}</td>
+                          <td data-label="Năm học">{forecast.academicYear || "-"}</td>
+                          <td data-label="Người tạo">{forecast.createdBy?.fullName || "Không xác định"}</td>
+                          <td data-label="Ngày tạo">
                             {forecast.createdAt
                               ? new Date(forecast.createdAt).toLocaleDateString("vi-VN")
                               : "-"}
                           </td>
-                          <td>
+                          <td data-label="Trạng thái">
                             <span className={`ui-status-badge ${status.className}`}>{status.text}</span>
                           </td>
                           <td className="text-center">

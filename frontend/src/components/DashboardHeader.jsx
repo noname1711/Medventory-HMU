@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import "./DashboardHeader.css";
 
 // --- UTILITIES ---
@@ -77,7 +77,7 @@ export default function DashboardHeader({ userInfo }) {
   // --- API CALLS ---
 
   // Gọi API lấy danh sách thông báo
-  const fetchMyNotifications = async ({ unreadOnly, page = 0, size = 20 }) => {
+  const fetchMyNotifications = useCallback(async ({ unreadOnly, page = 0, size = 20 }) => {
     if (!userId) return null;
 
     const qs = new URLSearchParams({
@@ -101,7 +101,7 @@ export default function DashboardHeader({ userInfo }) {
       console.error("Noti Error:", err);
       return null;
     }
-  };
+  }, [userId]);
 
   // API Đánh dấu 1 tin là đã đọc
   const markRead = async (notificationId) => {
@@ -151,7 +151,7 @@ export default function DashboardHeader({ userInfo }) {
         }
       });
     }
-  }, [userId]);
+  }, [userId, fetchMyNotifications]);
 
   // 2. Xử lý khi bấm nút chuông
   const handleToggleNoti = async () => {

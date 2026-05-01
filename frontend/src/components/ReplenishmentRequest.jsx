@@ -5,7 +5,7 @@ import "./ReplenishmentRequest.css";
 import MaterialSearchInput from "./MaterialSearchInput";
 
 export default function ReplenishmentRequest() {
-  const UNIT_MAP = {
+  const UNIT_MAP = useMemo(() => ({
     1: "Chai",
     2: "Lọ",
     3: "Hộp",
@@ -15,7 +15,7 @@ export default function ReplenishmentRequest() {
     7: "Viên",
     8: "kg",
     9: "Bộ",
-  };
+  }), []);
 
   /* Tạo một dòng trống dùng chung để tránh lặp code */
   const createEmptyRow = () => ({
@@ -203,7 +203,7 @@ export default function ReplenishmentRequest() {
       materialCode: m.materialCode || '',
       unitName: UNIT_MAP[m.unitId] || '',
     })),
-    [materials]
+    [materials, UNIT_MAP]
   );
 
   return (
@@ -269,9 +269,9 @@ export default function ReplenishmentRequest() {
                     {items.length > 0 ? (
                       items.map((item, index) => (
                         <tr key={item.rowId}>
-                          <td className="text-center">{index + 1}</td>
+                          <td className="text-center" data-label="STT">{index + 1}</td>
 
-                          <td>
+                          <td data-label="Tên vật tư">
                             <MaterialSearchInput
                               value={item.materialName || ""}
                               onChange={(text) =>
@@ -292,7 +292,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Quy cách">
                             <input
                               className="ui-input"
                               name="specification"
@@ -301,7 +301,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="ĐVT">
                             <input
                               className="ui-input"
                               name="unitId"
@@ -310,7 +310,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="SL hiện có">
                             <input
                               className="ui-input"
                               type="number"
@@ -320,7 +320,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Năm trước">
                             <input
                               className="ui-input"
                               type="number"
@@ -330,7 +330,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Dự trù">
                             <input
                               className="ui-input"
                               type="number"
@@ -340,7 +340,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Mã code">
                             <input
                               className="ui-input"
                               name="materialCode"
@@ -349,7 +349,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Hãng SX">
                             <input
                               className="ui-input"
                               name="manufacturer"
@@ -358,7 +358,7 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td>
+                          <td data-label="Lý do">
                             <input
                               className="ui-input"
                               name="reason"

@@ -389,6 +389,17 @@
 }
 
 
+@media (max-width: 720px) {
+  .issue-table {
+    min-width: 0;
+  }
+
+  .issue-table th,
+  .issue-table td {
+    white-space: normal;
+  }
+}
+
 .issue-table.issue-table-sm thead th,
 .issue-table.issue-table-sm tbody td {
   padding: 10px;

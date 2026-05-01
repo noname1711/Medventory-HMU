@@ -249,10 +249,10 @@ export default function InventoryPage() {
                   {filteredStockItems.length > 0 ? (
                     filteredStockItems.map((item) => (
                       <tr key={item.materialId}>
-                        <td>{item.materialCode}</td>
-                        <td>{item.materialName}</td>
-                        <td>{item.unitName}</td>
-                        <td className="text-right">
+                        <td data-label="Mã vật tư">{item.materialCode}</td>
+                        <td data-label="Tên vật tư">{item.materialName}</td>
+                        <td data-label="Đơn vị tính">{item.unitName}</td>
+                        <td data-label="Tồn kho" className="text-right">
                           <span className={getStockClass(item.closingStock)}>
                             {item.closingStock}
                           </span>

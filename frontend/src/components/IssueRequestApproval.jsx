@@ -21,7 +21,7 @@ export default function IssueRequestApproval() {
 
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
-  const [accessDeniedMsg, setAccessDeniedMsg] = useState("");
+  const [, setAccessDeniedMsg] = useState("");
 
   const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
 
@@ -428,11 +428,11 @@ export default function IssueRequestApproval() {
                 <tbody>
                   {currentRequests.map((request) => (
                     <tr key={request.id}>
-                      <td className="ira-cell-id">#{request.id}</td>
-                      <td>{request.createdByName}</td>
-                      <td>{request.departmentName}</td>
-                      <td>{new Date(request.requestedAt).toLocaleString("vi-VN")}</td>
-                      <td>
+                      <td className="ira-cell-id" data-label="Mã phiếu">#{request.id}</td>
+                      <td data-label="Người gửi">{request.createdByName}</td>
+                      <td data-label="Đơn vị">{request.departmentName}</td>
+                      <td data-label="Thời gian">{new Date(request.requestedAt).toLocaleString("vi-VN")}</td>
+                      <td data-label="Trạng thái">
                         <span className={`ui-status-badge ${getStatusUiClass(request)}`}>{request.statusName}</span>
                         {request.status === 2 && request.approvalNote && (
                           <div className="ira-rejection-note">{request.approvalNote}</div>

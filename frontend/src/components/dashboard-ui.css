@@ -26,11 +26,20 @@
 
   --ui-radius-xs: 4px;
   --ui-radius-sm: 6px;
-  --ui-radius: 12px;
-  --ui-radius-lg: 18px;
+  --ui-radius: 8px;
+  --ui-radius-lg: 10px;
 
-  --ui-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --ui-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
   --ui-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  --ui-stat-blue-bg: #eff6ff;
+  --ui-stat-blue: #2563eb;
+  --ui-stat-green-bg: #ecfdf5;
+  --ui-stat-green: #059669;
+  --ui-stat-yellow-bg: #fffbeb;
+  --ui-stat-yellow: #f59e0b;
+  --ui-stat-red-bg: #fff1f2;
+  --ui-stat-red: #ef4444;
 
   --ui-table-head-bg: #1e40af;
   --ui-table-head-text: #ffffff;
@@ -59,6 +68,7 @@ table {
   border-radius: var(--ui-radius-lg);
   box-shadow: var(--ui-shadow);
   padding: 24px;
+  min-width: 0;
 }
 
 /* Wrapper cho các trang dùng ui-card-header thay vì ui-page-head */
@@ -497,6 +507,7 @@ table {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: flex-start;
   min-width: 68px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -586,4 +597,105 @@ table {
   }
 
   .ui-search { max-width: 100%; }
+}
+
+@media (max-width: 720px) {
+  .ui-table-wrap {
+    border: 0;
+    box-shadow: none;
+  }
+
+  /* Table trở thành block để không còn intrinsic table width */
+  .ui-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ui-table thead {
+    display: none;
+  }
+
+  .ui-table tbody,
+  .ui-table tr,
+  .ui-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ui-table tbody {
+    border-spacing: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ui-table tbody tr {
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--ui-white);
+    box-shadow: var(--ui-shadow-soft);
+    overflow: hidden;
+    width: 100%;
+  }
+
+  /* Label nhỏ trên, value dưới — align-items: flex-start để badge/button không stretch */
+  .ui-table tbody td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ui-border);
+    text-align: left !important;
+    box-sizing: border-box;
+  }
+
+  .ui-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .ui-table tbody td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--ui-text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+
+  /* Inputs/selects/textareas: full-width trong cell có label */
+  .ui-table .ui-input,
+  .ui-table .ui-select,
+  .ui-table .ui-textarea {
+    width: 100%;
+    align-self: stretch;
+  }
+
+  /* Buttons: auto-width, không stretch */
+  .ui-table .ui-btn {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  /* Badges: force content-size, không stretch full-width */
+  .ui-table .ui-status-badge,
+  .ui-table .ui-stock-badge {
+    width: fit-content;
+    max-width: 100%;
+    align-self: flex-start;
+    display: inline-flex;
+  }
+
+  /* Cells không có data-label (action cells): flex row, buttons cạnh nhau */
+  .ui-table tbody td:not([data-label]) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .ui-table tbody td:not([data-label])::before {
+    display: none;
+  }
 }

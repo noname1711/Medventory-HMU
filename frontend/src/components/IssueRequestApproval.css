@@ -257,6 +257,17 @@
   }
 }
 
+@media (max-width: 720px) {
+  .ira-table {
+    min-width: 0;
+  }
+
+  .ira-table th,
+  .ira-table td {
+    white-space: normal;
+  }
+}
+
 @media (max-width: 640px) {
   .ira-modal-overlay {
     padding: 12px;

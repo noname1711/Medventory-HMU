@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import Swal from "sweetalert2";
 import "./dashboard-ui.css";
 import "./CreateIssueRequest.css";
@@ -55,12 +55,14 @@ export default function CreateIssueRequest() {
           fetchUnits(),
           fetchMaterials()
         ]);
-      } catch (error) {
+      } catch {
         setMessage("Lỗi khi tải dữ liệu từ server");
       }
     };
 
     fetchInitialData();
+    // Initial boot should only run once; the called helpers use current module constants.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch lịch sử khi user đã được thiết lập
@@ -68,6 +70,8 @@ export default function CreateIssueRequest() {
     if (currentUser?.id) {
       fetchRequestHistory();
     }
+    // Refresh history when the loaded user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
   const fetchUserInfo = async () => {
@@ -92,7 +96,7 @@ export default function CreateIssueRequest() {
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
+    } catch {
       setMessage("Lỗi khi tải thông tin người dùng");
     }
   };
@@ -106,7 +110,7 @@ export default function CreateIssueRequest() {
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
+    } catch {
       setUnits([]);
     }
   };
@@ -134,7 +138,7 @@ export default function CreateIssueRequest() {
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
+    } catch {
       setMaterials([]);
     }
   };
@@ -164,7 +168,7 @@ export default function CreateIssueRequest() {
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
+    } catch {
       setMessage("Lỗi khi tải lịch sử phiếu xin lĩnh");
     } finally {
       setHistoryLoading(false);
@@ -223,7 +227,7 @@ export default function CreateIssueRequest() {
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
+    } catch {
       setSubDepartments([]);
     }
   };
@@ -654,7 +658,7 @@ export default function CreateIssueRequest() {
         hour: '2-digit',
         minute: '2-digit'
       });
-    } catch (error) {
+    } catch {
       return 'Invalid Date';
     }
   };
@@ -788,8 +792,8 @@ export default function CreateIssueRequest() {
                 <tbody>
                   {formData.details.map((detail, index) => (
                     <tr key={index} className={isNewMaterial(detail) ? 'new-material' : 'existing-material'}>
-                      <td className="text-center">{index + 1}</td>
-                      <td>
+                      <td className="text-center" data-label="TT">{index + 1}</td>
+                      <td data-label="Mã code">
                         <input
                           type="text"
                           value={detail.proposedCode || ""}
@@ -805,7 +809,7 @@ export default function CreateIssueRequest() {
                           </div>
                         )}
                       </td>
-                      <td className="material-search-cell">
+                      <td className="material-search-cell" data-label="Tên vật tư">
                         <MaterialSearchInput
                           value={detail.materialName || ""}
                           onChange={(text) => handleDetailChange(index, "materialName", text)}
@@ -817,7 +821,7 @@ export default function CreateIssueRequest() {
                           placeholder="Nhập tên vật tư để tìm kiếm..."
                         />
                       </td>
-                      <td>
+                      <td data-label="Quy cách">
                         <input
                           type="text"
                           value={detail.spec || ""}
@@ -828,7 +832,7 @@ export default function CreateIssueRequest() {
                           disabled={!isNewMaterial(detail)}
                         />
                       </td>
-                      <td>
+                      <td data-label="Đơn vị">
                         <select
                           value={detail.unitId || ""}
                           onChange={(e) => handleDetailChange(index, "unitId", e.target.value)}
@@ -844,7 +848,7 @@ export default function CreateIssueRequest() {
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td data-label="Số lượng">
                         <input
                           type="text"
                           value={detail.qtyRequested || ""}
@@ -857,7 +861,7 @@ export default function CreateIssueRequest() {
                           title="Chỉ được nhập số nguyên"
                         />
                       </td>
-                      <td>
+                      <td data-label="Hãng SX">
                         <input
                           type="text"
                           value={detail.proposedManufacturer || ""}
@@ -868,7 +872,7 @@ export default function CreateIssueRequest() {
                           disabled={!isNewMaterial(detail)}
                         />
                       </td>
-                      <td>
+                      <td data-label="Loại">
                         <select
                           value={detail.category || ""}
                           onChange={(e) => handleCategoryChange(index, e.target.value)}
@@ -884,12 +888,12 @@ export default function CreateIssueRequest() {
                           ))}
                         </select>
                       </td>
-                      <td className="text-center">
+                      <td className="text-center" data-label="Phân loại">
                         <span className={`material-type-badge ${isNewMaterial(detail) ? 'new' : 'existing'}`}>
                           {isNewMaterial(detail) ? 'Vật tư mới' : 'Vật tư có sẵn'}
                         </span>
                       </td>
-                      <td className="text-center">
+                      <td className="text-center" data-label="Thao tác">
                         <button
                           type="button"
                           onClick={() => removeRow(index)}
@@ -995,16 +999,16 @@ export default function CreateIssueRequest() {
                 <tbody>
                   {requestHistory.map((request) => (
                     <tr key={request.id}>
-                      <td className="text-center">{request.id}</td>
-                      <td className="text-center">{formatDate(request.requestedAt)}</td>
-                      <td>{request.note}</td>
-                      <td className="text-center">{request.details?.length || 0}</td>
-                      <td className="text-center">
+                      <td className="text-center" data-label="Mã phiếu">{request.id}</td>
+                      <td className="text-center" data-label="Ngày gửi">{formatDate(request.requestedAt)}</td>
+                      <td data-label="Mục đích">{request.note}</td>
+                      <td className="text-center" data-label="Số vật tư">{request.details?.length || 0}</td>
+                      <td className="text-center" data-label="Trạng thái">
                         <span className={`status-badge ${getStatusColor(request.status)}`}>
                           {getStatusLabel(request.status)}
                         </span>
                       </td>
-                      <td className="text-center">
+                      <td className="text-center" data-label="Thao tác">
                         <button
                           type="button"
                           onClick={() => showRequestDetails(request)}
@@ -1077,16 +1081,16 @@ export default function CreateIssueRequest() {
                     <tbody>
                       {selectedRequest.details?.map((detail, index) => (
                         <tr key={index}>
-                          <td className="text-center">{index + 1}</td>
-                          <td>{detail.proposedCode || 'N/A'}</td>
-                          <td>{getMaterialDisplayName(detail)}</td>
-                          <td>{getMaterialDisplaySpec(detail)}</td>
-                          <td className="text-center">
+                          <td className="text-center" data-label="TT">{index + 1}</td>
+                          <td data-label="Mã code">{detail.proposedCode || 'N/A'}</td>
+                          <td data-label="Tên vật tư">{getMaterialDisplayName(detail)}</td>
+                          <td data-label="Quy cách">{getMaterialDisplaySpec(detail)}</td>
+                          <td className="text-center" data-label="Đơn vị">
                             {getUnitName(detail)}
                           </td>
-                          <td className="text-center">{detail.qtyRequested || 'N/A'}</td>
-                          <td>{detail.proposedManufacturer || 'N/A'}</td>
-                          <td className="text-center">{detail.category || 'N/A'}</td>
+                          <td className="text-center" data-label="Số lượng">{detail.qtyRequested || 'N/A'}</td>
+                          <td data-label="Hãng SX">{detail.proposedManufacturer || 'N/A'}</td>
+                          <td className="text-center" data-label="Loại">{detail.category || 'N/A'}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -188,7 +188,7 @@ export default function IssuePage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setCurrentUser(data);
-      } catch (e) {
+      } catch {
         setBootError("Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.");
       }
     };
@@ -298,7 +298,7 @@ export default function IssuePage() {
           setCreatedIssueId(null);
         }
       }
-    } catch (e) {
+    } catch {
       setListMsg({ type: "error", text: "Lỗi khi tải danh sách." });
       setEligible([]);
       setIneligible([]);
@@ -701,12 +701,12 @@ export default function IssuePage() {
               {eligible?.length ? (
                 eligible.map((r) => (
                   <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
-                    <td className="issue-mono">{r.id}</td>
-                    <td>{r.subDepartmentName || "-"}</td>
-                    <td>{r.departmentName || "-"}</td>
-                    <td>{r.createdByName || "-"}</td>
-                    <td className="issue-mono">{fmtDateTime(r.requestedAt)}</td>
-                    <td className="issue-muted">{r.note || ""}</td>
+                    <td data-label="Mã phiếu" className="issue-mono">{r.id}</td>
+                    <td data-label="Bộ môn / Đơn vị">{r.subDepartmentName || "-"}</td>
+                    <td data-label="Khoa / Phòng">{r.departmentName || "-"}</td>
+                    <td data-label="Người tạo">{r.createdByName || "-"}</td>
+                    <td data-label="Ngày gửi" className="issue-mono">{fmtDateTime(r.requestedAt)}</td>
+                    <td data-label="Ghi chú" className="issue-muted">{r.note || ""}</td>
                     <td className="text-right">
                       <button
                         className="ui-btn ui-btn-primary ui-btn-sm"
@@ -754,9 +754,9 @@ export default function IssuePage() {
                       const reasonText = vnReason(x.reasonCode);
                       return (
                         <tr key={`${x.reqId}-${idx}`}>
-                          <td className="issue-mono">{x.reqId}</td>
-                          <td className="issue-mono">{fmtDateTime(x.requestedAt)}</td>
-                          <td className="issue-muted">
+                          <td data-label="Mã phiếu" className="issue-mono">{x.reqId}</td>
+                          <td data-label="Ngày gửi" className="issue-mono">{fmtDateTime(x.requestedAt)}</td>
+                          <td data-label="Lý do" className="issue-muted">
                             {reasonText}
                             {x.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
                           </td>
@@ -918,15 +918,15 @@ export default function IssuePage() {
 
                       return (
                         <tr key={ln.materialId}>
-                          <td>
+                          <td data-label="Tên vật tư">
                             <div className="issue-cell-main">{ln.name}</div>
                           </td>
-                          <td className="issue-mono">{ln.code}</td>
-                          <td className="issue-muted">{ln.spec}</td>
-                          <td>{ln.unitName || "-"}</td>
-                          <td className="text-right issue-mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
-                          <td className="text-right issue-mono">{qtyFmt.format(need)}</td>
-                          <td className="issue-muted">
+                          <td data-label="Mã" className="issue-mono">{ln.code}</td>
+                          <td data-label="Quy cách" className="issue-muted">{ln.spec}</td>
+                          <td data-label="ĐVT">{ln.unitName || "-"}</td>
+                          <td data-label="SL yêu cầu" className="text-right issue-mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
+                          <td data-label="SL xuất" className="text-right issue-mono">{qtyFmt.format(need)}</td>
+                          <td data-label="Gợi ý lô" className="issue-muted">
                             {Array.isArray(ln.lots) && ln.lots.length ? (
                               <div className="issue-lot-list">
                                 {ln.lots.slice(0, 3).map((l, i) => (
@@ -1065,12 +1065,12 @@ export default function IssuePage() {
                         <tbody>
                           {(issueDetail?.details || []).map((d) => (
                             <tr key={d.id}>
-                              <td>{d.name}</td>
-                              <td className="issue-mono">{d.code}</td>
-                              <td>{d.unitName || "-"}</td>
-                              <td className="text-right issue-mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
-                              <td className="text-right issue-mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
-                              <td className="text-right issue-mono">{moneyFmt.format(toNumber(d.total))}</td>
+                              <td data-label="Tên vật tư">{d.name}</td>
+                              <td data-label="Mã" className="issue-mono">{d.code}</td>
+                              <td data-label="ĐVT">{d.unitName || "-"}</td>
+                              <td data-label="SL xuất" className="text-right issue-mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
+                              <td data-label="Đơn giá" className="text-right issue-mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
+                              <td data-label="Thành tiền" className="text-right issue-mono">{moneyFmt.format(toNumber(d.total))}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1161,10 +1161,10 @@ export default function IssuePage() {
 
                           return (
                             <tr key={lot}>
-                              <td className="issue-mono">{lot}</td>
-                              <td className="issue-mono">{l?.expDate || "-"}</td>
-                              <td className="text-right issue-mono">{qtyFmt.format(avail)}</td>
-                              <td className="text-right">
+                              <td data-label="Số lô" className="issue-mono">{lot}</td>
+                              <td data-label="Hạn dùng" className="issue-mono">{l?.expDate || "-"}</td>
+                              <td data-label="Tồn còn lại" className="text-right issue-mono">{qtyFmt.format(avail)}</td>
+                              <td data-label="SL xuất" className="text-right">
                                 <input
                                   className="ui-input issue-number-input"
                                   value={val}

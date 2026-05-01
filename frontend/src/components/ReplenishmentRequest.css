@@ -76,3 +76,19 @@
     max-width: 100%;
   }
 }
+
+@media (max-width: 720px) {
+  .req-table {
+    min-width: 0;
+  }
+
+  .req-table th,
+  .req-table td {
+    white-space: normal;
+  }
+
+  .req-table td:nth-child(10),
+  .req-table th:nth-child(10) {
+    min-width: 0;
+  }
+}
