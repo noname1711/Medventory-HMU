@@ -1,0 +1,13 @@
+# Claude Code local config — không push lên remote
+CLAUDE.md
+.claude/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
