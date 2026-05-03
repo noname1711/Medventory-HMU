@@ -912,7 +912,7 @@ SET total_amount = COALESCE((SELECT SUM(total) FROM receipt_detail d WHERE d.hea
 -- ============================================================
 
 INSERT INTO inventory_card(material_id, unit_id, warehouse_name, record_date, opening_stock, qty_in, qty_out, supplier, lot_number, mfg_date, exp_date, sub_department_id)
-SELECT m.id, m.unit_id, wh, rd, os, qi, qo, sup, lot, mfg, exp, sd
+SELECT m.id, m.unit_id, wh, rd, os, qi, qo, sup, lot, mfg, exp, sd.id
 FROM (VALUES
   -- Ethanol 96% - 2 lô
   ('ETH96-500',  'Kho Hóa chất',   DATE '2025-01-15',   0, 200, 15, 'Công ty TNHH ABC Pharma',        'ETH-0125-A', DATE '2025-01-05', DATE '2027-01-05', 'BHPT'),
