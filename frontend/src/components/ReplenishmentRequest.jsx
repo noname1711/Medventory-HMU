@@ -316,7 +316,7 @@ export default function ReplenishmentRequest() {
                               type="number"
                               name="qtyAvailable"
                               value={item.qtyAvailable || ""}
-                              onChange={(e) => changeItem(index, e)}
+                              readOnly
                             />
                           </td>
 
@@ -326,7 +326,7 @@ export default function ReplenishmentRequest() {
                               type="number"
                               name="qtyLastYear"
                               value={item.qtyLastYear || ""}
-                              onChange={(e) => changeItem(index, e)}
+                              readOnly
                             />
                           </td>
 
