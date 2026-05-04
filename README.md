@@ -65,7 +65,6 @@ Hệ thống hỗ trợ quản lý nghiệp vụ vật tư y tế:
 
 - PostgreSQL
 - Script chính: `database/final_database.sql`
-- Script cũ/đơn giản hơn: `database/database.sql`
 
 ## Cấu trúc thư mục
 
@@ -92,7 +91,6 @@ Medventory-HMU/
 │   └── vite.config.js
 ├── database/                # SQL khởi tạo database
 │   ├── final_database.sql
-│   ├── database.sql
 │   └── README.md
 └── report/                  # Báo cáo và slide
 ```
