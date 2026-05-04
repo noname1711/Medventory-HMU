@@ -83,7 +83,7 @@ public class MaterialController {
             @RequestHeader("X-User-Id") Long userId
     ) {
         try {
-            rbacService.requirePermission(userId, RbacService.PERM_MATERIAL_MANAGE, "Ban khong co quyen them vat tu");
+            rbacService.requirePermission(userId, RbacService.PERM_MATERIAL_MANAGE, "Bạn không có quyền thêm vật tư");
             return ResponseEntity.ok(materialService.addMaterial(dto));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));

@@ -9,5 +9,6 @@ public class ReceiptFeedItemDTO {
     private Long id;
     private LocalDate receiptDate;
     private String receivedFrom;
+    private String reason;
     private BigDecimal totalAmount;
 }

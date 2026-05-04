@@ -140,14 +140,14 @@ public class SuppForecastService {
     public Map<String, Object> getForecastDetail(Long forecastId, Long userId) {
         User actor = rbacService.requireApprovedUser(userId);
         SuppForecastHeader forecast = headerRepository.findById(forecastId)
-                .orElseThrow(() -> new RuntimeException("Du tru khong ton tai"));
+                .orElseThrow(() -> new RuntimeException("Dự trù không tồn tại"));
 
         boolean isCreator = forecast.getCreatedBy() != null
                 && forecast.getCreatedBy().getId() != null
                 && forecast.getCreatedBy().getId().equals(actor.getId());
 
         if (!isCreator && !rbacService.hasPermission(actor, RbacService.PERM_SUPP_FORECAST_APPROVE)) {
-            throw new SecurityException("Ban khong co quyen xem du tru nay");
+            throw new SecurityException("Bạn không có quyền xem dự trù này");
         }
 
         return convertToForecastDTO(forecast);
@@ -175,9 +175,11 @@ public class SuppForecastService {
         SuppForecastHeader header = new SuppForecastHeader();
         header.setAcademicYear(dto.getAcademicYear());
 
-        Department dept = departmentRepository.findById(dto.getDepartmentId())
-                .orElseThrow(() -> new RuntimeException("Department không tồn tại"));
-        header.setDepartment(dept);
+        if (dto.getDepartmentId() != null) {
+            Department dept = departmentRepository.findById(dto.getDepartmentId())
+                    .orElseThrow(() -> new RuntimeException("Department không tồn tại"));
+            header.setDepartment(dept);
+        }
 
         header.setStatus(requireDocStatus(DOC_PENDING));
         header.setCreatedBy(creator);
@@ -206,6 +208,31 @@ public class SuppForecastService {
         return saved;
 
 
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getMyForecasts(Long userId) {
+        try {
+            User actor = rbacService.requireApprovedUser(userId);
+            List<SuppForecastHeader> forecasts = headerRepository.findByCreatedBy_IdOrderByCreatedAtDesc(actor.getId());
+            List<Map<String, Object>> items = forecasts.stream()
+                    .map(h -> {
+                        Map<String, Object> dto = new HashMap<>();
+                        dto.put("id", h.getId());
+                        dto.put("academicYear", h.getAcademicYear());
+                        dto.put("status", h.getStatus() != null ? h.getStatus().getCode() : null);
+                        dto.put("createdAt", h.getCreatedAt());
+                        dto.put("itemCount", h.getDetails() != null ? h.getDetails().size() : 0);
+                        if (h.getDepartment() != null) {
+                            dto.put("departmentName", h.getDepartment().getName());
+                        }
+                        return dto;
+                    })
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(Map.of("success", true, "items", items));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
     }
 
     public List<SuppForecastPreviousDTO> loadPreviousForecast(Long departmentId) {

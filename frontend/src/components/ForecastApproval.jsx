@@ -5,6 +5,12 @@ import "./ForecastApproval.css";
 
 const API_URL = "http://localhost:8080/api";
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
 export default function ForecastApproval({ adminInfo }) {
   const [forecasts, setForecasts] = useState([]);
   const [activeForecastTab, setActiveForecastTab] = useState("pending");
@@ -333,7 +339,7 @@ export default function ForecastApproval({ adminInfo }) {
                           <td data-label="Người tạo">{forecast.createdBy?.fullName || "Không xác định"}</td>
                           <td data-label="Ngày tạo">
                             {forecast.createdAt
-                              ? new Date(forecast.createdAt).toLocaleDateString("vi-VN")
+                              ? fmtDate(forecast.createdAt)
                               : "-"}
                           </td>
                           <td data-label="Trạng thái">
@@ -423,7 +429,7 @@ export default function ForecastApproval({ adminInfo }) {
                   <span className="fa-info-label">Ngày tạo</span>
                   <strong className="fa-info-value">
                     {selectedForecast.createdAt
-                      ? new Date(selectedForecast.createdAt).toLocaleDateString("vi-VN")
+                      ? fmtDate(selectedForecast.createdAt)
                       : "-"}
                   </strong>
                 </div>
@@ -437,7 +443,7 @@ export default function ForecastApproval({ adminInfo }) {
                   <div className="fa-info-card">
                     <span className="fa-info-label">Ngày duyệt</span>
                     <strong className="fa-info-value">
-                      {new Date(selectedForecast.approvalAt).toLocaleDateString("vi-VN")}
+                      {fmtDate(selectedForecast.approvalAt)}
                     </strong>
                   </div>
                 )}

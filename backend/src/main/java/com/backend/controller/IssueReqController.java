@@ -104,24 +104,6 @@ public class IssueReqController {
         }
     }
 
-    @PostMapping("/{id}/request-adjustment")
-    public ResponseEntity<IssueReqDetailResponseDTO> requestAdjustment(
-            @PathVariable Long id,
-            @RequestBody ApprovalActionDTO request,
-            @RequestHeader("X-User-Id") Long approverId) {
-        try {
-            request.setIssueReqId(id);
-            request.setApproverId(approverId);
-            request.setAction(ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT);
-            IssueReqDetailResponseDTO response = issueReqService.processApproval(request);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi yêu cầu điều chỉnh"));
-        }
-    }
-
     // ==================== TẠO PHIẾU XIN LĨNH CHO CÁN BỘ ====================
 
     @PostMapping("/canbo/create")

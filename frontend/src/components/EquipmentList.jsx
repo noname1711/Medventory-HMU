@@ -64,10 +64,14 @@ export default function InventoryPage() {
 
   /* ================= ACTIONS ================= */
   async function handleSubmit() {
+    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
     try {
       const res = await fetch("http://localhost:8080/api/materials", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": String(currentUser.id),
+        },
         body: JSON.stringify(form),
       });
 

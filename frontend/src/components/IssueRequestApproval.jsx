@@ -6,6 +6,20 @@ import "./IssueRequestApproval.css";
 
 const API_URL = "http://localhost:8080/api";
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
+function fmtDateTime(s) {
+  if (!s) return "—";
+  const str = String(s).replace("T", " ");
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}`;
+  return fmtDate(s);
+}
+
 export default function IssueRequestApproval() {
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -431,7 +445,7 @@ export default function IssueRequestApproval() {
                       <td className="ira-cell-id" data-label="Mã phiếu">#{request.id}</td>
                       <td data-label="Người gửi">{request.createdByName}</td>
                       <td data-label="Đơn vị">{request.departmentName}</td>
-                      <td data-label="Thời gian">{new Date(request.requestedAt).toLocaleString("vi-VN")}</td>
+                      <td data-label="Thời gian">{fmtDateTime(request.requestedAt)}</td>
                       <td data-label="Trạng thái">
                         <span className={`ui-status-badge ${getStatusUiClass(request)}`}>{request.statusName}</span>
                         {request.status === 2 && request.approvalNote && (
@@ -450,9 +464,6 @@ export default function IssueRequestApproval() {
                               </button>
                               <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => openApprovalModal("reject", request)}>
                                 Từ chối
-                              </button>
-                              <button className="ui-btn ui-btn-warning ui-btn-sm" onClick={() => openApprovalModal("adjust", request)}>
-                                Điều chỉnh
                               </button>
                             </>
                           )}
@@ -489,13 +500,13 @@ export default function IssueRequestApproval() {
                     <div className="ira-info-item"><strong>Email:</strong> {selectedRequest.header.createdByEmail}</div>
                     <div className="ira-info-item"><strong>Đơn vị:</strong> {selectedRequest.header.departmentName}</div>
                     <div className="ira-info-item"><strong>Bộ môn:</strong> {selectedRequest.header.departmentName}</div>
-                    <div className="ira-info-item"><strong>Thời gian:</strong> {new Date(selectedRequest.header.requestedAt).toLocaleString()}</div>
+                    <div className="ira-info-item"><strong>Thời gian:</strong> {fmtDateTime(selectedRequest.header.requestedAt)}</div>
                     <div className="ira-info-item">
                       <strong>Trạng thái:</strong> <span className={`ui-status-badge ${getStatusUiClass(selectedRequest.header)}`}>{selectedRequest.header.statusName}</span>
                     </div>
                     {selectedRequest.header.approvalByName && <div className="ira-info-item"><strong>Người phê duyệt:</strong> {selectedRequest.header.approvalByName}</div>}
                     {selectedRequest.header.approvalAt && (
-                      <div className="ira-info-item"><strong>Thời gian phê duyệt:</strong> {new Date(selectedRequest.header.approvalAt).toLocaleString()}</div>
+                      <div className="ira-info-item"><strong>Thời gian phê duyệt:</strong> {fmtDateTime(selectedRequest.header.approvalAt)}</div>
                     )}
                     {selectedRequest.header.approvalNote && <div className="ira-info-item ira-info-item-full"><strong>Ghi chú phê duyệt:</strong> {selectedRequest.header.approvalNote}</div>}
                     {selectedRequest.header.note && <div className="ira-info-item ira-info-item-full"><strong>Ghi chú của người gửi:</strong> {selectedRequest.header.note}</div>}

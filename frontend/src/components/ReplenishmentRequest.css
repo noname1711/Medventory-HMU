@@ -64,6 +64,49 @@
   min-width: 180px;
 }
 
+/* History tab */
+.req-history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.req-history-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.req-history-table {
+  min-width: 760px;
+}
+
+.req-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.req-status-badge.req-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.req-status-badge.req-status-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.req-status-badge.req-status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 @media (max-width: 900px) {
   .req-topbar,
   .req-actions {

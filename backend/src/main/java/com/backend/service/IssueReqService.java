@@ -193,12 +193,6 @@ public class IssueReqService {
                     break;
                 }
 
-                case ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT: {
-                    // schema không có trạng thái riêng: giữ PENDING, chỉ gửi thông báo
-                    notificationService.notifyAdjustmentRequest(header, request.getNote());
-                    break;
-                }
-
                 default:
                     throw new RuntimeException("Hành động không hợp lệ");
             }

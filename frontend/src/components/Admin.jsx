@@ -388,7 +388,7 @@ export default function Admin() {
                     <th>Phòng ban</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th className="text-center">Thao tác</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -414,7 +414,7 @@ export default function Admin() {
                               title="Thay đổi quyền"
                               type="button"
                             >
-                              Sửa
+                              Xem
                             </button>
                             {u.statusValue === 0 && (
                               <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => approveUser(u.id)} type="button">

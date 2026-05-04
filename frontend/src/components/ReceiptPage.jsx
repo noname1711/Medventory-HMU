@@ -13,6 +13,12 @@ const API_ENDPOINTS = {
 
 const moneyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
 function toNumber(value) {
   if (value === null || value === undefined) return 0;
   const s = String(value).replace(/,/g, ".").trim();
@@ -589,13 +595,13 @@ export default function ReceiptPage() {
       });
 
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+      if (!res.ok || !data?.success) throw new Error(data?.message || `HTTP ${res.status}`);
 
       const headerObj = data?.receipt || data?.header || data?.data?.receipt || data?.data?.header || data?.data || {};
       const details = data?.details || data?.items || data?.lines || data?.data?.details || [];
 
       const hId = headerObj?.id ?? receiptId;
-      const hDate = headerObj?.receiptDate ?? headerObj?.receipt_date ?? "";
+      const hDate = fmtDate(headerObj?.receiptDate ?? headerObj?.receipt_date ?? "");
       const hFrom = headerObj?.receivedFrom ?? headerObj?.received_from ?? "";
       const hReason = headerObj?.reason ?? "";
       const hTotal = headerObj?.totalAmount ?? headerObj?.total_amount ?? 0;
@@ -606,7 +612,7 @@ export default function ReceiptPage() {
               const name = detail?.name || detail?.materialName || "";
               const code = detail?.code || "";
               const lot = detail?.lotNumber || detail?.lot_number || "";
-              const exp = detail?.expDate || detail?.exp_date || "";
+              const exp = fmtDate(detail?.expDate || detail?.exp_date || "");
               const qty = detail?.qtyActual ?? detail?.qty_actual ?? 0;
               const price = detail?.price ?? 0;
               const total = detail?.total ?? Number(qty) * Number(price);
@@ -995,7 +1001,7 @@ export default function ReceiptPage() {
                   {filteredHistory.length > 0 ? (
                     filteredHistory.map((item) => {
                       const id = item?.id;
-                      const date = item?.receiptDate ?? item?.receipt_date ?? "";
+                      const date = fmtDate(item?.receiptDate ?? item?.receipt_date ?? "");
                       const from = item?.receivedFrom ?? item?.received_from ?? "";
                       const reason = item?.reason ?? "";
                       const total = item?.totalAmount ?? item?.total_amount ?? 0;

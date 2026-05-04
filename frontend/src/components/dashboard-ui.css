@@ -394,6 +394,8 @@ table {
   position: sticky;
   top: 0;
   z-index: 2;
+  /* Fix subpixel gap between adjacent sticky th cells */
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.15);
 }
 
 .ui-table tbody td {
@@ -411,8 +413,8 @@ table {
   background: var(--ui-table-row-hover);
 }
 
-.ui-table .text-center { text-align: center; }
-.ui-table .text-right { text-align: right; }
+.ui-table .text-center { text-align: left; }
+.ui-table .text-right  { text-align: left; }
 
 .ui-empty,
 .ui-table .ui-empty {

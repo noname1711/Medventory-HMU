@@ -650,14 +650,12 @@ export default function CreateIssueRequest() {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const str = String(dateString).replace("T", " ");
+      const m = str.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/);
+      if (m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}`;
+      const d = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (d) return `${d[3]}/${d[2]}/${d[1]}`;
+      return dateString;
     } catch {
       return 'Invalid Date';
     }
@@ -716,23 +714,23 @@ export default function CreateIssueRequest() {
           <div>
             <h1 className="ui-page-title">Tạo phiếu xin lĩnh</h1>
           </div>
+          <div className="ui-tabs" style={{ marginBottom: 0 }}>
+            <button
+              type="button"
+              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("create")}
+            >
+              Tạo phiếu xin lĩnh
+            </button>
+            <button
+              type="button"
+              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("history")}
+            >
+              Lịch sử đã gửi ({requestHistory.length})
+            </button>
+          </div>
         </div>
-
-      {/* Tab Navigation */}
-      <div className="ui-tabs">
-        <button
-          className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("create")}
-        >
-          Tạo phiếu xin lĩnh
-        </button>
-        <button
-          className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("history")}
-        >
-          Lịch sử đã gửi ({requestHistory.length})
-        </button>
-      </div>
 
       {message && (
         <div className={`ui-alert ${message.includes("thành công") ? "is-success" : "is-error"}`}>
@@ -777,16 +775,16 @@ export default function CreateIssueRequest() {
               <table className="ui-table issue-table">
                 <thead>
                   <tr>
-                    <th width="50">TT</th>
+                    <th style={{ width: 50 }}>TT</th>
                     <th>Mã code</th>
                     <th>Tên vật tư hóa chất</th>
                     <th>Quy cách đóng gói</th>
-                    <th width="120">Đơn vị tính</th>
-                    <th width="120">Số lượng xin cấp</th>
+                    <th style={{ width: 120 }}>Đơn vị tính</th>
+                    <th style={{ width: 120 }}>Số lượng xin cấp</th>
                     <th>Hãng sản xuất</th>
-                    <th width="100">Loại</th>
-                    <th width="100">Phân loại</th>
-                    <th width="80">Thao tác</th>
+                    <th style={{ minWidth: 160 }}>Loại</th>
+                    <th style={{ width: 110 }}>Phân loại</th>
+                    <th style={{ width: 80 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -794,19 +792,18 @@ export default function CreateIssueRequest() {
                     <tr key={index} className={isNewMaterial(detail) ? 'new-material' : 'existing-material'}>
                       <td className="text-center" data-label="TT">{index + 1}</td>
                       <td data-label="Mã code">
-                        <input
-                          type="text"
-                          value={detail.proposedCode || ""}
-                          onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
-                          onBlur={(e) => handleCodeBlur(index, e.target.value)}
-                          className="ui-input table-input"
-                          placeholder="Nhập mã code"
-                          required
-                        />
-                        {detail.materialId && (
-                          <div className="hint-text" style={{ fontSize: '11px', color: '#666' }}>
-                            Mã code vật tư có sẵn
-                          </div>
+                        {isNewMaterial(detail) ? (
+                          <input
+                            type="text"
+                            value={detail.proposedCode || ""}
+                            onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
+                            onBlur={(e) => handleCodeBlur(index, e.target.value)}
+                            className="ui-input table-input"
+                            placeholder="Nhập mã code"
+                            required
+                          />
+                        ) : (
+                          <span style={{ fontSize: '13px', color: '#6b7280' }}>{detail.proposedCode || '—'}</span>
                         )}
                       </td>
                       <td className="material-search-cell" data-label="Tên vật tư">
@@ -877,6 +874,7 @@ export default function CreateIssueRequest() {
                           value={detail.category || ""}
                           onChange={(e) => handleCategoryChange(index, e.target.value)}
                           className="ui-select table-select category-select"
+                          style={{ minWidth: '140px', width: '100%' }}
                           required
                           disabled={!isNewMaterial(detail)} // CHỈ CHO PHÉP THAY ĐỔI KHI LÀ VẬT TƯ MỚI
                         >

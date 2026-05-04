@@ -1194,13 +1194,6 @@ public class IssueService {
 
                 if (isAlreadyIssued(req)) {
                     rejectedAlreadyIssued++;
-                    ineligible.add(IneligibleIssueReqDTO.of(
-                            reqDTO,
-                            "ALREADY_ISSUED",
-                            "Phiếu đã được xuất kho trước đó",
-                            null,
-                            null
-                    ));
                     continue;
                 }
 

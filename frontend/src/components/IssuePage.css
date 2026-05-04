@@ -56,7 +56,7 @@
 }
 
 .issue-cell-main {
-  font-weight: 800;
+  font-weight: 700;
   color: #111827;
 }
 
@@ -72,7 +72,7 @@
 
 .issue-muted-strong {
   color: #111827;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .issue-mini {
@@ -108,7 +108,7 @@
 .issue-collapse-title {
   margin: 0 0 10px;
   font-size: 0.98rem;
-  font-weight: 800;
+  font-weight: 700;
   color: #111827;
 }
 
@@ -140,7 +140,7 @@
 
 .issue-request-value {
   margin-top: 4px;
-  font-weight: 800;
+  font-weight: 700;
   color: #111827;
 }
 
@@ -171,7 +171,7 @@
 .issue-config-title {
   margin: 0;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
   color: #111827;
 }
 
@@ -194,7 +194,7 @@
   border: none;
   background: #ffffff;
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 600;
   color: #374151;
 }
 
@@ -309,7 +309,7 @@
 
 .issue-modal-title {
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
   color: #111827;
 }
 
@@ -411,3 +411,4 @@
   color: #92400e;
   font-size: 0.85rem;
 }
+

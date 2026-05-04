@@ -52,7 +52,7 @@
 
 .admin-user-table td:last-child,
 .admin-user-table th:last-child {
-  text-align: center;
+  text-align: left;
 }
 
 .admin-cell-main {
@@ -96,7 +96,7 @@
 .admin-row-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: wrap;
 }

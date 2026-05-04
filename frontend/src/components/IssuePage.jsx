@@ -28,11 +28,18 @@ function toNumber(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function fmtDateTime(v) {
-  if (!v) return "";
-  return String(v)
-    .replace("T", " ")
-    .substring(0, 16);
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
+function fmtDateTime(s) {
+  if (!s) return "—";
+  const str = String(s).replace("T", " ");
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}`;
+  return fmtDate(s);
 }
 
 function safeStr(s) {
@@ -130,8 +137,8 @@ export default function IssuePage() {
   const [bootError, setBootError] = useState("");
 
   // -------- Filters ----------
-  const [departmentId, setDepartmentId] = useState("");
-  const [subDepartmentId, setSubDepartmentId] = useState("");
+  const [departmentSearch, setDepartmentSearch] = useState("");
+  const [subDepartmentSearch, setSubDepartmentSearch] = useState("");
   const [limit, setLimit] = useState("80");
 
   // -------- List eligible/ineligible ----------
@@ -144,6 +151,7 @@ export default function IssuePage() {
 
   // -------- Selected request & preview ----------
   const [selected, setSelected] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewMsg, setPreviewMsg] = useState({ type: "", text: "" });
   const [previewData, setPreviewData] = useState(null);
@@ -254,9 +262,6 @@ export default function IssuePage() {
 
     try {
       const params = new URLSearchParams();
-      if (departmentId.trim()) params.set("departmentId", departmentId.trim());
-      if (subDepartmentId.trim()) params.set("subDepartmentId", subDepartmentId.trim());
-
       const lim = Number(limit);
       params.set("limit", Number.isFinite(lim) && lim > 0 ? String(lim) : "80");
 
@@ -319,6 +324,7 @@ export default function IssuePage() {
     if (!currentUser?.id) return;
 
     setSelected(req);
+    setPreviewOpen(true);
     setPreviewData(null);
     setIssueDetail(null);
     setCreatedIssueId(null);
@@ -351,6 +357,26 @@ export default function IssuePage() {
       setLoadingPreview(false);
     }
   };
+
+  const closeDrawer = () => {
+    setPreviewOpen(false);
+    setSelected(null);
+    setPreviewData(null);
+    setManualAlloc({});
+    setCreateMsg({ type: "", text: "" });
+    setIssueDetail(null);
+    setCreatedIssueId(null);
+  };
+
+  const filteredEligible = useMemo(() => {
+    const dept = departmentSearch.trim().toLowerCase();
+    const sub = subDepartmentSearch.trim().toLowerCase();
+    return eligible.filter((r) => {
+      if (dept && !safeStr(r.departmentName).toLowerCase().includes(dept)) return false;
+      if (sub && !safeStr(r.subDepartmentName).toLowerCase().includes(sub)) return false;
+      return true;
+    });
+  }, [eligible, departmentSearch, subDepartmentSearch]);
 
   const previewLines = useMemo(() => {
     const lines = previewData?.lines || [];
@@ -655,9 +681,9 @@ export default function IssuePage() {
             <label className="ui-label">Khoa / Phòng</label>
             <input
               className="ui-input"
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              placeholder="ID khoa, để trống = tất cả"
+              value={departmentSearch}
+              onChange={(e) => setDepartmentSearch(e.target.value)}
+              placeholder="Tìm theo tên khoa..."
             />
           </div>
 
@@ -665,9 +691,9 @@ export default function IssuePage() {
             <label className="ui-label">Bộ môn</label>
             <input
               className="ui-input"
-              value={subDepartmentId}
-              onChange={(e) => setSubDepartmentId(e.target.value)}
-              placeholder="ID bộ môn, để trống = tất cả"
+              value={subDepartmentSearch}
+              onChange={(e) => setSubDepartmentSearch(e.target.value)}
+              placeholder="Tìm theo tên bộ môn..."
             />
           </div>
 
@@ -698,8 +724,8 @@ export default function IssuePage() {
               </tr>
             </thead>
             <tbody>
-              {eligible?.length ? (
-                eligible.map((r) => (
+              {filteredEligible.length ? (
+                filteredEligible.map((r) => (
                   <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
                     <td data-label="Mã phiếu" className="issue-mono">{r.id}</td>
                     <td data-label="Bộ môn / Đơn vị">{r.subDepartmentName || "-"}</td>
@@ -721,7 +747,9 @@ export default function IssuePage() {
               ) : (
                 <tr>
                   <td colSpan={7} className="ui-empty">
-                    Không có phiếu đủ điều kiện theo bộ lọc hiện tại.
+                    {eligible.length === 0
+                      ? "Không có phiếu đủ điều kiện."
+                      : "Không có phiếu khớp với bộ lọc tên."}
                   </td>
                 </tr>
               )}
@@ -777,317 +805,308 @@ export default function IssuePage() {
         ) : null}
       </div>
 
-      {/* XEM TRƯỚC + TẠO PHIẾU XUẤT */}
-      <div className="ui-section">
-        <div className="ui-section-head">
-          <h2 className="ui-section-title">Xem trước và xuất kho</h2>
         </div>
+      </div>
 
-        {!selected ? (
-          <div className="ui-alert is-warning">Chọn một phiếu ở danh sách phía trên để xem trước và xuất kho.</div>
-        ) : (
-          <>
-            {previewMsg.text ? (
-              <div className={`ui-alert ${previewMsg.type === "error" ? "is-error" : "is-success"}`}>
-                {previewMsg.text}
-              </div>
-            ) : null}
-
-            <div className="issue-request-info">
-              <div className="issue-request-grid">
-                <div className="issue-request-item">
-                  <div className="issue-request-label">Phiếu xin lĩnh</div>
-                  <div className="issue-request-value issue-mono">#{selected.id}</div>
-                </div>
-                <div className="issue-request-item">
-                  <div className="issue-request-label">Bộ môn</div>
-                  <div className="issue-request-value">{selected.subDepartmentName || "-"}</div>
-                </div>
-                <div className="issue-request-item">
-                  <div className="issue-request-label">Khoa / Phòng</div>
-                  <div className="issue-request-value">{selected.departmentName || "-"}</div>
-                </div>
-                <div className="issue-request-item">
-                  <div className="issue-request-label">Ngày gửi</div>
-                  <div className="issue-request-value issue-mono">{fmtDateTime(selected.requestedAt)}</div>
-                </div>
-              </div>
-              {selected.note ? <div className="issue-request-note">{selected.note}</div> : null}
-            </div>
-
-            {previewMissingMessages.length ? (
-              <div className="ui-alert is-error">
-                <div className="issue-muted-strong">Không thể xuất kho vì:</div>
-                <ul className="mini-list">
-                  {previewMissingMessages.map((m, i) => (
-                    <li key={i}>{m}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            <div className="issue-config-box">
-              <div className="issue-config-head">
-                <h3 className="issue-config-title">Thông tin phiếu xuất</h3>
-              </div>
-
-              <div className="issue-config-grid">
-                <div className="ui-field">
-                  <label className="ui-label">Ngày xuất</label>
-                  <input
-                    type="date"
-                    className="ui-input"
-                    value={issueDate}
-                    onChange={(e) => setIssueDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="ui-field">
-                  <label className="ui-label">Kho</label>
-                  <input
-                    className="ui-input"
-                    value={warehouseName}
-                    onChange={(e) => setWarehouseName(e.target.value)}
-                    placeholder="Kho chính"
-                  />
-                </div>
-
-                <div className="ui-field">
-                  <label className="ui-label">Người nhận (nếu cần)</label>
-                  <input
-                    className="ui-input"
-                    value={receiverName}
-                    onChange={(e) => setReceiverName(e.target.value)}
-                    placeholder="Có thể để trống"
-                  />
-                </div>
-
-                <div className="ui-field">
-                  <label className="ui-label">Cách chọn lô</label>
-                  <div className="issue-segmented">
-                    <button
-                      className={`issue-seg-btn ${autoAllocate ? "active" : ""}`}
-                      type="button"
-                      onClick={() => setAutoAllocate(true)}
-                    >
-                      Tự động (FEFO)
-                    </button>
-                    <button
-                      className={`issue-seg-btn ${!autoAllocate ? "active" : ""}`}
-                      type="button"
-                      onClick={() => setAutoAllocate(false)}
-                    >
-                      Thủ công
-                    </button>
+      {/* PREVIEW MODAL XEM TRƯỚC + TẠO PHIẾU XUẤT */}
+      {previewOpen && selected
+        ? createPortal(
+            <div
+              className="issue-modal-backdrop"
+              style={{ zIndex: 8000 }}
+              onMouseDown={closeDrawer}
+            >
+              <div
+                className="issue-modal"
+                style={{ width: "min(980px, 100%)" }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="issue-modal-head">
+                  <div>
+                    <div className="issue-modal-title">Xem trước và xuất kho</div>
+                    <div className="issue-modal-subtitle">
+                      Phiếu #{selected.id} — {selected.subDepartmentName || "—"}
+                    </div>
                   </div>
+                  <button className="issue-modal-close" onClick={closeDrawer} aria-label="Đóng">×</button>
                 </div>
-              </div>
-            </div>
 
-            <div className="ui-table-wrap">
-              <table className="ui-table issue-table">
-                <thead>
-                  <tr>
-                    <th style={{ minWidth: 240 }}>Tên vật tư</th>
-                    <th style={{ minWidth: 140 }}>Mã</th>
-                    <th style={{ minWidth: 200 }}>Quy cách</th>
-                    <th style={{ minWidth: 90 }}>ĐVT</th>
-                    <th style={{ minWidth: 120 }} className="text-right">
-                      SL yêu cầu
-                    </th>
-                    <th style={{ minWidth: 120 }} className="text-right">
-                      SL xuất
-                    </th>
-                    <th style={{ minWidth: 320 }}>Gợi ý lô theo hạn dùng</th>
-                    <th style={{ width: 160 }} className="text-right">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingPreview ? (
-                    <tr>
-                      <td colSpan={8} className="ui-empty">
-                        Đang tải...
-                      </td>
-                    </tr>
-                  ) : previewLines.length ? (
-                    previewLines.map((ln) => {
-                      const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
-                      const status = manualStatusForLine(ln.materialId);
+                {/* Body (scrollable) */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+                  {previewMsg.text ? (
+                    <div className={`ui-alert ${previewMsg.type === "error" ? "is-error" : "is-success"}`}>
+                      {previewMsg.text}
+                    </div>
+                  ) : null}
 
-                      return (
-                        <tr key={ln.materialId}>
-                          <td data-label="Tên vật tư">
-                            <div className="issue-cell-main">{ln.name}</div>
-                          </td>
-                          <td data-label="Mã" className="issue-mono">{ln.code}</td>
-                          <td data-label="Quy cách" className="issue-muted">{ln.spec}</td>
-                          <td data-label="ĐVT">{ln.unitName || "-"}</td>
-                          <td data-label="SL yêu cầu" className="text-right issue-mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
-                          <td data-label="SL xuất" className="text-right issue-mono">{qtyFmt.format(need)}</td>
-                          <td data-label="Gợi ý lô" className="issue-muted">
-                            {Array.isArray(ln.lots) && ln.lots.length ? (
-                              <div className="issue-lot-list">
-                                {ln.lots.slice(0, 3).map((l, i) => (
-                                  <div className="issue-lot-item" key={i}>
-                                    <span className="issue-lot-pill">{l.lotNumber}</span>
-                                    <span className="issue-lot-meta">
-                                      HSD: {l.expDate || "-"} | Tồn: {qtyFmt.format(toNumber(l.availableStock))} → Xuất:{" "}
-                                      <b>{qtyFmt.format(toNumber(l.qtyOut))}</b>
-                                    </span>
-                                  </div>
-                                ))}
-                                {ln.lots.length > 3 ? (
-                                  <div className="issue-muted issue-mini">+{ln.lots.length - 3} lô khác</div>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <span className="issue-mini">Không có gợi ý</span>
-                            )}
-                          </td>
-                          <td className="text-right">
-                            {!autoAllocate ? (
-                              <button
-                                className={`btn ${status.ok ? "btn-outline" : "btn-primary"}`}
-                                type="button"
-                                onClick={() => openModalForLine(ln)}
-                              >
-                                {status.ok ? "Sửa lô" : "Chọn lô"}
-                              </button>
-                            ) : (
-                              <span className="ui-stock-badge is-ok">Tự động</span>
-                            )}
-                          </td>
+                  {/* Thông tin phiếu xin lĩnh */}
+                  <div className="issue-request-info">
+                    <div className="issue-request-grid">
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Phiếu xin lĩnh</div>
+                        <div className="issue-request-value issue-mono">#{selected.id}</div>
+                      </div>
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Bộ môn</div>
+                        <div className="issue-request-value">{selected.subDepartmentName || "-"}</div>
+                      </div>
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Khoa / Phòng</div>
+                        <div className="issue-request-value">{selected.departmentName || "-"}</div>
+                      </div>
+                      <div className="issue-request-item">
+                        <div className="issue-request-label">Ngày gửi</div>
+                        <div className="issue-request-value issue-mono">{fmtDateTime(selected.requestedAt)}</div>
+                      </div>
+                    </div>
+                    {selected.note ? <div className="issue-request-note">{selected.note}</div> : null}
+                  </div>
+
+                  {previewMissingMessages.length ? (
+                    <div className="ui-alert is-error" style={{ marginTop: 12 }}>
+                      <div className="issue-muted-strong">Không thể xuất kho vì:</div>
+                      <ul className="mini-list">
+                        {previewMissingMessages.map((m, i) => (
+                          <li key={i}>{m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {/* Config box */}
+                  <div className="issue-config-box" style={{ marginTop: 14 }}>
+                    <div className="issue-config-head">
+                      <h3 className="issue-config-title">Thông tin phiếu xuất</h3>
+                    </div>
+                    <div className="issue-config-grid">
+                      <div className="ui-field">
+                        <label className="ui-label">Ngày xuất</label>
+                        <input
+                          type="date"
+                          className="ui-input"
+                          value={issueDate}
+                          onChange={(e) => setIssueDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="ui-field">
+                        <label className="ui-label">Kho</label>
+                        <input
+                          className="ui-input"
+                          value={warehouseName}
+                          onChange={(e) => setWarehouseName(e.target.value)}
+                          placeholder="Kho chính"
+                        />
+                      </div>
+                      <div className="ui-field">
+                        <label className="ui-label">Người nhận (nếu cần)</label>
+                        <input
+                          className="ui-input"
+                          value={receiverName}
+                          onChange={(e) => setReceiverName(e.target.value)}
+                          placeholder="Có thể để trống"
+                        />
+                      </div>
+                      <div className="ui-field">
+                        <label className="ui-label">Cách chọn lô</label>
+                        <div className="issue-segmented">
+                          <button
+                            className={`issue-seg-btn ${autoAllocate ? "active" : ""}`}
+                            type="button"
+                            onClick={() => setAutoAllocate(true)}
+                          >
+                            Tự động (FEFO)
+                          </button>
+                          <button
+                            className={`issue-seg-btn ${!autoAllocate ? "active" : ""}`}
+                            type="button"
+                            onClick={() => setAutoAllocate(false)}
+                          >
+                            Thủ công
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bảng vật tư */}
+                  <div className="ui-table-wrap" style={{ marginTop: 14 }}>
+                    <table className="ui-table">
+                      <thead>
+                        <tr>
+                          <th style={{ minWidth: 160 }}>Tên vật tư</th>
+                          <th style={{ minWidth: 90 }}>Mã</th>
+                          <th style={{ minWidth: 60 }}>ĐVT</th>
+                          <th style={{ minWidth: 70 }} className="text-right">SL yêu cầu</th>
+                          <th style={{ minWidth: 70 }} className="text-right">SL xuất</th>
+                          <th style={{ minWidth: 200 }}>Gợi ý lô</th>
+                          <th style={{ width: 100 }} className="text-right">Thao tác</th>
                         </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="ui-empty">
-                        Chưa có dữ liệu.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {createMsg.text ? (
-              <div className={`ui-alert ${createMsg.type === "error" ? "is-error" : "is-success"}`}>
-                {createMsg.text}
-              </div>
-            ) : null}
-
-            <div className="issue-actions">
-              <button
-                className="ui-btn ui-btn-secondary ui-btn-sm"
-                type="button"
-                onClick={() => {
-                  setSelected(null);
-                  setPreviewData(null);
-                  setManualAlloc({});
-                  setCreateMsg({ type: "", text: "" });
-                  setIssueDetail(null);
-                  setCreatedIssueId(null);
-                }}
-                disabled={creating}
-              >
-                Bỏ chọn
-              </button>
-
-              <button
-                className="ui-btn ui-btn-primary ui-btn-sm"
-                type="button"
-                onClick={createIssue}
-                disabled={creating || !canCreateIssue}
-                title={!canCreateIssue ? "Phiếu chưa đủ điều kiện" : ""}
-              >
-                {creating ? "Đang tạo phiếu..." : "Tạo phiếu xuất kho"}
-              </button>
-            </div>
-
-            {createdIssueId ? (
-              <div className="issue-detail-card">
-                <div className="issue-detail-head">
-                  <h3 className="issue-detail-title">Chi tiết phiếu xuất</h3>
-                  <div className="issue-inline-actions">
-                    <button
-                      className="ui-btn ui-btn-secondary ui-btn-sm"
-                      type="button"
-                      onClick={() => loadIssueDetail(createdIssueId)}
-                      disabled={loadingDetail}
-                    >
-                      {loadingDetail ? "Đang tải..." : "Tải lại"}
-                    </button>
+                      </thead>
+                      <tbody>
+                        {loadingPreview ? (
+                          <tr>
+                            <td colSpan={7} className="ui-empty">Đang tải...</td>
+                          </tr>
+                        ) : previewLines.length ? (
+                          previewLines.map((ln) => {
+                            const need = toNumber(ln.qtyToIssue ?? ln.qtyRequested);
+                            const status = manualStatusForLine(ln.materialId);
+                            return (
+                              <tr key={ln.materialId}>
+                                <td data-label="Tên vật tư">
+                                  <div className="issue-cell-main">{ln.name}</div>
+                                  <div className="issue-cell-sub">{ln.spec}</div>
+                                </td>
+                                <td data-label="Mã" className="issue-mono">{ln.code}</td>
+                                <td data-label="ĐVT">{ln.unitName || "-"}</td>
+                                <td data-label="SL yêu cầu" className="text-right issue-mono">{qtyFmt.format(toNumber(ln.qtyRequested))}</td>
+                                <td data-label="SL xuất" className="text-right issue-mono">{qtyFmt.format(need)}</td>
+                                <td data-label="Gợi ý lô" className="issue-muted">
+                                  {Array.isArray(ln.lots) && ln.lots.length ? (
+                                    <div className="issue-lot-list">
+                                      {ln.lots.slice(0, 3).map((l, i) => (
+                                        <div className="issue-lot-item" key={i}>
+                                          <span className="issue-lot-pill">{l.lotNumber}</span>
+                                          <span className="issue-lot-meta">
+                                            HSD: {fmtDate(l.expDate)} | {qtyFmt.format(toNumber(l.availableStock))} → <b>{qtyFmt.format(toNumber(l.qtyOut))}</b>
+                                          </span>
+                                        </div>
+                                      ))}
+                                      {ln.lots.length > 3 ? (
+                                        <div className="issue-muted issue-mini">+{ln.lots.length - 3} lô khác</div>
+                                      ) : null}
+                                    </div>
+                                  ) : (
+                                    <span className="issue-mini">Không có gợi ý</span>
+                                  )}
+                                </td>
+                                <td className="text-right">
+                                  {!autoAllocate ? (
+                                    <button
+                                      className={`ui-btn ui-btn-sm ${status.ok ? "ui-btn-secondary" : "ui-btn-primary"}`}
+                                      type="button"
+                                      onClick={() => openModalForLine(ln)}
+                                    >
+                                      {status.ok ? "Sửa lô" : "Chọn lô"}
+                                    </button>
+                                  ) : (
+                                    <span className="ui-stock-badge is-ok">Tự động</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={7} className="ui-empty">Chưa có dữ liệu.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
+
+                  {createMsg.text ? (
+                    <div className={`ui-alert ${createMsg.type === "error" ? "is-error" : "is-success"}`} style={{ marginTop: 12 }}>
+                      {createMsg.text}
+                    </div>
+                  ) : null}
+
+                  {/* Chi tiết phiếu sau khi tạo */}
+                  {createdIssueId ? (
+                    <div className="issue-detail-card" style={{ marginTop: 14 }}>
+                      <div className="issue-detail-head">
+                        <h3 className="issue-detail-title">Chi tiết phiếu xuất</h3>
+                        <div className="issue-inline-actions">
+                          <button
+                            className="ui-btn ui-btn-secondary ui-btn-sm"
+                            type="button"
+                            onClick={() => loadIssueDetail(createdIssueId)}
+                            disabled={loadingDetail}
+                          >
+                            {loadingDetail ? "Đang tải..." : "Tải lại"}
+                          </button>
+                        </div>
+                      </div>
+                      {issueDetail?.success ? (
+                        <>
+                          <div className="issue-detail-grid">
+                            <div className="issue-request-item">
+                              <div className="issue-request-label">Mã phiếu xuất</div>
+                              <div className="issue-request-value issue-mono">#{issueDetail?.header?.id}</div>
+                            </div>
+                            <div className="issue-request-item">
+                              <div className="issue-request-label">Ngày xuất</div>
+                              <div className="issue-request-value issue-mono">{fmtDate(issueDetail?.header?.issueDate)}</div>
+                            </div>
+                            <div className="issue-request-item">
+                              <div className="issue-request-label">Người nhận</div>
+                              <div className="issue-request-value">{issueDetail?.header?.receiverName || "-"}</div>
+                            </div>
+                            <div className="issue-request-item">
+                              <div className="issue-request-label">Tổng tiền</div>
+                              <div className="issue-request-value issue-mono">{moneyFmt.format(toNumber(issueDetail?.header?.totalAmount))}</div>
+                            </div>
+                          </div>
+                          <div className="ui-table-wrap">
+                            <table className="ui-table issue-table-sm">
+                              <thead>
+                                <tr>
+                                  <th>Tên vật tư</th>
+                                  <th style={{ minWidth: 90 }}>Mã</th>
+                                  <th style={{ minWidth: 60 }}>ĐVT</th>
+                                  <th className="text-right" style={{ minWidth: 80 }}>SL xuất</th>
+                                  <th className="text-right" style={{ minWidth: 100 }}>Đơn giá</th>
+                                  <th className="text-right" style={{ minWidth: 100 }}>Thành tiền</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(issueDetail?.details || []).map((d) => (
+                                  <tr key={d.id}>
+                                    <td data-label="Tên vật tư">{d.name}</td>
+                                    <td data-label="Mã" className="issue-mono">{d.code}</td>
+                                    <td data-label="ĐVT">{d.unitName || "-"}</td>
+                                    <td data-label="SL xuất" className="text-right issue-mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
+                                    <td data-label="Đơn giá" className="text-right issue-mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
+                                    <td data-label="Thành tiền" className="text-right issue-mono">{moneyFmt.format(toNumber(d.total))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="ui-alert is-warning">Chưa có dữ liệu chi tiết.</div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
-                {issueDetail?.success ? (
-                  <>
-                    <div className="issue-detail-grid">
-                      <div className="issue-request-item">
-                        <div className="issue-request-label">Mã phiếu xuất</div>
-                        <div className="issue-request-value issue-mono">#{issueDetail?.header?.id}</div>
-                      </div>
-                      <div className="issue-request-item">
-                        <div className="issue-request-label">Ngày xuất</div>
-                        <div className="issue-request-value issue-mono">{issueDetail?.header?.issueDate}</div>
-                      </div>
-                      <div className="issue-request-item">
-                        <div className="issue-request-label">Người nhận</div>
-                        <div className="issue-request-value">{issueDetail?.header?.receiverName || "-"}</div>
-                      </div>
-                      <div className="issue-request-item">
-                        <div className="issue-request-label">Tổng tiền</div>
-                        <div className="issue-request-value issue-mono">{moneyFmt.format(toNumber(issueDetail?.header?.totalAmount))}</div>
-                      </div>
-                    </div>
-
-                    <div className="ui-table-wrap">
-                      <table className="ui-table issue-table issue-table-sm">
-                        <thead>
-                          <tr>
-                            <th>Tên vật tư</th>
-                            <th style={{ minWidth: 120 }}>Mã</th>
-                            <th style={{ minWidth: 90 }}>ĐVT</th>
-                            <th className="text-right" style={{ minWidth: 120 }}>
-                              SL xuất
-                            </th>
-                            <th className="text-right" style={{ minWidth: 140 }}>
-                              Đơn giá
-                            </th>
-                            <th className="text-right" style={{ minWidth: 140 }}>
-                              Thành tiền
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(issueDetail?.details || []).map((d) => (
-                            <tr key={d.id}>
-                              <td data-label="Tên vật tư">{d.name}</td>
-                              <td data-label="Mã" className="issue-mono">{d.code}</td>
-                              <td data-label="ĐVT">{d.unitName || "-"}</td>
-                              <td data-label="SL xuất" className="text-right issue-mono">{qtyFmt.format(toNumber(d.qtyIssued))}</td>
-                              <td data-label="Đơn giá" className="text-right issue-mono">{moneyFmt.format(toNumber(d.unitPrice))}</td>
-                              <td data-label="Thành tiền" className="text-right issue-mono">{moneyFmt.format(toNumber(d.total))}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="ui-alert is-warning">Chưa có dữ liệu chi tiết.</div>
-                )}
+                {/* Footer actions */}
+                <div className="issue-modal-actions">
+                  <button
+                    className="ui-btn ui-btn-secondary ui-btn-sm"
+                    type="button"
+                    onClick={closeDrawer}
+                    disabled={creating}
+                  >
+                    Bỏ chọn
+                  </button>
+                  <button
+                    className="ui-btn ui-btn-primary ui-btn-sm"
+                    type="button"
+                    onClick={createIssue}
+                    disabled={creating || !canCreateIssue}
+                    title={!canCreateIssue ? "Phiếu chưa đủ điều kiện" : ""}
+                  >
+                    {creating ? "Đang tạo phiếu..." : "Tạo phiếu xuất kho"}
+                  </button>
+                </div>
               </div>
-            ) : null}
-          </>
-        )}
-      </div>
-
-        </div>
-      </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       {/* MODAL CHỌN LÔ */}
       {modalOpen && modalLine
@@ -1133,17 +1152,13 @@ export default function IssuePage() {
                 </div>
 
                 <div className="ui-table-wrap issue-modal-table">
-                  <table className="ui-table issue-table">
+                  <table className="ui-table">
                     <thead>
                       <tr>
-                        <th style={{ minWidth: 160 }}>Số lô</th>
-                        <th style={{ minWidth: 140 }}>Hạn dùng</th>
-                        <th style={{ minWidth: 140 }} className="text-right">
-                          Tồn còn lại
-                        </th>
-                        <th style={{ minWidth: 160 }} className="text-right">
-                          Số lượng xuất
-                        </th>
+                        <th style={{ minWidth: 110 }}>Số lô</th>
+                        <th style={{ minWidth: 110 }}>Hạn dùng</th>
+                        <th style={{ minWidth: 100 }} className="text-right">Tồn còn lại</th>
+                        <th style={{ minWidth: 120 }} className="text-right">Số lượng xuất</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1162,7 +1177,7 @@ export default function IssuePage() {
                           return (
                             <tr key={lot}>
                               <td data-label="Số lô" className="issue-mono">{lot}</td>
-                              <td data-label="Hạn dùng" className="issue-mono">{l?.expDate || "-"}</td>
+                              <td data-label="Hạn dùng" className="issue-mono">{fmtDate(l?.expDate)}</td>
                               <td data-label="Tồn còn lại" className="text-right issue-mono">{qtyFmt.format(avail)}</td>
                               <td data-label="SL xuất" className="text-right">
                                 <input
