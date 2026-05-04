@@ -43,8 +43,7 @@ export default function InventoryPage() {
       const res = await fetch("http://localhost:8080/api/units");
       const data = await res.json();
       setUnits(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Load units error", error);
+    } catch {
       setUnits([]);
     }
   }
@@ -54,8 +53,7 @@ export default function InventoryPage() {
       const res = await fetch("http://localhost:8080/api/inventory/materials");
       const data = await res.json();
       setStockItems(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Load stock error", error);
+    } catch {
       setStockItems([]);
     }
   }

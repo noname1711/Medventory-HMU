@@ -547,16 +547,16 @@ export default function IssueRequestApproval() {
       </div>
 
       {selectedRequest && selectedRequest.header && (
-        <div className="ira-modal-overlay" onClick={() => setSelectedRequest(null)}>
-          <div className="ira-modal ira-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ira-modal-header">
+        <div className="ui-modal-overlay ira-modal-overlay" onClick={() => setSelectedRequest(null)}>
+          <div className="ui-modal ira-modal ira-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ui-modal-header ira-modal-header">
               <h2>Chi tiết Phiếu #{selectedRequest.header.id}</h2>
             </div>
 
             {isDetailLoading ? (
               <div className="ira-loading-state ira-modal-loading">Đang tải chi tiết...</div>
             ) : (
-              <div className="ira-modal-body">
+              <div className="ui-modal-body ira-modal-body">
                 <div className="ui-section">
                   <div className="ui-section-head">
                     <div>
@@ -664,8 +664,8 @@ export default function IssueRequestApproval() {
                   </div>
                 </div>
 
-                <div className={`ira-modal-footer ${canActOnRequest(selectedRequest.header) ? "" : "single"}`}>
-                  {canActOnRequest(selectedRequest.header) && (
+                {canActOnRequest(selectedRequest.header) && (
+                  <div className="ui-modal-footer ira-modal-footer">
                     <div className="ira-detail-actions">
                       <button
                         className="ui-btn ui-btn-primary"
@@ -680,11 +680,8 @@ export default function IssueRequestApproval() {
                         Từ chối
                       </button>
                     </div>
-                  )}
-                  <button className="ui-btn ui-btn-secondary" onClick={() => setSelectedRequest(null)}>
-                    Đóng
-                  </button>
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -692,12 +689,12 @@ export default function IssueRequestApproval() {
       )}
 
       {showApprovalModal && (
-        <div className="ira-modal-overlay" onClick={() => setShowApprovalModal(false)}>
-          <div className="ira-modal ira-approval-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ira-modal-header">
+        <div className="ui-modal-overlay ira-modal-overlay" onClick={() => setShowApprovalModal(false)}>
+          <div className="ui-modal ira-modal ira-approval-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ui-modal-header ira-modal-header">
               <h2>{getModalTitle(currentAction)}</h2>
             </div>
-            <div className="ira-modal-body">
+            <div className="ui-modal-body ira-modal-body">
               <p className="ira-modal-text">
                 Vui lòng nhập {currentAction === "reject" ? "lý do từ chối" : "ghi chú"} {getActionName(currentAction)}:
               </p>
@@ -709,7 +706,7 @@ export default function IssueRequestApproval() {
                 rows="4"
               />
               {currentAction === "reject" && <p className="ira-required-note">Lý do từ chối là bắt buộc</p>}
-              <div className="ira-modal-footer">
+              <div className="ui-modal-footer ira-modal-footer">
                 <button className="ui-btn ui-btn-secondary" onClick={() => setShowApprovalModal(false)}>
                   Hủy
                 </button>

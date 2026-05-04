@@ -97,8 +97,7 @@ export default function DashboardHeader({ userInfo }) {
 
       if (!res.ok) throw new Error("Failed to load notifications");
       return await res.json();
-    } catch (err) {
-      console.error("Noti Error:", err);
+    } catch {
       return null;
     }
   }, [userId]);
@@ -114,8 +113,8 @@ export default function DashboardHeader({ userInfo }) {
           "X-User-Id": String(userId),
         },
       });
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Best-effort notification update.
     }
   };
 
@@ -133,8 +132,8 @@ export default function DashboardHeader({ userInfo }) {
       // Cập nhật UI ngay lập tức
       setNotiItems((prev) => prev.map((it) => ({ ...it, isRead: true })));
       setUnreadCount(0);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Best-effort notification update.
     }
   };
 
@@ -185,8 +184,6 @@ export default function DashboardHeader({ userInfo }) {
       setUnreadCount((c) => Math.max(0, c - 1));
     }
 
-    // TODO: Điều hướng dựa trên entityType/entityId
-    // Ví dụ: if (it.entityType === 'ISSUE_REQ') navigate(`/issue-req/${it.entityId}`);
     setShowNoti(false);
   };
 
@@ -350,11 +347,10 @@ export default function DashboardHeader({ userInfo }) {
 
       {/* Profile Modal */}
       {showProfileModal && (
-        <div className="profile-modal-overlay">
-          <div className="profile-modal">
+        <div className="profile-modal-overlay" onMouseDown={() => setShowProfileModal(false)}>
+          <div className="profile-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="profile-modal-header">
               <h2>Thông tin cá nhân</h2>
-              <button className="profile-modal-close" onClick={() => setShowProfileModal(false)}>✕</button>
             </div>
             <div className="profile-modal-content">
               {/* Giữ nguyên nội dung modal profile cũ của bạn hoặc render từ userInfo */}
@@ -371,9 +367,6 @@ export default function DashboardHeader({ userInfo }) {
                  <div className="profile-detail-row"><span className="profile-detail-label">Email:</span> <span>{userInfo?.email}</span></div>
                  <div className="profile-detail-row"><span className="profile-detail-label">Khoa/Phòng:</span> <span>{userInfo?.department?.name || userInfo?.department}</span></div>
               </div>
-            </div>
-            <div className="profile-modal-footer">
-              <button className="profile-modal-btn profile-modal-btn-close" onClick={() => setShowProfileModal(false)}>Đóng</button>
             </div>
           </div>
         </div>

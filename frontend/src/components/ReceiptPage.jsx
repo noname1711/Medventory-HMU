@@ -692,8 +692,8 @@ export default function ReceiptPage() {
         width: 960,
         customClass: {
           popup: "ui-history-detail-popup",
-          confirmButton: "ui-btn ui-btn-secondary",
         },
+        showConfirmButton: false,
         confirmButtonText: "Đóng",
       });
     } catch (error) {

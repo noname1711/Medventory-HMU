@@ -678,10 +678,10 @@ export default function CreateIssueRequest() {
   // Hàm lấy màu cho trạng thái
   const getStatusColor = (status) => {
     switch (status) {
-      case 1: return 'status-approved';
-      case 2: return 'status-rejected';
+      case 1: return 'is-approved';
+      case 2: return 'is-rejected';
       case 0:
-      default: return 'status-pending';
+      default: return 'is-pending';
     }
   };
 
@@ -908,7 +908,7 @@ export default function CreateIssueRequest() {
                         </select>
                       </td>
                       <td className="text-center" data-label="Phân loại">
-                        <span className={`material-type-badge ${isNewMaterial(detail) ? 'new' : 'existing'}`}>
+                        <span className={`ui-status-badge ${isNewMaterial(detail) ? 'is-pending' : 'is-approved'}`}>
                           {isNewMaterial(detail) ? 'Vật tư mới' : 'Vật tư có sẵn'}
                         </span>
                       </td>
@@ -1023,7 +1023,7 @@ export default function CreateIssueRequest() {
                       <td data-label="Mục đích">{request.note}</td>
                       <td className="text-center" data-label="Số vật tư">{request.details?.length || 0}</td>
                       <td className="text-center" data-label="Trạng thái">
-                        <span className={`status-badge ${getStatusColor(request.status)}`}>
+                        <span className={`ui-status-badge ${getStatusColor(request.status)}`}>
                           {getStatusLabel(request.status)}
                         </span>
                       </td>
@@ -1102,7 +1102,7 @@ export default function CreateIssueRequest() {
                 </div>
                 <div className="info-row">
                   <label>Trạng thái:</label>
-                  <span className={`status-badge ${getStatusColor(selectedRequest.status)}`}>
+                  <span className={`ui-status-badge ${getStatusColor(selectedRequest.status)}`}>
                     {getStatusLabel(selectedRequest.status)}
                   </span>
                 </div>
@@ -1149,11 +1149,6 @@ export default function CreateIssueRequest() {
                   </table>
                 </div>
               </div>
-            </div>
-            <div className="modal-footer">
-              <button onClick={closeRequestDetails} className="ui-btn ui-btn-secondary btn-close-modal">
-                Đóng
-              </button>
             </div>
           </div>
         </div>

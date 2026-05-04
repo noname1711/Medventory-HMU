@@ -460,7 +460,7 @@ export default function Admin() {
                         <td data-label="Phòng ban">{u.department}</td>
                         <td data-label="Vai trò">{u.role}</td>
                         <td data-label="Trạng thái">
-                          <span className={`admin-status-pill ${u.statusValue === 1 ? "approved" : "pending"}`}>
+                          <span className={`ui-status-badge ${u.statusValue === 1 ? "is-approved" : "is-pending"}`}>
                             {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
                           </span>
                         </td>
@@ -527,19 +527,19 @@ export default function Admin() {
       </div>
 
       {editingUser && (
-        <div className="admin-modal-overlay" onMouseDown={closeRoleChangeModal}>
-          <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
+        <div className="ui-modal-overlay admin-modal-overlay" onMouseDown={closeRoleChangeModal}>
+          <div className="ui-modal admin-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ui-modal-header admin-modal-header">
               <div>
                 <h3>Chi tiết tài khoản</h3>
                 <p>Xem thông tin, điều chỉnh vai trò và xử lý trạng thái tài khoản.</p>
               </div>
-              <span className={`admin-status-pill ${editingUser.statusValue === 1 ? "approved" : "pending"}`}>
+              <span className={`ui-status-badge ${editingUser.statusValue === 1 ? "is-approved" : "is-pending"}`}>
                 {editingUser.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
               </span>
             </div>
 
-            <div className="admin-modal-content">
+            <div className="ui-modal-body admin-modal-content">
               <div className="admin-modal-grid">
                 <div className="admin-info-box">
                   <div className="admin-info-label">Họ tên</div>
@@ -578,7 +578,7 @@ export default function Admin() {
               </div>
             </div>
 
-            <div className="admin-modal-footer">
+            <div className="ui-modal-footer admin-modal-footer">
               <div className="admin-modal-danger-actions">
                 {editingUser.statusValue === 0 ? (
                   <>

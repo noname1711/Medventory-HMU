@@ -512,26 +512,31 @@ table {
 
 .ui-history-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 0;
   border-collapse: collapse;
+  table-layout: auto;
   background: #ffffff;
 }
 
 .ui-history-table th {
   background: var(--ui-table-head-bg);
   color: var(--ui-table-head-text);
-  padding: 12px;
+  padding: 9px 10px;
   text-align: left;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .ui-history-table td {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-top: 1px solid var(--ui-border);
   color: var(--ui-text);
-  vertical-align: top;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .ui-history-table .text-right {
@@ -540,6 +545,70 @@ table {
 
 .ui-history-table .text-center {
   text-align: center;
+}
+
+/* Shared in-app modal shell */
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.46);
+  z-index: 9999;
+}
+
+.ui-modal {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
+
+.ui-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--ui-border);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.ui-modal-header h2,
+.ui-modal-header h3 {
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 1.12rem;
+  font-weight: 900;
+}
+
+.ui-modal-header p {
+  margin: 6px 0 0;
+  color: var(--ui-text-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.ui-modal-body {
+  padding: 20px;
+  overflow: auto;
+}
+
+.ui-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--ui-border);
+  background: #f9fafb;
 }
 
 @media (max-width: 720px) {
@@ -558,6 +627,17 @@ table {
 
   .ui-history-info-value {
     text-align: left;
+  }
+
+  .ui-modal-overlay {
+    padding: 12px;
+  }
+
+  .ui-modal-header,
+  .ui-modal-body,
+  .ui-modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 
@@ -578,7 +658,8 @@ table {
 .ui-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 0;
+  table-layout: auto;
   background: var(--ui-white);
 }
 
@@ -586,11 +667,13 @@ table {
   background: var(--ui-table-head-bg);
   color: var(--ui-table-head-text);
   font-weight: 600;
-  padding: 14px 12px;
+  padding: 9px 10px;
   text-align: left;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
   border-bottom: none;
-  white-space: nowrap;
+  white-space: normal;
+  vertical-align: middle;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -599,12 +682,19 @@ table {
 }
 
 .ui-table tbody td {
-  padding: 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--ui-border);
-  vertical-align: top;
+  vertical-align: middle;
   background: var(--ui-white);
   color: var(--ui-text);
-  font-size: 0.875rem;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ui-table th,
+.ui-table td {
+  min-width: 0 !important;
 }
 
 .ui-table tbody tr:last-child td { border-bottom: none; }
@@ -638,10 +728,14 @@ table {
 .ui-table .ui-select,
 .ui-table .ui-textarea {
   min-height: 0;
-  padding: 8px 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
   border: 1px solid var(--ui-border-strong);
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: 0.84rem;
   background: #ffffff;
   font-family: inherit;
 }
@@ -669,10 +763,11 @@ table {
 
 .ui-table .ui-btn {
   min-height: 0;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   font-weight: 500;
+  white-space: nowrap;
   box-shadow: none;
 }
 

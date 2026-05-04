@@ -3,6 +3,7 @@ package com.backend.controller;
 import com.backend.dto.*;
 import com.backend.service.IssueReqService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,7 +12,7 @@ import java.util.ArrayList;
 @RestController
 @RequestMapping("/api/issue-requests")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@Slf4j
 public class IssueReqController {
 
     private final IssueReqService issueReqService;
@@ -25,7 +26,7 @@ public class IssueReqController {
             IssueReqListResponseDTO response = issueReqService.getPendingRequestsForLeader(leaderId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to load pending issue requests for leader {}", leaderId, e);
             // Fallback response nếu có lỗi
             return ResponseEntity.ok(IssueReqListResponseDTO.success(
                     "Không có phiếu nào chờ phê duyệt",
@@ -42,7 +43,7 @@ public class IssueReqController {
             IssueReqListResponseDTO response = issueReqService.getProcessedRequestsForLeader(leaderId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to load processed issue requests for leader {}", leaderId, e);
             return ResponseEntity.ok(IssueReqListResponseDTO.success(
                     "Chưa có lịch sử phê duyệt",
                     new ArrayList<>(),
@@ -61,7 +62,7 @@ public class IssueReqController {
             IssueReqDetailResponseDTO response = issueReqService.getRequestDetailWithSummary(id, userId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to load issue request detail id={} user={}", id, userId, e);
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Không thể tải chi tiết phiếu"));
         }
     }
@@ -81,7 +82,7 @@ public class IssueReqController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to approve issue request id={} approver={}", id, approverId, e);
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi phê duyệt phiếu"));
         }
     }
@@ -99,7 +100,7 @@ public class IssueReqController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to reject issue request id={} approver={}", id, approverId, e);
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi từ chối phiếu"));
         }
     }
@@ -114,7 +115,7 @@ public class IssueReqController {
             IssueReqDetailResponseDTO response = issueReqService.createIssueRequest(request, creatorId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to create issue request for creator {}", creatorId, e);
             return ResponseEntity.ok(IssueReqDetailResponseDTO.error("Lỗi khi tạo phiếu xin lĩnh: " + e.getMessage()));
         }
     }
@@ -126,7 +127,7 @@ public class IssueReqController {
             IssueReqListResponseDTO response = issueReqService.getRequestsForCanBo(canBoId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to load issue requests for canBo {}", canBoId, e);
             return ResponseEntity.ok(IssueReqListResponseDTO.success(
                     "Chưa có phiếu xin lĩnh nào",
                     new ArrayList<>(),

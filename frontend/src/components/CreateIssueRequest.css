@@ -69,21 +69,21 @@
 }
 
 .create-issue-request .issue-table {
-  min-width: 1200px;
+  min-width: 0;
 }
 
 .create-issue-request .history-table {
-  min-width: 860px;
+  min-width: 0;
 }
 
 .create-issue-request .details-table {
-  min-width: 900px;
+  min-width: 0;
 }
 
 /* Cells / compact overrides */
 .create-issue-request .material-search-cell {
   position: relative;
-  min-width: 220px;
+  min-width: 0;
 }
 
 .create-issue-request .number-input {
@@ -91,57 +91,11 @@
   font-family: "Courier New", monospace;
 }
 
-.create-issue-request .material-type-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.create-issue-request .material-type-badge.new {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.create-issue-request .material-type-badge.existing {
-  background: #dcfce7;
-  color: #166534;
-}
-
 .create-issue-request .hint-text {
   margin-top: 4px;
   font-style: italic;
   color: #6b7280;
   font-size: 0.75rem;
-}
-
-.create-issue-request .status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.create-issue-request .status-pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.create-issue-request .status-approved {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.create-issue-request .status-rejected {
-  background: #fee2e2;
-  color: #991b1b;
 }
 
 .create-issue-request .text-center {
@@ -278,13 +232,6 @@
 
 .create-issue-request .modal-body {
   padding: 1.5rem;
-}
-
-.create-issue-request .modal-footer {
-  padding: 1rem 1.5rem 1.5rem;
-  border-top: 1px solid #e2e8f0;
-  display: flex;
-  justify-content: flex-end;
 }
 
 /* Request info */

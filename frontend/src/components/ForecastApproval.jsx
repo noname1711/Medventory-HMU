@@ -436,79 +436,65 @@ export default function ForecastApproval({ adminInfo }) {
       </div>
 
       {selectedForecast && (
-        <div className="fa-modal-overlay" onMouseDown={closeForecastDetails}>
-          <div className="fa-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="fa-modal-header">
-              <div>
-                <h3 className="fa-modal-title">Chi tiết dự trù #{selectedForecast.id}</h3>
-                <p className="fa-modal-subtitle">Xem thông tin chung và danh sách vật tư của phiếu dự trù.</p>
-              </div>
-              <div className="fa-modal-header-right">
-                <span className={`ui-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
-                  {getStatusBadge(selectedForecast.status).text}
-                </span>
-                <button type="button" className="fa-modal-close" onClick={closeForecastDetails}>
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="fa-modal-content">
-              <div className="fa-info-grid">
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Khoa/Phòng</span>
-                  <strong className="fa-info-value">{selectedForecast.department?.name || "Không xác định"}</strong>
-                </div>
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Năm học</span>
-                  <strong className="fa-info-value">{selectedForecast.academicYear || "-"}</strong>
-                </div>
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Người tạo</span>
-                  <strong className="fa-info-value">{selectedForecast.createdBy?.fullName || "Không xác định"}</strong>
-                </div>
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Ngày tạo</span>
-                  <strong className="fa-info-value">
-                    {selectedForecast.createdAt
-                      ? fmtDate(selectedForecast.createdAt)
-                      : "-"}
-                  </strong>
-                </div>
-                {selectedForecast.approvalBy && (
-                  <div className="fa-info-card">
-                    <span className="fa-info-label">Người duyệt</span>
-                    <strong className="fa-info-value">{selectedForecast.approvalBy?.fullName || "-"}</strong>
-                  </div>
-                )}
-                {selectedForecast.approvalAt && (
-                  <div className="fa-info-card">
-                    <span className="fa-info-label">Ngày duyệt</span>
-                    <strong className="fa-info-value">
-                      {fmtDate(selectedForecast.approvalAt)}
-                    </strong>
-                  </div>
-                )}
+        <div className="ui-modal-overlay fa-modal-overlay" onMouseDown={closeForecastDetails}>
+          <div className="ui-modal fa-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ui-modal-body fa-modal-content fa-history-detail">
+              <div className="ui-history-detail-head">
+                Chi tiết Phiếu Dự Trù #{selectedForecast.id}
               </div>
 
-              {selectedForecast.approvalNote && (
-                <div className="ui-alert is-warning fa-note-box">
-                  <strong>Ghi chú xử lý:</strong> {selectedForecast.approvalNote}
-                </div>
-              )}
-
-              <div className="fa-detail-block">
-                <div className="ui-section-head fa-detail-head">
-                  <div>
-                    <h4 className="ui-section-title">Danh sách vật tư</h4>
-                    <p className="ui-section-subtitle">
-                      Tổng số dòng: {selectedForecast.details?.length || 0}
-                    </p>
+              <div className="ui-history-detail-body">
+                <div className="ui-history-info">
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Khoa/Phòng:</div>
+                    <div className="ui-history-info-value">{selectedForecast.department?.name || "Không xác định"}</div>
                   </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Năm học:</div>
+                    <div className="ui-history-info-value">{selectedForecast.academicYear || "-"}</div>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Người tạo:</div>
+                    <div className="ui-history-info-value">{selectedForecast.createdBy?.fullName || "Không xác định"}</div>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Ngày tạo:</div>
+                    <div className="ui-history-info-value">{selectedForecast.createdAt ? fmtDate(selectedForecast.createdAt) : "-"}</div>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Trạng thái:</div>
+                    <div className="ui-history-info-value">
+                      <span className={`ui-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
+                        {getStatusBadge(selectedForecast.status).text}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedForecast.approvalBy && (
+                    <div className="ui-history-info-row">
+                      <div className="ui-history-info-label">Người duyệt:</div>
+                      <div className="ui-history-info-value">{selectedForecast.approvalBy?.fullName || "-"}</div>
+                    </div>
+                  )}
+                  {selectedForecast.approvalAt && (
+                    <div className="ui-history-info-row">
+                      <div className="ui-history-info-label">Ngày duyệt:</div>
+                      <div className="ui-history-info-value">{fmtDate(selectedForecast.approvalAt)}</div>
+                    </div>
+                  )}
+                  {selectedForecast.approvalNote && (
+                    <div className="ui-history-info-row">
+                      <div className="ui-history-info-label">Ghi chú xử lý:</div>
+                      <div className="ui-history-info-value">{selectedForecast.approvalNote}</div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="ui-table-wrap">
-                  <table className="ui-table fa-detail-table">
+                <h4 className="ui-history-detail-section-title">
+                  Danh sách vật tư ({selectedForecast.details?.length || 0} dòng)
+                </h4>
+
+                <div className="ui-history-table-wrap">
+                  <table className="ui-history-table fa-detail-table">
                     <thead>
                       <tr>
                         <th>Tên vật tư</th>
@@ -542,8 +528,8 @@ export default function ForecastApproval({ adminInfo }) {
               </div>
             </div>
 
-            <div className="fa-modal-footer">
-              {isPendingStatus(selectedForecast.status) && (
+            {isPendingStatus(selectedForecast.status) && (
+              <div className="ui-modal-footer fa-modal-footer">
                 <>
                   <button type="button" className="ui-btn ui-btn-danger" onClick={() => rejectForecast(selectedForecast.id)}>
                     Từ chối
@@ -552,11 +538,8 @@ export default function ForecastApproval({ adminInfo }) {
                     Phê duyệt
                   </button>
                 </>
-              )}
-              <button type="button" className="ui-btn ui-btn-secondary" onClick={closeForecastDetails}>
-                Đóng
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

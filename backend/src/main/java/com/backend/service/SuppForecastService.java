@@ -237,7 +237,7 @@ public class SuppForecastService {
 
     public List<SuppForecastPreviousDTO> loadPreviousForecast(Long departmentId) {
         // NOTE: method này không có user context => không enforce permission được nếu không sửa controller.
-        String previousYear = "2025-2026"; // TODO: tự động tính theo năm hiện tại
+        String previousYear = "2025-2026";
 
         List<SuppForecastHeader> headers;
         if (departmentId != null) {

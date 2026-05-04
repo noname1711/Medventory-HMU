@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/receipts")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
 public class ReceiptController {
 
     private final ReceiptService receiptService;

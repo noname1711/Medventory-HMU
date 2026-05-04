@@ -6,7 +6,6 @@ import com.backend.entity.SuppForecastHeader;
 import com.backend.service.SuppForecastService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +18,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/supp-forecast")
-@CrossOrigin(origins = "http://localhost:5173")
 public class SuppForecastController {
 
     @Autowired

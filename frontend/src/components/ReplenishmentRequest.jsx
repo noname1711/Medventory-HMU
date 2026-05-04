@@ -33,6 +33,15 @@ function statusLabel(code) {
   }
 }
 
+function statusUiClass(code) {
+  switch (String(code || "").toUpperCase()) {
+    case "APPROVED": return "is-approved";
+    case "REJECTED": return "is-rejected";
+    case "PENDING":
+    default: return "is-pending";
+  }
+}
+
 function escapeHtml(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;")
@@ -40,6 +49,21 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function numberOrEmpty(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? n : "";
+}
+
+function buildPreviousByMaterialId(rows) {
+  const map = {};
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    if (!row?.materialId || map[row.materialId]) return;
+    map[row.materialId] = row;
+  });
+  return map;
 }
 
 export default function ReplenishmentRequest() {
@@ -66,6 +90,8 @@ export default function ReplenishmentRequest() {
 
   const [items, setItems] = useState([createEmptyRow()]);
   const [materials, setMaterials] = useState([]);
+  const [stockByMaterialId, setStockByMaterialId] = useState({});
+  const [previousByMaterialId, setPreviousByMaterialId] = useState({});
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
   const [departmentInput, setDepartmentInput] = useState("");
@@ -99,6 +125,11 @@ export default function ReplenishmentRequest() {
   }
 
   function handleSelectMaterial(index, material) {
+    const stockInfo = stockByMaterialId[material.materialId] || {};
+    const previousInfo = previousByMaterialId[material.materialId] || {};
+    const currentStock = numberOrEmpty(stockInfo.closingStock ?? previousInfo.currentStock);
+    const previousQty = numberOrEmpty(previousInfo.prevYearQty);
+
     setItems((prev) => {
       const updated = [...prev];
       updated[index] = {
@@ -109,6 +140,8 @@ export default function ReplenishmentRequest() {
         unitId: material.unitId || "",
         materialCode: material.materialCode || "",
         manufacturer: material.manufacturer || "",
+        qtyAvailable: currentStock,
+        qtyLastYear: previousQty,
       };
       return updated;
     });
@@ -275,8 +308,8 @@ export default function ReplenishmentRequest() {
         width: 960,
         customClass: {
           popup: "ui-history-detail-popup",
-          confirmButton: "ui-btn ui-btn-secondary",
         },
+        showConfirmButton: false,
         confirmButtonText: "Đóng",
       });
     } catch (err) {
@@ -297,6 +330,8 @@ export default function ReplenishmentRequest() {
         Swal.fire({ icon: "info", title: "Không có dữ liệu dự trù năm trước", timer: 1500, showConfirmButton: false });
         return;
       }
+
+      setPreviousByMaterialId(buildPreviousByMaterialId(data));
 
       const mapped = data.map((item) => ({
         rowId: crypto.randomUUID(),
@@ -339,10 +374,44 @@ export default function ReplenishmentRequest() {
     }
   }
 
+  async function fetchMaterialStock() {
+    try {
+      const res = await fetch(`${API_URL}/inventory/materials`);
+      const data = await res.json();
+      const map = {};
+      (Array.isArray(data) ? data : []).forEach((item) => {
+        if (!item?.materialId) return;
+        map[item.materialId] = item;
+      });
+      setStockByMaterialId(map);
+    } catch {
+      setStockByMaterialId({});
+    }
+  }
+
+  async function fetchPreviousLookup(departmentId = selectedDept) {
+    try {
+      const url = departmentId
+        ? `${API_URL}/supp-forecast/previous?departmentId=${departmentId}`
+        : `${API_URL}/supp-forecast/previous`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setPreviousByMaterialId(buildPreviousByMaterialId(Array.isArray(data) ? data : []));
+    } catch {
+      setPreviousByMaterialId({});
+    }
+  }
+
   useEffect(() => {
     fetchMaterials();
+    fetchMaterialStock();
     fetchDepartments();
   }, []);
+
+  useEffect(() => {
+    fetchPreviousLookup(selectedDept);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDept]);
 
   const materialSearchItems = useMemo(
     () => materials.map((m) => ({
@@ -619,7 +688,7 @@ export default function ReplenishmentRequest() {
                         <td data-label="Năm học">{item.academicYear}</td>
                         <td data-label="Bộ môn">{item.departmentName || "—"}</td>
                         <td data-label="Trạng thái">
-                          <span className={`req-status-badge req-status-${(item.status || "").toLowerCase()}`}>
+                          <span className={`ui-status-badge ${statusUiClass(item.status)}`}>
                             {statusLabel(item.status)}
                           </span>
                         </td>

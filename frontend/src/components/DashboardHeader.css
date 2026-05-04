@@ -490,23 +490,6 @@
   font-weight: 900;
 }
 
-.profile-modal-close {
-  background: #fff;
-  border: 1px solid var(--dh-border);
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: #6b7280;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-}
-
-.profile-modal-close:hover {
-  color: #374151;
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-}
-
 .profile-modal-content {
   padding: 0;
   max-height: 62vh;
@@ -582,41 +565,6 @@
   color: #374151;
   min-width: 120px;
   font-size: 0.9rem;
-}
-
-.profile-modal-footer {
-  display: flex;
-  gap: 12px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--dh-border);
-  background: #f9fafb;
-}
-
-.profile-modal-btn {
-  padding: 10px 16px;
-  border: 1px solid var(--dh-border);
-  border-radius: 10px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
-  flex: 1;
-  background: #fff;
-  color: #111827;
-}
-
-.profile-modal-btn:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-}
-
-.profile-modal-btn-close {
-  background: #6b7280;
-  color: #fff;
-  border: none;
-}
-
-.profile-modal-btn-close:hover {
-  background: #4b5563;
 }
 
 /* =========================

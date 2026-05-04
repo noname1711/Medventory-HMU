@@ -739,8 +739,8 @@ export default function IssuePage() {
         width: 960,
         customClass: {
           popup: "ui-history-detail-popup",
-          confirmButton: "ui-btn ui-btn-secondary",
         },
+        showConfirmButton: false,
         confirmButtonText: "Đóng",
       });
     } catch (error) {
@@ -1244,7 +1244,6 @@ export default function IssuePage() {
                       Phiếu #{selected.id} — {selected.subDepartmentName || "—"}
                     </div>
                   </div>
-                  <button className="issue-modal-close" onClick={closeDrawer} aria-label="Đóng">×</button>
                 </div>
 
                 {/* Body (scrollable) */}
@@ -1535,9 +1534,6 @@ export default function IssuePage() {
                       {modalLine.code} - {modalLine.name}
                     </div>
                   </div>
-                  <button className="issue-modal-close" onClick={closeModal} aria-label="close">
-                    ×
-                  </button>
                 </div>
 
                 {modalError ? <div className="ui-alert is-error">{modalError}</div> : null}
@@ -1621,9 +1617,6 @@ export default function IssuePage() {
                 </div>
 
                 <div className="issue-modal-actions">
-                  <button className="ui-btn ui-btn-secondary ui-btn-sm" type="button" onClick={closeModal}>
-                    Đóng
-                  </button>
                   <button className="ui-btn ui-btn-primary ui-btn-sm" type="button" onClick={saveModalAllocation}>
                     Lưu
                   </button>
