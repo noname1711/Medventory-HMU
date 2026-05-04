@@ -15,6 +15,7 @@ public class UserDTO {
     private Integer roleCheck; // 0,1,2,3
     private Integer statusValue; // 0,1
     private Boolean isApproved;
+    private Boolean isAdmin;
     private Boolean isBanGiamHieu;
     private Boolean isLanhDao;
     private Boolean isThuKho;

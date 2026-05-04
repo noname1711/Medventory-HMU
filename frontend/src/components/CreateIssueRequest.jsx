@@ -14,7 +14,19 @@ const API_ENDPOINTS = {
   ISSUE_REQUESTS: `${API_URL}/issue-requests`
 };
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function CreateIssueRequest() {
+  const HISTORY_PAGE_SIZE = 10;
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState("create");
   const [formData, setFormData] = useState({
@@ -45,6 +57,7 @@ export default function CreateIssueRequest() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
 
   // Lấy thông tin user và dữ liệu
   useEffect(() => {
@@ -162,6 +175,7 @@ export default function CreateIssueRequest() {
         if (result.success) {
           const historyData = result.requests || [];
           setRequestHistory(historyData);
+          setHistoryPage(0);
         } else {
           throw new Error(result.message || "Lỗi không xác định");
         }
@@ -707,6 +721,13 @@ export default function CreateIssueRequest() {
     [materials, units]
   );
 
+  const historyTotalPages = Math.max(1, Math.ceil(requestHistory.length / HISTORY_PAGE_SIZE));
+  const safeHistoryPage = Math.min(historyPage, historyTotalPages - 1);
+  const pagedRequestHistory = requestHistory.slice(
+    safeHistoryPage * HISTORY_PAGE_SIZE,
+    safeHistoryPage * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
+  );
+
   return (
     <div className="ui-page">
       <div className="ui-page-frame create-issue-request">
@@ -995,7 +1016,7 @@ export default function CreateIssueRequest() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requestHistory.map((request) => (
+                  {pagedRequestHistory.map((request) => (
                     <tr key={request.id}>
                       <td className="text-center" data-label="Mã phiếu">{request.id}</td>
                       <td className="text-center" data-label="Ngày gửi">{formatDate(request.requestedAt)}</td>
@@ -1010,10 +1031,10 @@ export default function CreateIssueRequest() {
                         <button
                           type="button"
                           onClick={() => showRequestDetails(request)}
-                          className="ui-btn ui-btn-secondary ui-btn-sm btn-view-details"
-                          title="Xem chi tiết"
+                          className="ui-btn ui-btn-secondary ui-btn-sm"
+                          title="Xem"
                         >
-                          Xem chi tiết
+                          Xem
                         </button>
                       </td>
                     </tr>
@@ -1022,6 +1043,39 @@ export default function CreateIssueRequest() {
               </table>
             </div>
           )}
+          {!historyLoading && requestHistory.length > 0 ? (
+            <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu xin lĩnh">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setHistoryPage((page) => Math.max(0, page - 1))}
+                disabled={safeHistoryPage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(historyTotalPages, safeHistoryPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeHistoryPage ? "is-active" : ""}`}
+                  onClick={() => setHistoryPage(page)}
+                  disabled={page === safeHistoryPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setHistoryPage((page) => Math.min(historyTotalPages - 1, page + 1))}
+                disabled={safeHistoryPage >= historyTotalPages - 1}
+              >
+                Trang sau
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
 

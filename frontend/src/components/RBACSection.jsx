@@ -5,6 +5,7 @@ import "./RBACSection.css";
 
 const API_URL = "http://localhost:8080/api";
 const SPECIAL_PERMISSIONS = ["USERS.MANAGE", "PERMISSIONS.MANAGE"];
+const LOCKED_ROLE_CODE = "ADMIN";
 
 export default function RBACSection({ adminInfo }) {
   // =========================================================
@@ -47,6 +48,13 @@ export default function RBACSection({ adminInfo }) {
   const [editingUserPermSet, setEditingUserPermSet] = useState(new Set());
   const [userPermSearch] = useState("");
 
+  // =========================================================
+  // BUSINESS SETTINGS
+  // =========================================================
+  const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
+  const [autoApproveLoading, setAutoApproveLoading] = useState(false);
+  const [autoApproveSaving, setAutoApproveSaving] = useState(false);
+
   const API_ENDPOINTS = {
     USERS_ALL: `${API_URL}/admin/users/all`,
 
@@ -59,6 +67,8 @@ export default function RBACSection({ adminInfo }) {
     RBAC_USER_PERMS: (userId) => `${API_URL}/admin/rbac/users/${userId}/permissions`,
     RBAC_USER_PERMS_REPLACE: (userId) => `${API_URL}/admin/rbac/users/${userId}/permissions`,
     RBAC_USER_PERMS_CLEAR: (userId) => `${API_URL}/admin/rbac/users/${userId}/permissions`,
+
+    ISSUE_REQ_AUTO_APPROVE_SETTING: `${API_URL}/admin/settings/issue-req-auto-approve`,
   };
 
   // =========================================================
@@ -171,10 +181,10 @@ export default function RBACSection({ adminInfo }) {
     if (!selectedRoleCode) return;
 
     const roleCodeUpper = String(selectedRoleCode).toUpperCase();
-    if (roleCodeUpper === "BGH") {
+    if (roleCodeUpper === LOCKED_ROLE_CODE) {
       Swal.fire({
         title: "Không hợp lệ",
-        text: "Backend đã khóa chỉnh role BGH.",
+        text: "Backend đã khóa chỉnh role Admin.",
         icon: "warning",
         timer: 2500,
       });
@@ -187,7 +197,7 @@ export default function RBACSection({ adminInfo }) {
     if (hasSpecialPermission) {
       Swal.fire({
         title: "Không được phép",
-        text: "Không thể thêm quyền USERS.MANAGE hoặc PERMISSIONS.MANAGE vào role. Hai quyền này chỉ dành cho BGH.",
+        text: "Không thể thêm quyền USERS.MANAGE hoặc PERMISSIONS.MANAGE vào role. Hai quyền này chỉ dành cho Admin.",
         icon: "error",
         timer: 3000,
       });
@@ -237,10 +247,10 @@ export default function RBACSection({ adminInfo }) {
     if (!selectedRoleCode) return;
 
     const roleCodeUpper = String(selectedRoleCode).toUpperCase();
-    if (roleCodeUpper === "BGH") {
+    if (roleCodeUpper === LOCKED_ROLE_CODE) {
       Swal.fire({
         title: "Không hợp lệ",
-        text: "Backend đã khóa chỉnh role BGH.",
+        text: "Backend đã khóa chỉnh role Admin.",
         icon: "warning",
         timer: 2500,
       });
@@ -561,6 +571,90 @@ export default function RBACSection({ adminInfo }) {
     });
   };
 
+  const fetchIssueReqAutoApproveSetting = async () => {
+    setAutoApproveLoading(true);
+
+    try {
+      const res = await fetch(API_ENDPOINTS.ISSUE_REQ_AUTO_APPROVE_SETTING, {
+        headers: { ...authHeaders() },
+      });
+
+      if (res.status === 403) throw new Error("FORBIDDEN");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      setAutoApproveEnabled(!!data?.enabled);
+    } catch (error) {
+      if (String(error?.message) === "FORBIDDEN") {
+        Swal.fire({
+          title: "Không có quyền",
+          text: "Bạn không có PERMISSIONS.MANAGE để xem thiết lập nghiệp vụ.",
+          icon: "error",
+          timer: 3000,
+        });
+      } else {
+        Swal.fire({
+          title: "Lỗi!",
+          text: "Không thể tải thiết lập tự động phê duyệt.",
+          icon: "error",
+          timer: 3000,
+        });
+      }
+    } finally {
+      setAutoApproveLoading(false);
+    }
+  };
+
+  const updateIssueReqAutoApproveSetting = async (nextEnabled) => {
+    setAutoApproveSaving(true);
+
+    try {
+      const res = await fetch(API_ENDPOINTS.ISSUE_REQ_AUTO_APPROVE_SETTING, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+
+      if (res.status === 403) throw new Error("FORBIDDEN");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const enabled = !!data?.enabled;
+      setAutoApproveEnabled(enabled);
+
+      Swal.fire({
+        title: "Đã lưu",
+        text: enabled
+          ? "Đã bật tự động phê duyệt phiếu xin lĩnh khi đủ tồn kho."
+          : "Đã tắt tự động phê duyệt. Phiếu xin lĩnh sẽ chờ lãnh đạo duyệt.",
+        icon: "success",
+        timer: 2200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      setAutoApproveEnabled(!nextEnabled);
+
+      if (String(error?.message) === "FORBIDDEN") {
+        Swal.fire({ title: "Không có quyền", text: "Bạn không có PERMISSIONS.MANAGE.", icon: "error", timer: 3000 });
+      } else {
+        Swal.fire({
+          title: "Lỗi!",
+          text: `Không thể lưu thiết lập tự động phê duyệt: ${error?.message || ""}`,
+          icon: "error",
+          timer: 3500,
+        });
+      }
+    } finally {
+      setAutoApproveSaving(false);
+    }
+  };
+
   // =========================================================
   // COMPUTED DATA
   // =========================================================
@@ -639,8 +733,8 @@ export default function RBACSection({ adminInfo }) {
       setRbacPermissions(permList);
 
       if (!selectedRoleCode) {
-        const firstNonBgh = roleList.find((role) => String(role.code).toUpperCase() !== "BGH");
-        const first = firstNonBgh || roleList[0];
+        const firstEditableRole = roleList.find((role) => String(role.code).toUpperCase() !== LOCKED_ROLE_CODE);
+        const first = firstEditableRole || roleList[0];
         if (first?.code) {
           await fetchRolePermissions(String(first.code));
         }
@@ -669,6 +763,7 @@ export default function RBACSection({ adminInfo }) {
   useEffect(() => {
     fetchRbacCatalog();
     fetchAllUsers();
+    fetchIssueReqAutoApproveSetting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -689,7 +784,7 @@ export default function RBACSection({ adminInfo }) {
   useEffect(() => {
     if (selectedRoleCode && rbacRoles.length > 0) {
       const r = rbacRoles.find((r) => String(r.code) === String(selectedRoleCode));
-      const locked = r && String(r.code).toUpperCase() === "BGH";
+      const locked = r && String(r.code).toUpperCase() === LOCKED_ROLE_CODE;
       setRoleInputVal(r ? `${r.code} - ${r.name}${locked ? " (khóa)" : ""}` : selectedRoleCode);
     } else {
       setRoleInputVal("");
@@ -708,6 +803,46 @@ export default function RBACSection({ adminInfo }) {
   // =========================================================
   // RENDER HELPERS
   // =========================================================
+  const renderBusinessSettings = () => {
+    const disabled = autoApproveLoading || autoApproveSaving;
+
+    return (
+      <div className="ui-section rbac-settings-section">
+        <div className="rbac-setting-row">
+          <div className="rbac-setting-copy">
+            <h2 className="ui-section-title">Thiết lập nghiệp vụ</h2>
+            <p className="rbac-setting-desc">
+              Tự động phê duyệt phiếu xin lĩnh khi đủ tồn kho và hệ thống giữ chỗ vật tư thành công.
+            </p>
+          </div>
+
+          <label className={`rbac-switch ${disabled ? "is-disabled" : ""}`}>
+            <input
+              type="checkbox"
+              checked={autoApproveEnabled}
+              disabled={disabled}
+              onChange={(e) => {
+                const nextEnabled = e.target.checked;
+                setAutoApproveEnabled(nextEnabled);
+                updateIssueReqAutoApproveSetting(nextEnabled);
+              }}
+            />
+            <span className="rbac-switch-slider" />
+            <span className="rbac-switch-label">
+              {autoApproveLoading
+                ? "Đang tải..."
+                : autoApproveSaving
+                  ? "Đang lưu..."
+                  : autoApproveEnabled
+                    ? "Đang bật"
+                    : "Đang tắt"}
+            </span>
+          </label>
+        </div>
+      </div>
+    );
+  };
+
   const renderPermissionItem = ({ perm, checked, disabled, onToggle, isSpecial = false }) => {
     const code = perm?.code || "";
 
@@ -726,7 +861,7 @@ export default function RBACSection({ adminInfo }) {
           <div className="rbac-perm-card-title-wrap">
             <div className="rbac-perm-card-name">
               {perm?.name || code}
-              {isSpecial && <span className="rbac-inline-badge">Chỉ dành cho BGH</span>}
+              {isSpecial && <span className="rbac-inline-badge">Chỉ dành cho Admin</span>}
             </div>
           </div>
         </div>
@@ -773,14 +908,14 @@ export default function RBACSection({ adminInfo }) {
               <button
                 className="ui-btn ui-btn-secondary"
                 onClick={resetRolePermissionsToDefault}
-                disabled={rbacLoading || rbacSaving || !selectedRoleCode || String(selectedRoleCode).toUpperCase() === "BGH"}
+                disabled={rbacLoading || rbacSaving || !selectedRoleCode || String(selectedRoleCode).toUpperCase() === LOCKED_ROLE_CODE}
               >
                 Đặt về mặc định
               </button>
               <button
                 className="ui-btn ui-btn-primary"
                 onClick={saveRolePermissions}
-                disabled={rbacLoading || rbacSaving || !selectedRoleCode || !dirtyRole || String(selectedRoleCode).toUpperCase() === "BGH"}
+                disabled={rbacLoading || rbacSaving || !selectedRoleCode || !dirtyRole || String(selectedRoleCode).toUpperCase() === LOCKED_ROLE_CODE}
               >
                 {rbacSaving ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
@@ -799,7 +934,7 @@ export default function RBACSection({ adminInfo }) {
                 setRoleInputVal(val);
                 const matched = rbacRoles.find((r) => {
                   const code = String(r?.code || "");
-                  const locked = code.toUpperCase() === "BGH";
+                  const locked = code.toUpperCase() === LOCKED_ROLE_CODE;
                   return `${code} - ${r?.name || ""}${locked ? " (khóa)" : ""}` === val;
                 });
                 if (matched) fetchRolePermissions(String(matched.code));
@@ -809,12 +944,12 @@ export default function RBACSection({ adminInfo }) {
             <datalist id="rbac-roles-datalist">
               {rbacRoles.map((role) => {
                 const code = String(role?.code || "");
-                const locked = code.toUpperCase() === "BGH";
+                const locked = code.toUpperCase() === LOCKED_ROLE_CODE;
                 return <option key={role.id || code} value={`${code} - ${role?.name || ""}${locked ? " (khóa)" : ""}`} />;
               })}
             </datalist>
             <span className="ui-help">
-              BGH được bảo vệ, không cho phép chỉnh sửa.
+              Admin được bảo vệ, không cho phép chỉnh sửa.
               {" · So với mặc định: "}
               {addedVsDefault.length === 0 && removedVsDefault.length === 0
                 ? "Đúng mặc định"
@@ -841,7 +976,7 @@ export default function RBACSection({ adminInfo }) {
                 rbacLoading ||
                 rbacSaving ||
                 !selectedRoleCode ||
-                String(selectedRoleCode).toUpperCase() === "BGH" ||
+                String(selectedRoleCode).toUpperCase() === LOCKED_ROLE_CODE ||
                 filteredPermissionsForRole.filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length === 0
               }
             >
@@ -854,7 +989,7 @@ export default function RBACSection({ adminInfo }) {
                 rbacLoading ||
                 rbacSaving ||
                 !selectedRoleCode ||
-                String(selectedRoleCode).toUpperCase() === "BGH" ||
+                String(selectedRoleCode).toUpperCase() === LOCKED_ROLE_CODE ||
                 filteredPermissionsForRole.filter((perm) => !SPECIAL_PERMISSIONS.includes(perm?.code)).length === 0
               }
             >
@@ -874,7 +1009,7 @@ export default function RBACSection({ adminInfo }) {
                 const code = perm?.code || "";
                 const checked = (editingPermSet || new Set()).has(code);
                 const isSpecial = SPECIAL_PERMISSIONS.includes(code);
-                const disabled = String(selectedRoleCode).toUpperCase() === "BGH" || rbacSaving || isSpecial;
+                const disabled = String(selectedRoleCode).toUpperCase() === LOCKED_ROLE_CODE || rbacSaving || isSpecial;
 
                 return renderPermissionItem({
                   perm,
@@ -890,7 +1025,7 @@ export default function RBACSection({ adminInfo }) {
         <div className="ui-alert is-warning rbac-footnote">
           <div><strong>Ghi chú:</strong></div>
           <div>1. Nếu không muốn phân quyền tùy chỉnh cho role, dùng nút <strong>Đặt về mặc định</strong>.</div>
-          <div>2. Quyền <strong>Quản lý người dùng</strong> và <strong>Phân quyền vai trò</strong> chỉ dành cho BGH, không thể thêm vào role khác.</div>
+          <div>2. Quyền <strong>Quản lý người dùng</strong> và <strong>Phân quyền vai trò</strong> chỉ dành cho Admin, không thể thêm vào role khác.</div>
         </div>
       </div>
     );
@@ -1030,6 +1165,8 @@ export default function RBACSection({ adminInfo }) {
             <h1 className="ui-page-title">Phân quyền vai trò</h1>
           </div>
         </div>
+
+        {renderBusinessSettings()}
 
         <div className="ui-tabs">
           <button

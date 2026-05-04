@@ -3,6 +3,7 @@
 -- Rerunnable: drops schema, recreates all tables
 -- Includes RBAC (Role/Permission) + Notifications 1->N
 -- Adds Stock Reservation for safe auto-approve Issue Requests
+-- Adds System Settings for configurable business switches
 -- ============================================================
 BEGIN;
 
@@ -40,7 +41,7 @@ CREATE TABLE units (
 
 CREATE TABLE roles (
   id   SERIAL PRIMARY KEY,
-  code VARCHAR(30) UNIQUE NOT NULL,      -- 'BGH','LANH_DAO','THU_KHO','CAN_BO'
+  code VARCHAR(30) UNIQUE NOT NULL,      -- 'ADMIN','BGH','LANH_DAO','THU_KHO','CAN_BO'
   name VARCHAR(80) NOT NULL
 );
 
@@ -360,6 +361,15 @@ CREATE TABLE notification_recipients (
 );
 
 -- ============================================================
+-- 11.1) SYSTEM SETTINGS
+-- ============================================================
+
+CREATE TABLE system_settings (
+  setting_key   VARCHAR(100) PRIMARY KEY,
+  setting_value VARCHAR(500) NOT NULL
+);
+
+-- ============================================================
 -- 12) INDEXES
 -- ============================================================
 
@@ -395,6 +405,7 @@ CREATE INDEX idx_notif_recip_user      ON notification_recipients(user_id, is_re
 -- ============================================================
 
 INSERT INTO roles (code, name) VALUES
+('ADMIN',    'Admin'),
 ('BGH',      'Ban Giám Hiệu'),
 ('LANH_DAO', 'Lãnh đạo'),
 ('THU_KHO',  'Thủ kho'),
@@ -424,11 +435,15 @@ INSERT INTO reservation_status (code, name) VALUES
 ('CANCELLED', 'Đã hủy'),
 ('CONSUMED',  'Đã tiêu thụ');
 
+INSERT INTO system_settings(setting_key, setting_value) VALUES
+('issue_req.auto_approve_enabled', 'false');
+
 -- ============================================================
 -- SEED: PERMISSIONS
 -- ============================================================
 
 INSERT INTO permissions(code, name, description) VALUES
+('MATERIAL.VIEW',          'Xem danh sách vật tư',                           'Xem danh sách vật tư tồn kho'),
 ('SUPP_FORECAST.CREATE',  'Tạo phiếu dự trù bổ sung',                       'Thủ kho tạo phiếu dự trù'),
 ('SUPP_FORECAST.APPROVE', 'Phê duyệt phiếu dự trù',                         'BGH phê duyệt phiếu dự trù'),
 ('ISSUE_REQ.CREATE',      'Tạo phiếu xin lĩnh',                             'Đơn vị tạo phiếu xin lĩnh'),
@@ -436,33 +451,33 @@ INSERT INTO permissions(code, name, description) VALUES
 ('RECEIPT.CREATE',        'Tạo phiếu nhập kho',                             'Thủ kho lập phiếu nhập kho'),
 ('ISSUE.CREATE',          'Tạo phiếu xuất kho',                             'Thủ kho lập phiếu xuất kho'),
 ('MATERIAL.MANAGE',       'Theo dõi hàng tồn, thêm mới danh mục vật tư',    'Theo dõi tồn kho, thêm danh mục vật tư'),
-('USERS.MANAGE',          'Quản lý danh mục người dùng',                    'Phê duyệt/điều chỉnh quyền tài khoản, thêm mới đơn vị'),
-('PERMISSIONS.MANAGE',    'Quản lý danh sách quyền hệ thống',               'Mở rộng quyền hệ thống'),
+('USERS.MANAGE',          'Quản lý danh mục người dùng',                    'Admin phê duyệt/điều chỉnh quyền tài khoản, thêm mới đơn vị'),
+('PERMISSIONS.MANAGE',    'Quản lý danh sách quyền hệ thống',               'Admin mở rộng quyền hệ thống'),
 ('NOTIF.MANAGE',          'Quản lý thông báo',                              'Tạo thông báo và phân phối tới người nhận');
 
 -- ROLE -> PERMISSIONS
 INSERT INTO role_permissions(role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.code='BGH' AND p.code IN ('SUPP_FORECAST.APPROVE','NOTIF.MANAGE');
+WHERE r.code='BGH' AND p.code IN ('MATERIAL.VIEW','SUPP_FORECAST.APPROVE','NOTIF.MANAGE');
 
 INSERT INTO role_permissions(role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
-WHERE r.code='BGH' AND p.code IN ('USERS.MANAGE','PERMISSIONS.MANAGE');
+WHERE r.code='ADMIN' AND p.code IN ('USERS.MANAGE','PERMISSIONS.MANAGE');
 
 INSERT INTO role_permissions(role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.code='LANH_DAO' AND p.code IN ('ISSUE_REQ.APPROVE','NOTIF.MANAGE');
+WHERE r.code='LANH_DAO' AND p.code IN ('MATERIAL.VIEW','ISSUE_REQ.APPROVE','NOTIF.MANAGE');
 
 INSERT INTO role_permissions(role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.code='THU_KHO' AND p.code IN (
-  'SUPP_FORECAST.CREATE', 'RECEIPT.CREATE','ISSUE.CREATE','MATERIAL.MANAGE','NOTIF.MANAGE'
+  'MATERIAL.VIEW','SUPP_FORECAST.CREATE', 'RECEIPT.CREATE','ISSUE.CREATE','MATERIAL.MANAGE','NOTIF.MANAGE'
 );
 
 INSERT INTO role_permissions(role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.code='CAN_BO' AND p.code IN ('ISSUE_REQ.CREATE');
+WHERE r.code='CAN_BO' AND p.code IN ('MATERIAL.VIEW','ISSUE_REQ.CREATE');
 
 -- ============================================================
 -- SEED: MASTER DATA
@@ -506,6 +521,7 @@ INSERT INTO units(name) VALUES
 -- ============================================================
 
 INSERT INTO users(full_name, email, password, date_of_birth, department_id, role_id, job_title, status_id) VALUES
+('Admin hệ thống',              'admin@gmail.com',          '12345', '1990-01-01', NULL,                                                                  (SELECT id FROM roles WHERE code='ADMIN'),    'Quản trị hệ thống',                    (SELECT id FROM user_status WHERE code='APPROVED')),
 ('Trưởng phòng QTVT',           'lanhdao@gmail.com',        '12345', '1975-03-12', (SELECT id FROM departments WHERE name='Quản trị vật tư'),             (SELECT id FROM roles WHERE code='LANH_DAO'), 'Trưởng phòng Quản trị vật tư',       (SELECT id FROM user_status WHERE code='APPROVED')),
 ('Phó phòng QTVT',              'pholanhdao@gmail.com',     '12345', '1980-07-25', (SELECT id FROM departments WHERE name='Quản trị vật tư'),             (SELECT id FROM roles WHERE code='LANH_DAO'), 'Phó phòng Quản trị vật tư',          (SELECT id FROM user_status WHERE code='APPROVED')),
 ('Thủ Kho Chính',               'thukho@gmail.com',         '12345', '1985-11-08', (SELECT id FROM departments WHERE name='Quản trị vật tư'),             (SELECT id FROM roles WHERE code='THU_KHO'),  'Thủ kho chính',                       (SELECT id FROM user_status WHERE code='APPROVED')),

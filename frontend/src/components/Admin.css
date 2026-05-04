@@ -212,6 +212,12 @@
   background: #f9fafb;
 }
 
+.admin-modal-danger-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 720px) {
   .admin-user-table {
     min-width: 0;

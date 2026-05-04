@@ -64,12 +64,17 @@ public class AuthController {
                         .body(new AuthResponse(false, "Mật khẩu xác nhận không khớp!"));
             }
 
-            // Kiểm tra role hợp lệ (không cho phép đăng ký Ban Giám Hiệu)
+            // Kiểm tra role hợp lệ (không cho phép đăng ký Admin/Ban Giám Hiệu)
             if (request.getRole() != null) {
                 String role = request.getRole();
-                if (role.equals("Ban Giám Hiệu") || role.equals("0")) {
+                if (role.equalsIgnoreCase("Admin")
+                        || role.equalsIgnoreCase("ADMIN")
+                        || role.equalsIgnoreCase("Quản trị hệ thống")
+                        || role.equalsIgnoreCase("Quan tri he thong")
+                        || role.equals("Ban Giám Hiệu")
+                        || role.equals("0")) {
                     return ResponseEntity.badRequest()
-                            .body(new AuthResponse(false, "Không thể đăng ký tài khoản Ban Giám Hiệu!"));
+                            .body(new AuthResponse(false, "Không thể đăng ký tài khoản Admin/Ban Giám Hiệu!"));
                 }
             }
 
@@ -90,8 +95,8 @@ public class AuthController {
 
             if (user != null) {
                 UserDTO userDTO = userService.convertToDTO(user);
-                String message = user.isBanGiamHieu() ?
-                        "Xin chào Ban Giám Hiệu!" : "Đăng nhập thành công!";
+                String message = user.isAdmin() ? "Xin chào Admin!" :
+                        (user.isBanGiamHieu() ? "Xin chào Ban Giám Hiệu!" : "Đăng nhập thành công!");
 
                 AuthResponse response = new AuthResponse(true, message, "user-token-" + user.getId(), userDTO);
                 return ResponseEntity.ok(response);

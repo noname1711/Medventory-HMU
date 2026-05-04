@@ -3,6 +3,7 @@ package com.backend.controller;
 import com.backend.dto.UpdateRolePermissionsRequestDTO;
 import com.backend.dto.UserDTO;
 import com.backend.service.RbacService;
+import com.backend.service.SystemSettingsService;
 import com.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,9 @@ public class AdminController {
 
     @Autowired
     private RbacService rbacService;
+
+    @Autowired
+    private SystemSettingsService systemSettingsService;
 
     @GetMapping("/users/pending")
     public ResponseEntity<?> getPendingUsers(
@@ -134,11 +138,15 @@ public class AdminController {
                 return ResponseEntity.badRequest().body("Role không được để trống");
             }
 
-            if (newRole.equalsIgnoreCase("BGH")
+            if (newRole.equalsIgnoreCase("ADMIN")
+                    || newRole.equalsIgnoreCase("BGH")
+                    || newRole.equalsIgnoreCase("Admin")
+                    || newRole.equalsIgnoreCase("Quản trị hệ thống")
+                    || newRole.equalsIgnoreCase("Quan tri he thong")
                     || newRole.equals("Ban Giam Hieu")
                     || newRole.equals("Ban Giám Hiệu")
                     || newRole.equals("0")) {
-                return ResponseEntity.badRequest().body("Không thể cập nhật thành Ban Giám Hiệu");
+                return ResponseEntity.badRequest().body("Không thể cập nhật thành Admin/Ban Giám Hiệu");
             }
 
             boolean success = userService.updateUserRole(userId, newRole);
@@ -177,6 +185,36 @@ public class AdminController {
     public ResponseEntity<?> listPermissions(@RequestHeader(value = "Authorization", required = false) String auth) {
         try {
             return ResponseEntity.ok(rbacService.listPermissions(auth));
+        } catch (SecurityException se) {
+            return forbidden(se);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/settings/issue-req-auto-approve")
+    public ResponseEntity<?> getIssueReqAutoApproveSetting(
+            @RequestHeader(value = "Authorization", required = false) String auth
+    ) {
+        try {
+            requireSettingsManage(auth);
+            return ResponseEntity.ok(systemSettingsService.getIssueReqAutoApproveSetting());
+        } catch (SecurityException se) {
+            return forbidden(se);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/settings/issue-req-auto-approve")
+    public ResponseEntity<?> updateIssueReqAutoApproveSetting(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestBody Map<String, Object> request
+    ) {
+        try {
+            requireSettingsManage(auth);
+            boolean enabled = request != null && Boolean.TRUE.equals(request.get("enabled"));
+            return ResponseEntity.ok(systemSettingsService.updateIssueReqAutoApproveSetting(enabled));
         } catch (SecurityException se) {
             return forbidden(se);
         } catch (Exception e) {
@@ -311,6 +349,11 @@ public class AdminController {
             return;
         }
         rbacService.requirePermissionFromAuth(auth, RbacService.PERM_USERS_MANAGE, message);
+    }
+
+    private void requireSettingsManage(String auth) {
+        String message = "Ban khong co quyen " + RbacService.PERM_PERMISSIONS_MANAGE;
+        rbacService.requirePermissionFromAuth(auth, RbacService.PERM_PERMISSIONS_MANAGE, message);
     }
 
     private ResponseEntity<Map<String, String>> forbidden(SecurityException se) {

@@ -195,6 +195,9 @@ export default function DashboardHeader({ userInfo }) {
     lanhdao: "Lãnh đạo",
     thukho: "Thủ kho",
     canbo: "Cán bộ",
+    ADMIN: "Admin",
+    Admin: "Admin",
+    admin: "Admin",
     BGH: "Ban Giám Hiệu",
     bgh: "Ban Giám Hiệu"
   };
@@ -217,6 +220,7 @@ export default function DashboardHeader({ userInfo }) {
   const getAvatarImage = (user) => {
     const roleCode = (typeof user?.role === 'object' ? user.role.code : user?.role) || "";
     const r = roleCode.toLowerCase();
+    if (r.includes("admin")) return "/avatar-lanhdao.png";
     if (r.includes("lanhdao") || r.includes("bgh")) return "/avatar-lanhdao.png";
     if (r.includes("thukho")) return "/avatar-thukho.png";
     return "/avatar-canbo.png";

@@ -3,11 +3,25 @@ import toast from "react-hot-toast";
 import "./dashboard-ui.css";
 import "./EquipmentList.css";
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function InventoryPage() {
+  const PAGE_SIZE = 10;
+
   /* ================= STATE ================= */
   const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState("");
   const [stockItems, setStockItems] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const [form, setForm] = useState({
     materialCode: "",
@@ -53,6 +67,13 @@ export default function InventoryPage() {
     const search = keyword.toLowerCase();
     return code.includes(search) || name.includes(search);
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredStockItems.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1);
+  const pagedStockItems = filteredStockItems.slice(
+    safeCurrentPage * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
+  );
 
   const totalItems = stockItems.length;
   const lowStockItems = stockItems.filter(
@@ -233,7 +254,10 @@ export default function InventoryPage() {
                   className="ui-input ui-search"
                   placeholder="Tìm theo mã hoặc tên vật tư..."
                   value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
+                  onChange={(e) => {
+                    setKeyword(e.target.value);
+                    setCurrentPage(0);
+                  }}
                 />
               </div>
             </div>
@@ -250,8 +274,8 @@ export default function InventoryPage() {
                 </thead>
 
                 <tbody>
-                  {filteredStockItems.length > 0 ? (
-                    filteredStockItems.map((item) => (
+                  {pagedStockItems.length > 0 ? (
+                    pagedStockItems.map((item) => (
                       <tr key={item.materialId}>
                         <td data-label="Mã vật tư">{item.materialCode}</td>
                         <td data-label="Tên vật tư">{item.materialName}</td>
@@ -274,6 +298,38 @@ export default function InventoryPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="ui-pagination" aria-label="Phân trang danh sách vật tư">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                disabled={safeCurrentPage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
+                  onClick={() => setCurrentPage(page)}
+                  disabled={page === safeCurrentPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
+                disabled={safeCurrentPage >= totalPages - 1}
+              >
+                Trang sau
+              </button>
             </div>
           </section>
         </div>

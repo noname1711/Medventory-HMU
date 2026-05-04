@@ -1,16 +1,30 @@
 import React, { useEffect, useState } from "react";
 import "./dashboard-ui.css";
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function ExportEquipment({ equipmentData, onExport }) {
+  const PAGE_SIZE = 10;
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [previewData, setPreviewData] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
     setPreviewData(getFiltered());
+    setCurrentPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [department, status, dateFrom, dateTo, equipmentData]);
 
@@ -62,6 +76,12 @@ export default function ExportEquipment({ equipmentData, onExport }) {
     maintenance: previewData.filter((eq) => eq.status === "Cần bảo trì").length,
     broken: previewData.filter((eq) => eq.status === "Hỏng hóc").length,
   };
+  const totalPages = Math.max(1, Math.ceil(previewData.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1);
+  const pagedPreviewData = previewData.slice(
+    safeCurrentPage * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
+  );
 
   const statusBadgeClass = (s) => {
     if (s === "Hoạt động tốt") return "is-ok";
@@ -176,8 +196,8 @@ export default function ExportEquipment({ equipmentData, onExport }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {previewData.length ? (
-                    previewData.map((eq) => (
+                  {pagedPreviewData.length ? (
+                    pagedPreviewData.map((eq) => (
                       <tr key={eq.id}>
                         <td>{eq.code}</td>
                         <td>{eq.name}</td>
@@ -196,6 +216,39 @@ export default function ExportEquipment({ equipmentData, onExport }) {
                 </tbody>
               </table>
             </div>
+            {previewData.length > 0 ? (
+              <div className="ui-pagination" aria-label="Phân trang xem trước dữ liệu xuất">
+                <button
+                  type="button"
+                  className="ui-pagination-btn"
+                  onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                  disabled={safeCurrentPage <= 0}
+                >
+                  Trang trước
+                </button>
+
+                {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
+                    onClick={() => setCurrentPage(page)}
+                    disabled={page === safeCurrentPage}
+                  >
+                    {page + 1}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  className="ui-pagination-btn"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
+                  disabled={safeCurrentPage >= totalPages - 1}
+                >
+                  Trang sau
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>

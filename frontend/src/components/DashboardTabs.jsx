@@ -3,7 +3,7 @@ import "./DashboardTabs.css";
 
 const API_URL = "http://localhost:8080/api";
 
-export default function DashboardTabs({ active, setActive }) {
+export default function DashboardTabs({ active, setActive, onVisibleTabsChange }) {
   const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
   const userId = currentUser?.id;
 
@@ -46,7 +46,7 @@ export default function DashboardTabs({ active, setActive }) {
 
     fetchPerms();
 
-    // Nếu muốn tab tự cập nhật khi BGH đổi quyền trong lúc user đang mở:
+    // Nếu muốn tab tự cập nhật khi Admin đổi quyền trong lúc user đang mở:
     const t = setInterval(fetchPerms, 60 * 1000);
 
     return () => {
@@ -62,6 +62,7 @@ export default function DashboardTabs({ active, setActive }) {
   const hasPerm = (code) => permSet.has(code);
 
   // Mapping tab -> permission
+  const showEquipment = hasPerm("MATERIAL.VIEW");
   const showReplenish = hasPerm("SUPP_FORECAST.CREATE");
   const showReceipt   = hasPerm("RECEIPT.CREATE");
   const showIssue     = hasPerm("ISSUE.CREATE");
@@ -75,16 +76,52 @@ export default function DashboardTabs({ active, setActive }) {
   const showRBACManage      = hasPerm("PERMISSIONS.MANAGE");
   
   // QUẢN LÝ USERS
-  const showAdminManage     = hasPerm("USERS.MANAGE") || currentUser?.isBanGiamHieu;
+  const showAdminManage     = hasPerm("USERS.MANAGE");
+
+  const visibleTabs = useMemo(() => {
+    const tabs = [];
+    if (showEquipment) tabs.push("equipment");
+    if (showReplenish) tabs.push("replenish");
+    if (showReceipt) tabs.push("receipt");
+    if (showIssue) tabs.push("issue");
+    if (showCreateIssueReq) tabs.push("create-issue");
+    if (showApproveIssueReq) tabs.push("approval");
+    if (showForecastApprove) tabs.push("forecast");
+    if (showAdminManage) tabs.push("admin");
+    if (showRBACManage) tabs.push("rbac");
+    return tabs;
+  }, [
+    showEquipment,
+    showReplenish,
+    showReceipt,
+    showIssue,
+    showCreateIssueReq,
+    showApproveIssueReq,
+    showForecastApprove,
+    showAdminManage,
+    showRBACManage,
+  ]);
+
+  useEffect(() => {
+    if (loadingPerms || visibleTabs.length === 0 || visibleTabs.includes(active)) return;
+    setActive(visibleTabs[0]);
+  }, [active, loadingPerms, setActive, visibleTabs]);
+
+  useEffect(() => {
+    if (typeof onVisibleTabsChange !== "function") return;
+    onVisibleTabsChange({ visibleTabs, loading: loadingPerms });
+  }, [loadingPerms, onVisibleTabsChange, visibleTabs]);
 
   const btnClass = (name) => `dt-tab ${active === name ? "active" : ""}`;
 
   return (
     <nav className="dt-nav max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-      <button className={btnClass("equipment")} onClick={() => setActive("equipment")}>
-        Danh sách vật tư
-      </button>
+      {showEquipment && (
+        <button className={btnClass("equipment")} onClick={() => setActive("equipment")}>
+          Danh sách vật tư
+        </button>
+      )}
 
       {showReplenish && (
         <button className={btnClass("replenish")} onClick={() => setActive("replenish")}>

@@ -12,6 +12,17 @@ function fmtDate(s) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
 }
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 function statusLabel(code) {
   if (!code) return "—";
   switch (code.toUpperCase()) {
@@ -57,11 +68,14 @@ export default function ReplenishmentRequest() {
   const [materials, setMaterials] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
+  const [departmentInput, setDepartmentInput] = useState("");
 
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyErr, setHistoryErr] = useState("");
   const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(0);
+  const HISTORY_PAGE_SIZE = 10;
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("currentUser") || "null");
@@ -161,6 +175,7 @@ export default function ReplenishmentRequest() {
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) throw new Error(data?.message || `HTTP ${res.status}`);
       setHistoryItems(Array.isArray(data.items) ? data.items : []);
+      setHistoryPage(0);
     } catch (err) {
       setHistoryErr(err.message || "Không thể tải lịch sử phiếu dự trù");
     } finally {
@@ -186,46 +201,69 @@ export default function ReplenishmentRequest() {
         const code = d.material?.code || "—";
         return `
           <tr>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${i + 1}</td>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(name)}</td>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(code)}</td>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;text-align:right;">${escapeHtml(String(d.currentStock ?? "—"))}</td>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;text-align:right;">${escapeHtml(String(d.prevYearQty ?? "—"))}</td>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;text-align:right;">${escapeHtml(String(d.thisYearQty ?? "—"))}</td>
-            <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(d.justification || "—")}</td>
+            <td class="text-center">${i + 1}</td>
+            <td>${escapeHtml(code)}</td>
+            <td>${escapeHtml(name)}</td>
+            <td class="text-right">${escapeHtml(String(d.currentStock ?? "—"))}</td>
+            <td class="text-right">${escapeHtml(String(d.prevYearQty ?? "—"))}</td>
+            <td class="text-right">${escapeHtml(String(d.thisYearQty ?? "—"))}</td>
+            <td>${escapeHtml(d.justification || "—")}</td>
           </tr>
         `;
       }).join("");
 
       const html = `
-        <div style="text-align:left;font-size:14px;">
-          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
-            <div><b>Mã phiếu:</b> #${escapeHtml(String(data.id))}</div>
-            <div><b>Năm học:</b> ${escapeHtml(data.academicYear || "—")}</div>
-            <div><b>Ngày tạo:</b> ${escapeHtml(String(data.createdAt || "—"))}</div>
-          </div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
-            <div><b>Bộ môn:</b> ${escapeHtml(data.department?.name || "Không có")}</div>
-            <div><b>Người tạo:</b> ${escapeHtml(data.createdBy?.fullName || "—")}</div>
-            <div><b>Trạng thái:</b> <span style="background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:4px;font-weight:600;font-size:0.8em;">${escapeHtml(statusText)}</span></div>
-          </div>
-          ${data.approvalNote ? `<div style="margin-bottom:8px;"><b>Ghi chú duyệt:</b> ${escapeHtml(data.approvalNote)}</div>` : ""}
-          <div style="margin-top:12px;">
-            <b>Chi tiết vật tư (${details.length} dòng):</b>
-            <div style="overflow:auto;max-height:320px;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px;">
-              <table style="width:100%;border-collapse:collapse;">
+        <div class="ui-history-detail">
+          <div class="ui-history-detail-head">Chi tiết Phiếu Dự Trù #${escapeHtml(String(data.id))}</div>
+          <div class="ui-history-detail-body">
+            <div class="ui-history-info">
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Mã phiếu:</div>
+                <div class="ui-history-info-value">#${escapeHtml(String(data.id))}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Năm học:</div>
+                <div class="ui-history-info-value">${escapeHtml(data.academicYear || "—")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Ngày tạo:</div>
+                <div class="ui-history-info-value">${escapeHtml(fmtDate(data.createdAt || ""))}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Bộ môn:</div>
+                <div class="ui-history-info-value">${escapeHtml(data.department?.name || "Không có")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Người tạo:</div>
+                <div class="ui-history-info-value">${escapeHtml(data.createdBy?.fullName || "—")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Trạng thái:</div>
+                <div class="ui-history-info-value"><span style="background:${statusBg};color:${statusColor};padding:4px 10px;border-radius:4px;font-weight:800;font-size:0.8rem;">${escapeHtml(statusText)}</span></div>
+              </div>
+              ${data.approvalNote ? `
+                <div class="ui-history-info-row">
+                  <div class="ui-history-info-label">Ghi chú duyệt:</div>
+                  <div class="ui-history-info-value">${escapeHtml(data.approvalNote)}</div>
+                </div>
+              ` : ""}
+            </div>
+
+            <h4 class="ui-history-detail-section-title">Danh sách vật tư (${details.length} vật tư)</h4>
+            <div class="ui-history-table-wrap">
+              <table class="ui-history-table">
                 <thead>
-                  <tr style="background:#f8fafc;">
-                    <th style="padding:8px;text-align:left;">#</th>
-                    <th style="padding:8px;text-align:left;">Tên vật tư</th>
-                    <th style="padding:8px;text-align:left;">Mã code</th>
-                    <th style="padding:8px;text-align:right;">SL hiện có</th>
-                    <th style="padding:8px;text-align:right;">Năm trước</th>
-                    <th style="padding:8px;text-align:right;">Dự trù</th>
-                    <th style="padding:8px;text-align:left;">Lý do</th>
+                  <tr>
+                    <th>TT</th>
+                    <th>Mã code</th>
+                    <th>Tên vật tư</th>
+                    <th class="text-right">SL hiện có</th>
+                    <th class="text-right">Năm trước</th>
+                    <th class="text-right">Dự trù</th>
+                    <th>Lý do</th>
                   </tr>
                 </thead>
-                <tbody>${rowsHtml || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#6b7280;">Không có vật tư</td></tr>'}</tbody>
+                <tbody>${rowsHtml || '<tr><td colspan="7" class="text-center">Không có vật tư</td></tr>'}</tbody>
               </table>
             </div>
           </div>
@@ -233,9 +271,12 @@ export default function ReplenishmentRequest() {
       `;
 
       await Swal.fire({
-        title: `Chi tiết phiếu dự trù #${data.id}`,
         html,
-        width: 860,
+        width: 960,
+        customClass: {
+          popup: "ui-history-detail-popup",
+          confirmButton: "ui-btn ui-btn-secondary",
+        },
         confirmButtonText: "Đóng",
       });
     } catch (err) {
@@ -313,6 +354,28 @@ export default function ReplenishmentRequest() {
     [materials, UNIT_MAP]
   );
 
+  const departmentSearchItems = useMemo(
+    () => departments.map((dept) => ({
+      id: dept.id,
+      materialName: dept.name,
+      materialCode: "",
+    })),
+    [departments]
+  );
+
+  const handleDepartmentInputChange = (text) => {
+    setDepartmentInput(text);
+
+    const normalized = text.trim().toLowerCase();
+    const matched = departments.find((dept) => String(dept?.name || "").trim().toLowerCase() === normalized);
+    setSelectedDept(matched?.id ? String(matched.id) : "");
+  };
+
+  const handleSelectDepartment = (deptItem) => {
+    setSelectedDept(String(deptItem.id));
+    setDepartmentInput(deptItem.materialName || "");
+  };
+
   const filteredHistory = useMemo(() => {
     const search = (historySearch || "").trim().toLowerCase();
     if (!search) return historyItems;
@@ -324,6 +387,13 @@ export default function ReplenishmentRequest() {
       String(item.createdAt ?? "").includes(search)
     );
   }, [historyItems, historySearch]);
+
+  const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / HISTORY_PAGE_SIZE));
+  const safeHistoryPage = Math.min(historyPage, historyTotalPages - 1);
+  const pagedHistory = filteredHistory.slice(
+    safeHistoryPage * HISTORY_PAGE_SIZE,
+    safeHistoryPage * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
+  );
 
   return (
     <div className="ui-page req-page">
@@ -356,16 +426,14 @@ export default function ReplenishmentRequest() {
               <div className="req-topbar">
                 <div className="ui-field req-department-field">
                   <label className="ui-label">Chọn bộ môn lập dự trù</label>
-                  <select
-                    className="ui-select"
-                    value={selectedDept}
-                    onChange={(e) => setSelectedDept(e.target.value)}
-                  >
-                    <option value="">-- Chọn bộ môn --</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
-                    ))}
-                  </select>
+                  <MaterialSearchInput
+                    value={departmentInput}
+                    onChange={handleDepartmentInputChange}
+                    onSelect={handleSelectDepartment}
+                    items={departmentSearchItems}
+                    placeholder="Gõ để tìm bộ môn..."
+                    emptyText="Không tìm thấy bộ môn"
+                  />
                 </div>
 
                 <div className="req-top-actions">
@@ -511,7 +579,10 @@ export default function ReplenishmentRequest() {
                 <input
                   className="ui-input"
                   value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
+                  onChange={(e) => {
+                    setHistorySearch(e.target.value);
+                    setHistoryPage(0);
+                  }}
                   placeholder="Tìm theo mã phiếu / ngày / bộ môn / trạng thái..."
                 />
               </div>
@@ -540,8 +611,8 @@ export default function ReplenishmentRequest() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredHistory.length > 0 ? (
-                    filteredHistory.map((item) => (
+                  {pagedHistory.length > 0 ? (
+                    pagedHistory.map((item) => (
                       <tr key={item.id}>
                         <td data-label="Mã phiếu">#{item.id}</td>
                         <td data-label="Ngày tạo">{fmtDate(item.createdAt)}</td>
@@ -572,6 +643,38 @@ export default function ReplenishmentRequest() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu dự trù">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setHistoryPage((page) => Math.max(0, page - 1))}
+                disabled={historyLoading || safeHistoryPage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(historyTotalPages, safeHistoryPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeHistoryPage ? "is-active" : ""}`}
+                  onClick={() => setHistoryPage(page)}
+                  disabled={historyLoading || page === safeHistoryPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setHistoryPage((page) => Math.min(historyTotalPages - 1, page + 1))}
+                disabled={historyLoading || safeHistoryPage >= historyTotalPages - 1}
+              >
+                Trang sau
+              </button>
             </div>
           </div>
         )}

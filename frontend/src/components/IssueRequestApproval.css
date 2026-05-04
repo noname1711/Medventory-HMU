@@ -139,6 +139,12 @@
   justify-content: center;
 }
 
+.ira-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .ira-info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -242,6 +248,118 @@
   color: #92400e;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.ira-detail-modal {
+  border-radius: 12px;
+}
+
+.ira-detail-modal .ira-modal-header {
+  margin: 30px 30px 0;
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  text-align: center;
+}
+
+.ira-detail-modal .ira-modal-header h2 {
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.ira-detail-modal .ira-modal-body {
+  padding: 24px 30px 30px;
+}
+
+.ira-detail-modal .ui-section {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.ira-detail-modal .ui-section:first-child {
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 20px;
+}
+
+.ira-detail-modal .ui-section:first-child .ui-section-head {
+  display: none;
+}
+
+.ira-detail-modal .ui-section + .ui-section {
+  margin-top: 22px;
+}
+
+.ira-detail-modal .ui-section-title {
+  margin: 0 0 14px;
+  color: var(--ui-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ira-detail-modal .ira-info-grid {
+  display: block;
+}
+
+.ira-detail-modal .ira-info-item {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 16px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-text);
+  text-align: right;
+}
+
+.ira-detail-modal .ira-info-item:last-child {
+  border-bottom: 0;
+}
+
+.ira-detail-modal .ira-info-item strong {
+  color: var(--ui-text-soft);
+  font-weight: 600;
+  text-align: left;
+}
+
+.ira-detail-modal .ira-summary-grid {
+  gap: 12px;
+}
+
+.ira-detail-modal .ira-summary-card,
+.ira-detail-modal .ira-category-card {
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.ira-detail-modal .ui-table-wrap {
+  max-height: 320px;
+  border-radius: 8px;
+}
+
+.ira-detail-modal .ui-table th {
+  font-size: 0.875rem;
+}
+
+.ira-detail-modal .ui-table td {
+  vertical-align: top;
+}
+
+.ira-detail-modal .ira-modal-footer {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ira-detail-modal .ira-modal-footer.single {
+  justify-content: flex-end;
 }
 
 @media (max-width: 900px) {

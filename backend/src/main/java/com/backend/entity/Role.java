@@ -13,7 +13,7 @@ public class Role {
     private Long id;
 
     @Column(name = "code", nullable = false, unique = true, length = 30)
-    private String code; // 'BGH','LANH_DAO','THU_KHO','CAN_BO'
+    private String code; // 'ADMIN','BGH','LANH_DAO','THU_KHO','CAN_BO'
 
     @Column(name = "name", nullable = false, length = 80)
     private String name;

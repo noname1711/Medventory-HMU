@@ -71,6 +71,10 @@ public class User {
         return role != null && "BGH".equalsIgnoreCase(role.getCode());
     }
 
+    public boolean isAdmin() {
+        return role != null && "ADMIN".equalsIgnoreCase(role.getCode());
+    }
+
     public boolean isLanhDao() {
         return role != null && "LANH_DAO".equalsIgnoreCase(role.getCode());
     }

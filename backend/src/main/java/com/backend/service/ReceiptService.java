@@ -6,7 +6,9 @@ import com.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -324,27 +326,41 @@ public class ReceiptService {
     }
 
     @Transactional(readOnly = true)
-    public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId) {
+    public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId, Integer page) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
             if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
 
-            long cursor = (afterId == null || afterId <= 0) ? Long.MAX_VALUE : afterId;
             int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);
 
+            if (page != null) {
+                int pageNumber = Math.max(0, page);
+                Page<ReceiptHeader> pageResult = receiptHeaderRepository
+                        .findAll(PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
+
+                List<ReceiptFeedItemDTO> items = pageResult.getContent().stream().map(this::toReceiptFeedItemDTO).toList();
+
+                return ReceiptFeedResponseDTO.success(
+                        items.isEmpty() ? "Không có phiếu nhập mới" : "Có phiếu nhập mới",
+                        items,
+                        Map.of(
+                                "currentPage", pageNumber,
+                                "pageSize", size,
+                                "totalPages", pageResult.getTotalPages(),
+                                "totalElements", pageResult.getTotalElements(),
+                                "hasPrevious", pageResult.hasPrevious(),
+                                "hasNext", pageResult.hasNext(),
+                                "count", items.size()
+                        )
+                );
+            }
+
+            long cursor = (afterId == null || afterId <= 0) ? Long.MAX_VALUE : afterId;
             List<ReceiptHeader> headers = receiptHeaderRepository
                     .findByIdLessThanOrderByIdDesc(cursor, PageRequest.of(0, size));
 
-            List<ReceiptFeedItemDTO> items = headers.stream().map(h -> {
-                ReceiptFeedItemDTO x = new ReceiptFeedItemDTO();
-                x.setId(h.getId());
-                x.setReceiptDate(h.getReceiptDate());
-                x.setReceivedFrom(h.getReceivedFrom());
-                x.setReason(h.getReason());
-                x.setTotalAmount(h.getTotalAmount());
-                return x;
-            }).toList();
+            List<ReceiptFeedItemDTO> items = headers.stream().map(this::toReceiptFeedItemDTO).toList();
 
             Long nextCursor = items.isEmpty() ? cursor : items.get(items.size() - 1).getId();
             boolean hasMore = items.size() == size;
@@ -358,5 +374,15 @@ public class ReceiptService {
         } catch (Exception e) {
             return ReceiptFeedResponseDTO.error("Không thể lấy feed phiếu nhập: " + e.getMessage());
         }
+    }
+
+    private ReceiptFeedItemDTO toReceiptFeedItemDTO(ReceiptHeader h) {
+        ReceiptFeedItemDTO x = new ReceiptFeedItemDTO();
+        x.setId(h.getId());
+        x.setReceiptDate(h.getReceiptDate());
+        x.setReceivedFrom(h.getReceivedFrom());
+        x.setReason(h.getReason());
+        x.setTotalAmount(h.getTotalAmount());
+        return x;
     }
 }

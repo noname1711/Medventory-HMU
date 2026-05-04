@@ -16,6 +16,19 @@ public class IssueController {
 
     private final IssueService issueService;
 
+    @GetMapping("/feed")
+    public ResponseEntity<IssueFeedResponseDTO> feed(
+            @RequestParam(value = "afterId", required = false) Long afterId,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestHeader("X-User-Id") Long userId) {
+        try {
+            return ResponseEntity.ok(issueService.feedIssues(afterId, limit, userId, page));
+        } catch (Exception e) {
+            return ResponseEntity.ok(IssueFeedResponseDTO.error("Không thể lấy feed: " + e.getMessage()));
+        }
+    }
+
     // Preview FEFO allocation cho 1 phiếu xin lĩnh đã duyệt
     @GetMapping("/preview")
     public ResponseEntity<IssuePreviewResponseDTO> preview(

@@ -20,6 +20,7 @@ public class RbacService {
     public static final String PERM_ISSUE_CREATE           = "ISSUE.CREATE";
     public static final String PERM_SUPP_FORECAST_CREATE   = "SUPP_FORECAST.CREATE";
     public static final String PERM_SUPP_FORECAST_APPROVE  = "SUPP_FORECAST.APPROVE";
+    public static final String PERM_MATERIAL_VIEW          = "MATERIAL.VIEW";
     public static final String PERM_MATERIAL_MANAGE        = "MATERIAL.MANAGE";
     public static final String PERM_NOTIF_MANAGE           = "NOTIF.MANAGE";
     public static final String PERM_USERS_MANAGE           = "USERS.MANAGE";
@@ -39,10 +40,11 @@ public class RbacService {
 
     // ===== Default mapping =====
     private static final Map<String, List<String>> DEFAULT_ROLE_PERMS = Map.of(
-            "BGH",      List.of("SUPP_FORECAST.APPROVE", "NOTIF.MANAGE", "USERS.MANAGE", "PERMISSIONS.MANAGE"),
-            "LANH_DAO", List.of("ISSUE_REQ.APPROVE", "NOTIF.MANAGE"),
-            "THU_KHO",  List.of("SUPP_FORECAST.CREATE", "RECEIPT.CREATE", "ISSUE.CREATE", "MATERIAL.MANAGE", "NOTIF.MANAGE"),
-            "CAN_BO",   List.of("ISSUE_REQ.CREATE")
+            "ADMIN",    List.of("USERS.MANAGE", "PERMISSIONS.MANAGE"),
+            "BGH",      List.of("MATERIAL.VIEW", "SUPP_FORECAST.APPROVE", "NOTIF.MANAGE"),
+            "LANH_DAO", List.of("MATERIAL.VIEW", "ISSUE_REQ.APPROVE", "NOTIF.MANAGE"),
+            "THU_KHO",  List.of("MATERIAL.VIEW", "SUPP_FORECAST.CREATE", "RECEIPT.CREATE", "ISSUE.CREATE", "MATERIAL.MANAGE", "NOTIF.MANAGE"),
+            "CAN_BO",   List.of("MATERIAL.VIEW", "ISSUE_REQ.CREATE")
     );
 
     // ================= Public helpers for other services =================
@@ -234,8 +236,8 @@ public class RbacService {
         requirePermissionManage(authorizationHeader);
 
         String rc = normRole(roleCode);
-        if ("BGH".equalsIgnoreCase(rc)) {
-            throw new IllegalArgumentException("Không cho phép cập nhật permission của role BGH qua API này.");
+        if ("ADMIN".equalsIgnoreCase(rc)) {
+            throw new IllegalArgumentException("Không cho phép cập nhật permission của role ADMIN qua API này.");
         }
 
         Role role = roleRepository.findByCode(rc)
@@ -274,8 +276,8 @@ public class RbacService {
     @Transactional
     public RolePermissionsResponseDTO resetRolePermissionsToDefault(String authorizationHeader, String roleCode) {
         String rc = normRole(roleCode);
-        if ("BGH".equalsIgnoreCase(rc)) {
-            throw new IllegalArgumentException("Không cho phép reset permission của role BGH qua API này.");
+        if ("ADMIN".equalsIgnoreCase(rc)) {
+            throw new IllegalArgumentException("Không cho phép reset permission của role ADMIN qua API này.");
         }
         List<String> defaults = DEFAULT_ROLE_PERMS.getOrDefault(rc, List.of());
         return replaceRolePermissions(authorizationHeader, rc, defaults);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import DashboardHeader from "./DashboardHeader";
 import DashboardTabs from "./DashboardTabs";
 import EquipmentList from "./EquipmentList";
@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [userInfo, setUserInfo] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState("equipment");
+  const [visibleTabs, setVisibleTabs] = useState([]);
+  const [tabsLoading, setTabsLoading] = useState(true);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("currentUser");
@@ -32,12 +34,19 @@ export default function Dashboard() {
         ...userData,
         role: ROLE_DISPLAY_MAPPING[userData.role] || userData.role,
       });
-      setIsAdmin(userData.isBanGiamHieu === true);
+      setIsAdmin(userData.isAdmin === true);
     } catch {
       setUserInfo(null);
       setIsAdmin(false);
     }
   }, []);
+
+  const handleVisibleTabsChange = useCallback(({ visibleTabs: nextVisibleTabs, loading }) => {
+    setVisibleTabs(nextVisibleTabs || []);
+    setTabsLoading(!!loading);
+  }, []);
+
+  const canRenderActiveTab = !tabsLoading && visibleTabs.includes(activeTab);
 
   return (
     <div className="dashboard-page">
@@ -48,18 +57,20 @@ export default function Dashboard() {
           active={activeTab}
           setActive={setActiveTab}
           isAdmin={isAdmin}
+          onVisibleTabsChange={handleVisibleTabsChange}
         />
 
         <div className="mt-4">
-          {activeTab === "equipment" && <EquipmentList />}
-          {activeTab === "approval" && <IssueRequestApproval />}
-          {activeTab === "create-issue" && <CreateIssueRequest />}
-          {activeTab === "replenish" && <ReplenishmentRequest />}
-          {activeTab === "receipt" && <ReceiptPage />}
-          {activeTab === "issue" && <IssuePage />}
-          {activeTab === "forecast" && userInfo && <ForecastApproval adminInfo={userInfo} />}
-          {activeTab === "admin" && <Admin />}
-          {activeTab === "rbac" && <RBACSection />}
+          {tabsLoading && <div className="ui-empty">Đang đồng bộ quyền...</div>}
+          {canRenderActiveTab && activeTab === "equipment" && <EquipmentList />}
+          {canRenderActiveTab && activeTab === "approval" && <IssueRequestApproval />}
+          {canRenderActiveTab && activeTab === "create-issue" && <CreateIssueRequest />}
+          {canRenderActiveTab && activeTab === "replenish" && <ReplenishmentRequest />}
+          {canRenderActiveTab && activeTab === "receipt" && <ReceiptPage />}
+          {canRenderActiveTab && activeTab === "issue" && <IssuePage />}
+          {canRenderActiveTab && activeTab === "forecast" && userInfo && <ForecastApproval adminInfo={userInfo} />}
+          {canRenderActiveTab && activeTab === "admin" && <Admin />}
+          {canRenderActiveTab && activeTab === "rbac" && <RBACSection />}
         </div>
       </div>
     </div>

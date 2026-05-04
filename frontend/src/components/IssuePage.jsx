@@ -34,6 +34,17 @@ function fmtDate(s) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
 }
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 function fmtDateTime(s) {
   if (!s) return "—";
   const str = String(s).replace("T", " ");
@@ -44,6 +55,19 @@ function fmtDateTime(s) {
 
 function safeStr(s) {
   return s == null ? "" : String(s);
+}
+
+function escapeHtml(value) {
+  return safeStr(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function cleanReceiverName(value) {
+  return safeStr(value).replace(/\s*\(IssueReq#\d+\)\s*$/i, "").trim();
 }
 
 function sumLotDraft(draft) {
@@ -132,14 +156,21 @@ function normalizeIneligibleRow(x) {
 }
 
 export default function IssuePage() {
+  const HISTORY_LIMIT = 20;
+  const ELIGIBLE_PAGE_SIZE = 10;
+  const ELIGIBLE_FETCH_LIMIT = 200;
+
   // -------- Current user (thủ kho) ----------
   const [currentUser, setCurrentUser] = useState(null);
   const [bootError, setBootError] = useState("");
 
+  // -------- Tabs ----------
+  const [activeTab, setActiveTab] = useState("create");
+
   // -------- Filters ----------
   const [departmentSearch, setDepartmentSearch] = useState("");
   const [subDepartmentSearch, setSubDepartmentSearch] = useState("");
-  const [limit, setLimit] = useState("80");
+  const [eligiblePage, setEligiblePage] = useState(0);
 
   // -------- List eligible/ineligible ----------
   const [loadingList, setLoadingList] = useState(false);
@@ -148,6 +179,7 @@ export default function IssuePage() {
   const [ineligible, setIneligible] = useState([]);
   const [summary, setSummary] = useState(null);
   const [showIneligible, setShowIneligible] = useState(false);
+  const [ineligiblePage, setIneligiblePage] = useState(0);
 
   // -------- Selected request & preview ----------
   const [selected, setSelected] = useState(null);
@@ -173,6 +205,14 @@ export default function IssuePage() {
   // -------- Issue detail ----------
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [issueDetail, setIssueDetail] = useState(null);
+
+  // -------- Issue history ----------
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyErr, setHistoryErr] = useState("");
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historySearch, setHistorySearch] = useState("");
 
   // -------- Manual lot modal ----------
   const [modalOpen, setModalOpen] = useState(false);
@@ -262,8 +302,7 @@ export default function IssuePage() {
 
     try {
       const params = new URLSearchParams();
-      const lim = Number(limit);
-      params.set("limit", Number.isFinite(lim) && lim > 0 ? String(lim) : "80");
+      params.set("limit", String(ELIGIBLE_FETCH_LIMIT));
 
       // ưu tiên endpoint có reasons
       const url = `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`;
@@ -281,6 +320,9 @@ export default function IssuePage() {
 
       setEligible(norm.eligible);
       setIneligible(norm.ineligible);
+      if (!norm.ineligible.length) setShowIneligible(false);
+      setEligiblePage(0);
+      setIneligiblePage(0);
       setSummary(norm.summary);
 
       setListMsg({
@@ -377,6 +419,13 @@ export default function IssuePage() {
       return true;
     });
   }, [eligible, departmentSearch, subDepartmentSearch]);
+
+  const eligibleTotalPages = Math.max(1, Math.ceil(filteredEligible.length / ELIGIBLE_PAGE_SIZE));
+  const safeEligiblePage = Math.min(eligiblePage, eligibleTotalPages - 1);
+  const pagedEligible = filteredEligible.slice(
+    safeEligiblePage * ELIGIBLE_PAGE_SIZE,
+    safeEligiblePage * ELIGIBLE_PAGE_SIZE + ELIGIBLE_PAGE_SIZE
+  );
 
   const previewLines = useMemo(() => {
     const lines = previewData?.lines || [];
@@ -554,6 +603,156 @@ export default function IssuePage() {
     }
   };
 
+  function normalizeHistoryFeed(data) {
+    const list =
+      (Array.isArray(data?.items) && data.items) ||
+      (Array.isArray(data?.content) && data.content) ||
+      (Array.isArray(data?.data) && data.data) ||
+      (Array.isArray(data) && data) ||
+      [];
+
+    const summary = data?.summary || {};
+    const currentPage = Number(summary?.currentPage ?? data?.currentPage ?? 0);
+    const totalPages = Math.max(1, Number(summary?.totalPages ?? data?.totalPages ?? 1));
+
+    return { list, currentPage, totalPages };
+  }
+
+  async function loadHistory(page = 0) {
+    if (!currentUser?.id) return;
+
+    setHistoryErr("");
+    setHistoryLoading(true);
+
+    try {
+      const nextPage = Math.max(0, Number(page) || 0);
+      const qs = new URLSearchParams();
+      qs.set("limit", String(HISTORY_LIMIT));
+      qs.set("page", String(nextPage));
+
+      const { ok, status, data } = await fetchJson(`${API_ENDPOINTS.ISSUES}/feed?${qs.toString()}`, {
+        headers: authHeaders,
+      });
+
+      if (!ok || data?.success !== true) {
+        throw new Error(data?.message || `HTTP ${status}`);
+      }
+
+      const { list, currentPage, totalPages } = normalizeHistoryFeed(data);
+      setHistoryItems(list);
+      setHistoryPage(currentPage);
+      setHistoryTotalPages(totalPages);
+    } catch (error) {
+      setHistoryErr(error?.message || "Không thể tải lịch sử phiếu xuất");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function openIssueDetail(issueId) {
+    if (!issueId) return;
+
+    try {
+      const { ok, status, data } = await fetchJson(`${API_ENDPOINTS.ISSUES}/${issueId}/detail`, {
+        headers: authHeaders,
+      });
+
+      if (!ok || !data?.success) {
+        throw new Error(data?.message || `HTTP ${status}`);
+      }
+
+      const headerObj = data?.header || {};
+      const details = Array.isArray(data?.details) ? data.details : [];
+      const headerId = headerObj?.id ?? issueId;
+      const receiver = cleanReceiverName(headerObj?.receiverName);
+
+      const rowsHtml = details
+        .map((detail, index) => {
+          const qty = detail?.qtyIssued ?? 0;
+          const price = detail?.unitPrice ?? 0;
+          const total = detail?.total ?? Number(qty) * Number(price);
+
+          return `
+            <tr>
+              <td class="text-center">${index + 1}</td>
+              <td>${escapeHtml(detail?.name || "")}</td>
+              <td>${escapeHtml(detail?.code || "")}</td>
+              <td>${escapeHtml(detail?.unitName || "")}</td>
+              <td class="text-right">${escapeHtml(qtyFmt.format(toNumber(qty)))}</td>
+              <td class="text-right">${escapeHtml(moneyFmt.format(toNumber(price)))}</td>
+              <td class="text-right">${escapeHtml(moneyFmt.format(toNumber(total)))}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      const html = `
+        <div class="ui-history-detail">
+          <div class="ui-history-detail-head">Chi tiết Phiếu Xuất #${escapeHtml(headerId)}</div>
+          <div class="ui-history-detail-body">
+            <div class="ui-history-info">
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Mã phiếu xuất:</div>
+                <div class="ui-history-info-value">#${escapeHtml(headerId)}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Ngày xuất:</div>
+                <div class="ui-history-info-value">${escapeHtml(fmtDate(headerObj?.issueDate))}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Khoa / Phòng:</div>
+                <div class="ui-history-info-value">${escapeHtml(headerObj?.departmentName || "—")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Người nhận:</div>
+                <div class="ui-history-info-value">${escapeHtml(receiver || "—")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Tổng tiền:</div>
+                <div class="ui-history-info-value">${escapeHtml(moneyFmt.format(toNumber(headerObj?.totalAmount)))}</div>
+              </div>
+            </div>
+
+            <h4 class="ui-history-detail-section-title">Danh sách vật tư (${details.length} vật tư)</h4>
+            <div class="ui-history-table-wrap">
+              <table class="ui-history-table">
+                <thead>
+                  <tr>
+                    <th>TT</th>
+                    <th>Tên vật tư</th>
+                    <th>Mã code</th>
+                    <th>Đơn vị tính</th>
+                    <th class="text-right">SL xuất</th>
+                    <th class="text-right">Đơn giá</th>
+                    <th class="text-right">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml || '<tr><td colspan="7" class="text-center">Không có vật tư</td></tr>'}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      await Swal.fire({
+        html,
+        width: 960,
+        customClass: {
+          popup: "ui-history-detail-popup",
+          confirmButton: "ui-btn ui-btn-secondary",
+        },
+        confirmButtonText: "Đóng",
+      });
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Không thể tải chi tiết",
+        text: error?.message || "Có lỗi xảy ra",
+        confirmButtonText: "OK",
+      });
+    }
+  }
+
   const createIssue = async () => {
     if (!currentUser?.id) return;
 
@@ -601,6 +800,7 @@ export default function IssuePage() {
 
       await loadEligibleList();
       if (issueId) await loadIssueDetail(issueId);
+      if (historyItems.length > 0) await loadHistory(historyPage);
     } catch {
       setCreateMsg({ type: "error", text: "Lỗi khi tạo phiếu xuất." });
     } finally {
@@ -614,6 +814,46 @@ export default function IssuePage() {
     const total = sumLotDraft(saved.lots);
     return { ok: total > 0, total };
   };
+
+  useEffect(() => {
+    if (activeTab === "history" && currentUser?.id && historyItems.length === 0 && !historyLoading) {
+      loadHistory(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentUser?.id]);
+
+  const filteredHistory = useMemo(() => {
+    const search = String(historySearch || "").trim().toLowerCase();
+    if (!search) return historyItems;
+
+    return historyItems.filter((item) => {
+      const id = String(item?.id ?? "").toLowerCase();
+      const issueReqId = String(item?.issueReqId ?? "").toLowerCase();
+      const receiver = cleanReceiverName(item?.receiverName).toLowerCase();
+      const dept = String(item?.departmentName ?? "").toLowerCase();
+      const subDept = String(item?.subDepartmentName ?? "").toLowerCase();
+      const creator = String(item?.createdByName ?? "").toLowerCase();
+      const date = String(item?.issueDate ?? "").toLowerCase();
+      return (
+        id.includes(search) ||
+        issueReqId.includes(search) ||
+        receiver.includes(search) ||
+        dept.includes(search) ||
+        subDept.includes(search) ||
+        creator.includes(search) ||
+        date.includes(search)
+      );
+    });
+  }, [historyItems, historySearch]);
+
+  const ineligibleCount = Number(summary?.ineligible ?? ineligible.length);
+  const hasIneligible = ineligibleCount > 0;
+  const ineligibleTotalPages = Math.max(1, Math.ceil(ineligible.length / ELIGIBLE_PAGE_SIZE));
+  const safeIneligiblePage = Math.min(ineligiblePage, ineligibleTotalPages - 1);
+  const pagedIneligible = ineligible.slice(
+    safeIneligiblePage * ELIGIBLE_PAGE_SIZE,
+    safeIneligiblePage * ELIGIBLE_PAGE_SIZE + ELIGIBLE_PAGE_SIZE
+  );
 
   if (bootError) {
     return (
@@ -637,12 +877,29 @@ export default function IssuePage() {
           <div>
             <h1 className="ui-page-title">Xuất kho</h1>
           </div>
+
+          <div className="ui-tabs" style={{ marginBottom: 0 }}>
+            <button
+              type="button"
+              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("create")}
+            >
+              Tạo phiếu xuất
+            </button>
+            <button
+              type="button"
+              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("history")}
+            >
+              Lịch sử phiếu xuất
+            </button>
+          </div>
         </div>
 
         <div className="issue-stack">
-
+          {activeTab === "create" ? (
+            <div className="ui-section">
       {/* DANH SÁCH PHIẾU ĐỦ ĐIỀU KIỆN */}
-      <div className="ui-section">
         <div className="ui-section-head">
           <h2 className="ui-section-title">Phiếu xin lĩnh đủ điều kiện xuất</h2>
           <div className="issue-inline-actions">
@@ -656,33 +913,16 @@ export default function IssuePage() {
           <div className={`ui-alert ${listMsg.type === "error" ? "is-error" : "is-success"}`}>{listMsg.text}</div>
         ) : null}
 
-        {summary ? (
-          <div className="issue-summary-grid">
-            <div className="ui-stat-card is-success">
-              <p className="ui-stat-label">Đã kiểm tra</p>
-              <p className="ui-stat-value">{summary.checked ?? "-"}</p>
-              <p className="ui-stat-note">Tổng phiếu đã xét</p>
-            </div>
-            <div className="ui-stat-card is-primary">
-              <p className="ui-stat-label">Đủ điều kiện</p>
-              <p className="ui-stat-value">{summary.eligible ?? eligible.length}</p>
-              <p className="ui-stat-note">Sẵn sàng xuất kho</p>
-            </div>
-            <div className="ui-stat-card is-warning">
-              <p className="ui-stat-label">Không đủ điều kiện</p>
-              <p className="ui-stat-value">{summary.ineligible ?? ineligible.length}</p>
-              <p className="ui-stat-note">Cần xử lý trước</p>
-            </div>
-          </div>
-        ) : null}
-
         <div className="issue-filter-grid">
           <div className="ui-field">
             <label className="ui-label">Khoa / Phòng</label>
             <input
               className="ui-input"
               value={departmentSearch}
-              onChange={(e) => setDepartmentSearch(e.target.value)}
+              onChange={(e) => {
+                setDepartmentSearch(e.target.value);
+                setEligiblePage(0);
+              }}
               placeholder="Tìm theo tên khoa..."
             />
           </div>
@@ -692,40 +932,33 @@ export default function IssuePage() {
             <input
               className="ui-input"
               value={subDepartmentSearch}
-              onChange={(e) => setSubDepartmentSearch(e.target.value)}
+              onChange={(e) => {
+                setSubDepartmentSearch(e.target.value);
+                setEligiblePage(0);
+              }}
               placeholder="Tìm theo tên bộ môn..."
-            />
-          </div>
-
-          <div className="ui-field">
-            <label className="ui-label">Số phiếu hiển thị</label>
-            <input
-              className="ui-input"
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-              placeholder="80"
             />
           </div>
         </div>
 
-        <div className="ui-table-wrap">
-          <table className="ui-table issue-table">
-            <thead>
-              <tr>
-                <th style={{ width: 90 }}>Mã phiếu</th>
-                <th style={{ minWidth: 220 }}>Bộ môn / Đơn vị</th>
-                <th style={{ minWidth: 220 }}>Khoa / Phòng</th>
-                <th style={{ minWidth: 190 }}>Người tạo</th>
-                <th style={{ minWidth: 190 }}>Ngày gửi</th>
-                <th style={{ minWidth: 320 }}>Ghi chú</th>
-                <th style={{ width: 150 }} className="text-right">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEligible.length ? (
-                filteredEligible.map((r) => (
+        {pagedEligible.length ? (
+          <div className="ui-table-wrap">
+            <table className="ui-table issue-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 90 }}>Mã phiếu</th>
+                  <th style={{ minWidth: 220 }}>Bộ môn / Đơn vị</th>
+                  <th style={{ minWidth: 220 }}>Khoa / Phòng</th>
+                  <th style={{ minWidth: 190 }}>Người tạo</th>
+                  <th style={{ minWidth: 190 }}>Ngày gửi</th>
+                  <th style={{ minWidth: 320 }}>Ghi chú</th>
+                  <th style={{ width: 150 }} className="text-right">
+                    Thao tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedEligible.map((r) => (
                   <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
                     <td data-label="Mã phiếu" className="issue-mono">{r.id}</td>
                     <td data-label="Bộ môn / Đơn vị">{r.subDepartmentName || "-"}</td>
@@ -743,27 +976,62 @@ export default function IssuePage() {
                       </button>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="ui-empty">
-                    {eligible.length === 0
-                      ? "Không có phiếu đủ điều kiện."
-                      : "Không có phiếu khớp với bộ lọc tên."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="issue-empty-panel">
+            <h3>{eligible.length === 0 ? "Không có phiếu sẵn sàng xuất kho" : "Không có phiếu khớp bộ lọc"}</h3>
+            <p>
+              {eligible.length === 0
+                ? "Các phiếu đã xét hiện đều đã xuất kho hoặc chưa đủ điều kiện nghiệp vụ để đưa vào danh sách xuất."
+                : "Thử đổi bộ lọc khoa/phòng hoặc bộ môn để xem phiếu khác."}
+            </p>
+          </div>
+        )}
 
-        <div className="issue-toggle-row">
-          <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => setShowIneligible((p) => !p)}>
-            {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
+        <div className="ui-pagination" aria-label="Phân trang phiếu đủ điều kiện xuất">
+          <button
+            type="button"
+            className="ui-pagination-btn"
+            onClick={() => setEligiblePage((page) => Math.max(0, page - 1))}
+            disabled={loadingList || safeEligiblePage <= 0}
+          >
+            Trang trước
+          </button>
+
+          {visiblePageNumbers(eligibleTotalPages, safeEligiblePage).map((page) => (
+            <button
+              key={page}
+              type="button"
+              className={`ui-pagination-btn ${page === safeEligiblePage ? "is-active" : ""}`}
+              onClick={() => setEligiblePage(page)}
+              disabled={loadingList || page === safeEligiblePage}
+            >
+              {page + 1}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="ui-pagination-btn"
+            onClick={() => setEligiblePage((page) => Math.min(eligibleTotalPages - 1, page + 1))}
+            disabled={loadingList || safeEligiblePage >= eligibleTotalPages - 1}
+          >
+            Trang sau
           </button>
         </div>
 
-        {showIneligible ? (
+        {hasIneligible ? (
+          <div className="issue-toggle-row">
+            <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => setShowIneligible((p) => !p)}>
+              {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
+            </button>
+          </div>
+        ) : null}
+
+        {hasIneligible && showIneligible ? (
           <div className="issue-collapse-box">
             <div className="issue-collapse-title">Phiếu không đủ điều kiện (tóm tắt lý do)</div>
             <div className="ui-table-wrap">
@@ -776,35 +1044,182 @@ export default function IssuePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ineligible?.length ? (
-                    ineligible.map((raw, idx) => {
-                      const x = normalizeIneligibleRow(raw);
-                      const reasonText = vnReason(x.reasonCode);
-                      return (
-                        <tr key={`${x.reqId}-${idx}`}>
-                          <td data-label="Mã phiếu" className="issue-mono">{x.reqId}</td>
-                          <td data-label="Ngày gửi" className="issue-mono">{fmtDateTime(x.requestedAt)}</td>
-                          <td data-label="Lý do" className="issue-muted">
-                            {reasonText}
-                            {x.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="ui-empty">
-                        Không có dữ liệu.
-                      </td>
-                    </tr>
-                  )}
+                  {pagedIneligible.map((raw, idx) => {
+                    const x = normalizeIneligibleRow(raw);
+                    const reasonText = vnReason(x.reasonCode);
+                    const rowIndex = safeIneligiblePage * ELIGIBLE_PAGE_SIZE + idx;
+                    return (
+                      <tr key={`${x.reqId}-${rowIndex}`}>
+                        <td data-label="Mã phiếu" className="issue-mono">{x.reqId}</td>
+                        <td data-label="Ngày gửi" className="issue-mono">{fmtDateTime(x.requestedAt)}</td>
+                        <td data-label="Lý do" className="issue-muted">
+                          {reasonText}
+                          {x.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+            <div className="ui-pagination" aria-label="Phân trang phiếu không đủ điều kiện">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setIneligiblePage((page) => Math.max(0, page - 1))}
+                disabled={loadingList || safeIneligiblePage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(ineligibleTotalPages, safeIneligiblePage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeIneligiblePage ? "is-active" : ""}`}
+                  onClick={() => setIneligiblePage(page)}
+                  disabled={loadingList || page === safeIneligiblePage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setIneligiblePage((page) => Math.min(ineligibleTotalPages - 1, page + 1))}
+                disabled={loadingList || safeIneligiblePage >= ineligibleTotalPages - 1}
+              >
+                Trang sau
+              </button>
+            </div>
           </div>
         ) : null}
-      </div>
+            </div>
+          ) : (
+            <div className="ui-section">
+              <div className="ui-section-head">
+                <div>
+                  <h2 className="ui-section-title">Lịch sử phiếu xuất kho</h2>
+                </div>
+              </div>
 
+              <div className="issue-history-toolbar">
+                <div className="issue-history-search">
+                  <input
+                    className="ui-input"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    placeholder="Tìm theo mã phiếu / phiếu xin lĩnh / khoa / bộ môn / người nhận..."
+                  />
+                </div>
+
+                <div className="issue-actions">
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-secondary"
+                    onClick={() => loadHistory(historyPage)}
+                    disabled={historyLoading}
+                  >
+                    Tải lại
+                  </button>
+                </div>
+              </div>
+
+              {historyErr ? <div className="ui-alert is-error">{historyErr}</div> : null}
+
+              <div className="ui-table-wrap">
+                <table className="ui-table issue-table">
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: 110 }}>Mã phiếu</th>
+                      <th style={{ minWidth: 130 }}>Phiếu xin lĩnh</th>
+                      <th style={{ minWidth: 140 }}>Ngày xuất</th>
+                      <th style={{ minWidth: 220 }}>Khoa / Phòng</th>
+                      <th style={{ minWidth: 220 }}>Bộ môn</th>
+                      <th style={{ minWidth: 220 }}>Người nhận</th>
+                      <th style={{ minWidth: 140 }} className="text-right">Tổng tiền</th>
+                      <th style={{ width: 120 }} className="text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredHistory.length > 0 ? (
+                      filteredHistory.map((item) => {
+                        const id = item?.id;
+                        const issueReqId = item?.issueReqId;
+                        const receiver = cleanReceiverName(item?.receiverName);
+
+                        return (
+                          <tr key={id ?? `${item?.issueDate}-${item?.receiverName}`}>
+                            <td data-label="Mã phiếu" className="issue-mono">#{id}</td>
+                            <td data-label="Phiếu xin lĩnh" className="issue-mono">
+                              {issueReqId ? `#${issueReqId}` : "-"}
+                            </td>
+                            <td data-label="Ngày xuất" className="issue-mono">{fmtDate(item?.issueDate)}</td>
+                            <td data-label="Khoa / Phòng">{item?.departmentName || "-"}</td>
+                            <td data-label="Bộ môn">{item?.subDepartmentName || "-"}</td>
+                            <td data-label="Người nhận">{receiver || "-"}</td>
+                            <td className="text-right issue-mono" data-label="Tổng tiền">
+                              {moneyFmt.format(toNumber(item?.totalAmount))}
+                            </td>
+                            <td className="text-center">
+                              <button
+                                type="button"
+                                className="ui-btn ui-btn-secondary ui-btn-sm"
+                                onClick={() => openIssueDetail(id)}
+                                disabled={!id}
+                              >
+                                Xem
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="ui-empty">
+                          {historyLoading ? "Đang tải..." : "Chưa có phiếu xuất"}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu xuất">
+                <button
+                  type="button"
+                  className="ui-pagination-btn"
+                  onClick={() => loadHistory(historyPage - 1)}
+                  disabled={historyLoading || historyPage <= 0}
+                >
+                  Trang trước
+                </button>
+
+                {visiblePageNumbers(historyTotalPages, historyPage).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    className={`ui-pagination-btn ${page === historyPage ? "is-active" : ""}`}
+                    onClick={() => loadHistory(page)}
+                    disabled={historyLoading || page === historyPage}
+                  >
+                    {page + 1}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  className="ui-pagination-btn"
+                  onClick={() => loadHistory(historyPage + 1)}
+                  disabled={historyLoading || historyPage >= historyTotalPages - 1}
+                >
+                  Trang sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1041,7 +1456,7 @@ export default function IssuePage() {
                             </div>
                             <div className="issue-request-item">
                               <div className="issue-request-label">Người nhận</div>
-                              <div className="issue-request-value">{issueDetail?.header?.receiverName || "-"}</div>
+                              <div className="issue-request-value">{cleanReceiverName(issueDetail?.header?.receiverName) || "-"}</div>
                             </div>
                             <div className="issue-request-item">
                               <div className="issue-request-label">Tổng tiền</div>

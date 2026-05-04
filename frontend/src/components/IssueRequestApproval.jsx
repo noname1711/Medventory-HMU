@@ -20,7 +20,19 @@ function fmtDateTime(s) {
   return fmtDate(s);
 }
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function IssueRequestApproval() {
+  const PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRequests, setPendingRequests] = useState([]);
   const [processedRequests, setProcessedRequests] = useState([]);
@@ -32,6 +44,7 @@ export default function IssueRequestApproval() {
   const [currentAction, setCurrentAction] = useState("");
   const [initialLoad, setInitialLoad] = useState(true);
   const [categories, setCategories] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -242,7 +255,12 @@ export default function IssueRequestApproval() {
 
   const openApprovalModal = (action, request) => {
     setCurrentAction(action);
-    setSelectedRequest({ header: request });
+    setSelectedRequest((current) => {
+      if (current?.header?.id === request?.id && Array.isArray(current?.details)) {
+        return current;
+      }
+      return { header: request };
+    });
     setShowApprovalModal(true);
     setApprovalNote("");
   };
@@ -329,6 +347,14 @@ export default function IssueRequestApproval() {
     return "is-info";
   };
 
+  const canActOnRequest = (request) => {
+    const badge = String(request?.statusBadge || "").toLowerCase();
+    const name = String(request?.statusName || "").toLowerCase();
+    const status = Number(request?.status);
+
+    return activeTab === "pending" && (badge.includes("pending") || name.includes("chờ") || status === 0);
+  };
+
   useEffect(() => {
     checkAccessAndLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,6 +370,12 @@ export default function IssueRequestApproval() {
 
   const currentRequests = activeTab === "pending" ? pendingRequests : processedRequests;
   const currentTabLoading = isLoading && initialLoad;
+  const totalPages = Math.max(1, Math.ceil(currentRequests.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1);
+  const pagedRequests = currentRequests.slice(
+    safeCurrentPage * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
+  );
 
   const summary = useMemo(
     () => ({
@@ -408,10 +440,22 @@ export default function IssueRequestApproval() {
 
         <div className="ui-section">
           <div className="ui-tabs">
-            <button className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`} onClick={() => setActiveTab("pending")}>
+            <button
+              className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`}
+              onClick={() => {
+                setActiveTab("pending");
+                setCurrentPage(0);
+              }}
+            >
               Chờ phê duyệt ({pendingRequests.length})
             </button>
-            <button className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`} onClick={() => setActiveTab("history")}>
+            <button
+              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              onClick={() => {
+                setActiveTab("history");
+                setCurrentPage(0);
+              }}
+            >
               Lịch sử ({processedRequests.length})
             </button>
           </div>
@@ -440,7 +484,7 @@ export default function IssueRequestApproval() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentRequests.map((request) => (
+                  {pagedRequests.map((request) => (
                     <tr key={request.id}>
                       <td className="ira-cell-id" data-label="Mã phiếu">#{request.id}</td>
                       <td data-label="Người gửi">{request.createdByName}</td>
@@ -457,16 +501,6 @@ export default function IssueRequestApproval() {
                           <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => fetchRequestDetail(request.id)}>
                             Xem
                           </button>
-                          {activeTab === "pending" && (
-                            <>
-                              <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => openApprovalModal("approve", request)}>
-                                Duyệt
-                              </button>
-                              <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => openApprovalModal("reject", request)}>
-                                Từ chối
-                              </button>
-                            </>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -475,6 +509,40 @@ export default function IssueRequestApproval() {
               </table>
             </div>
           )}
+
+          {!currentTabLoading && currentRequests.length > 0 ? (
+            <div className="ui-pagination" aria-label="Phân trang phê duyệt phiếu xin lĩnh">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                disabled={safeCurrentPage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
+                  onClick={() => setCurrentPage(page)}
+                  disabled={page === safeCurrentPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
+                disabled={safeCurrentPage >= totalPages - 1}
+              >
+                Trang sau
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -596,7 +664,23 @@ export default function IssueRequestApproval() {
                   </div>
                 </div>
 
-                <div className="ira-modal-footer single">
+                <div className={`ira-modal-footer ${canActOnRequest(selectedRequest.header) ? "" : "single"}`}>
+                  {canActOnRequest(selectedRequest.header) && (
+                    <div className="ira-detail-actions">
+                      <button
+                        className="ui-btn ui-btn-primary"
+                        onClick={() => openApprovalModal("approve", selectedRequest.header)}
+                      >
+                        Duyệt
+                      </button>
+                      <button
+                        className="ui-btn ui-btn-danger"
+                        onClick={() => openApprovalModal("reject", selectedRequest.header)}
+                      >
+                        Từ chối
+                      </button>
+                    </div>
+                  )}
                   <button className="ui-btn ui-btn-secondary" onClick={() => setSelectedRequest(null)}>
                     Đóng
                   </button>
