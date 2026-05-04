@@ -70,29 +70,48 @@ Hệ thống hỗ trợ quản lý nghiệp vụ vật tư y tế:
 
 ```txt
 Medventory-HMU/
-├── backend/                 # Spring Boot REST API
-│   ├── src/main/java/com/backend/
-│   │   ├── config/          # Cấu hình CORS
-│   │   ├── controller/      # REST controllers
-│   │   ├── service/         # Xử lý nghiệp vụ
-│   │   ├── repository/      # Giao tiếp database qua JPA
-│   │   ├── entity/          # Entity ánh xạ bảng database
-│   │   └── dto/             # Request/response DTO
-│   ├── src/main/resources/
-│   │   └── application.properties
-│   └── pom.xml
-├── frontend/                # React/Vite SPA
+├── backend/                         # Spring Boot REST API
 │   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/backend/
+│   │   │   │   ├── config/          # Cấu hình CORS
+│   │   │   │   ├── controller/      # REST controllers
+│   │   │   │   ├── dto/             # Request/response DTO
+│   │   │   │   ├── entity/          # Entity ánh xạ bảng database
+│   │   │   │   ├── repository/      # Giao tiếp database qua JPA
+│   │   │   │   ├── service/         # Xử lý nghiệp vụ
+│   │   │   │   └── BackendApplication.java
+│   │   │   └── resources/
+│   │   │       └── application.properties
+│   │   └── test/
+│   │       ├── java/com/backend/
+│   │       │   ├── controller/      # AdminControllerTests
+│   │       │   └── BackendApplicationTests.java
+│   │       └── resources/
+│   │           └── application.properties
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── frontend/                        # React/Vite SPA
+│   ├── src/
+│   │   ├── components/              # Tất cả các component React
+│   │   ├── assets/
 │   │   ├── App.jsx
+│   │   ├── App.css
 │   │   ├── main.jsx
-│   │   └── components/
+│   │   └── index.css
 │   ├── public/
+│   ├── index.html
 │   ├── package.json
-│   └── vite.config.js
-├── database/                # SQL khởi tạo database
-│   ├── final_database.sql
-│   └── README.md
-└── report/                  # Báo cáo và slide
+│   ├── vite.config.js
+│   └── eslint.config.js
+├── database/                        # SQL khởi tạo database
+│   └── final_database.sql
+├── report/                          # Báo cáo và slide
+│   ├── BCCK.pdf
+│   ├── BCCK.pptx
+│   └── SETUP.pdf
+└── README.md
 ```
 
 ## Yêu cầu môi trường
