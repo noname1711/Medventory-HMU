@@ -849,7 +849,7 @@ export default function RBACSection({ adminInfo }) {
     return (
       <label
         key={code}
-        className={`rbac-perm-card ${checked ? "is-checked" : ""} ${isSpecial ? "is-special" : ""}`}
+        className={`ui-card rbac-perm-card ${checked ? "is-checked" : ""} ${isSpecial ? "is-special" : ""}`}
       >
         <div className="rbac-perm-card-top">
           <input
@@ -874,7 +874,7 @@ export default function RBACSection({ adminInfo }) {
   const renderRoleTab = () => {
     return (
       <div className="rbac-panel-body">
-        <div className="rbac-info-row">
+        <div className="ui-history-info rbac-info-row">
           <span>
             <span className="rbac-info-label">Role:</span>{" "}
             {selectedRoleCode
@@ -1034,7 +1034,7 @@ export default function RBACSection({ adminInfo }) {
   const renderUserTab = () => {
     return (
       <div className="rbac-panel-body">
-        <div className="rbac-info-row">
+        <div className="ui-history-info rbac-info-row">
           <span>
             <span className="rbac-info-label">User:</span>{" "}
             {selectedUserInfo?.fullName

@@ -665,9 +665,15 @@ export default function ReceiptPage() {
               </div>
             </div>
 
-            <h4 class="ui-history-detail-section-title">Danh sách vật tư (${Array.isArray(details) ? details.length : 0} vật tư)</h4>
-            <div class="ui-history-table-wrap">
-              <table class="ui-history-table">
+            <div class="ui-section">
+              <div class="ui-section-head">
+                <div>
+                  <h3 class="ui-section-title">Danh sách vật tư</h3>
+                  <p class="ui-section-subtitle">${Array.isArray(details) ? details.length : 0} vật tư</p>
+                </div>
+              </div>
+              <div class="ui-table-wrap">
+                <table class="ui-table">
                 <thead>
                   <tr>
                     <th>TT</th>
@@ -680,8 +686,9 @@ export default function ReceiptPage() {
                     <th class="text-right">Thành tiền</th>
                   </tr>
                 </thead>
-                <tbody>${rowsHtml || '<tr><td colspan="8" class="text-center">Không có vật tư</td></tr>'}</tbody>
-              </table>
+                  <tbody>${rowsHtml || '<tr><td colspan="8" class="text-center">Không có vật tư</td></tr>'}</tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

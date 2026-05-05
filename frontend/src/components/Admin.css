@@ -28,20 +28,6 @@
 }
 
 
-.admin-count-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 0.92rem;
-  font-weight: 800;
-}
-
-
 .admin-table-wrap {
   background: #ffffff;
 }
@@ -114,31 +100,8 @@
   gap: 18px;
 }
 
-.admin-modal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.admin-info-box {
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fafcff;
-}
-
-.admin-info-label {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #6b7280;
-}
-
-.admin-info-value {
-  margin-top: 6px;
-  color: #111827;
-  font-size: 0.95rem;
-  font-weight: 800;
-  line-height: 1.45;
+.admin-modal-info {
+  margin-bottom: 0;
 }
 
 .admin-modal-danger-actions {
@@ -159,10 +122,6 @@
 }
 
 @media (max-width: 768px) {
-  .admin-modal-grid {
-    grid-template-columns: 1fr;
-  }
-
   .admin-modal-header,
   .admin-modal-footer {
     flex-direction: column;

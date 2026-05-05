@@ -411,7 +411,7 @@ export default function Admin() {
               <div>
                 <h2 className="ui-section-title">Danh sách tài khoản</h2>
               </div>
-              <div className="admin-count-chip">{filteredUsers.length} tài khoản</div>
+              <div className="ui-status-badge is-info">{filteredUsers.length} tài khoản</div>
             </div>
 
             <div className="ui-tabs">
@@ -540,22 +540,22 @@ export default function Admin() {
             </div>
 
             <div className="ui-modal-body admin-modal-content">
-              <div className="admin-modal-grid">
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Họ tên</div>
-                  <div className="admin-info-value">{editingUser.fullName}</div>
+              <div className="ui-history-info admin-modal-info">
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Họ tên</div>
+                  <div className="ui-history-info-value">{editingUser.fullName}</div>
                 </div>
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Email</div>
-                  <div className="admin-info-value">{editingUser.email}</div>
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Email</div>
+                  <div className="ui-history-info-value">{editingUser.email}</div>
                 </div>
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Phòng ban</div>
-                  <div className="admin-info-value">{editingUser.department}</div>
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Phòng ban</div>
+                  <div className="ui-history-info-value">{editingUser.department}</div>
                 </div>
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Vai trò hiện tại</div>
-                  <div className="admin-info-value">{editingUser.role}</div>
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Vai trò hiện tại</div>
+                  <div className="ui-history-info-value">{editingUser.role}</div>
                 </div>
               </div>
 

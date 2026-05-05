@@ -563,60 +563,59 @@ export default function IssueRequestApproval() {
                       <h3 className="ui-section-title">Thông tin chung</h3>
                     </div>
                   </div>
-                  <div className="ira-info-grid">
-                    <div className="ira-info-item"><strong>Người gửi:</strong> {selectedRequest.header.createdByName}</div>
-                    <div className="ira-info-item"><strong>Email:</strong> {selectedRequest.header.createdByEmail}</div>
-                    <div className="ira-info-item"><strong>Đơn vị:</strong> {selectedRequest.header.departmentName}</div>
-                    <div className="ira-info-item"><strong>Bộ môn:</strong> {selectedRequest.header.departmentName}</div>
-                    <div className="ira-info-item"><strong>Thời gian:</strong> {fmtDateTime(selectedRequest.header.requestedAt)}</div>
-                    <div className="ira-info-item">
-                      <strong>Trạng thái:</strong> <span className={`ui-status-badge ${getStatusUiClass(selectedRequest.header)}`}>{selectedRequest.header.statusName}</span>
+                  <div className="ui-detail-info-grid">
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Người gửi</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.createdByName}</span>
                     </div>
-                    {selectedRequest.header.approvalByName && <div className="ira-info-item"><strong>Người phê duyệt:</strong> {selectedRequest.header.approvalByName}</div>}
-                    {selectedRequest.header.approvalAt && (
-                      <div className="ira-info-item"><strong>Thời gian phê duyệt:</strong> {fmtDateTime(selectedRequest.header.approvalAt)}</div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Email</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.createdByEmail}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Đơn vị</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.departmentName}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Bộ môn</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.departmentName}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Thời gian</span>
+                      <span className="ui-detail-info-value">{fmtDateTime(selectedRequest.header.requestedAt)}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Trạng thái</span>
+                      <span className="ui-detail-info-value">
+                        <span className={`ui-status-badge ${getStatusUiClass(selectedRequest.header)}`}>{selectedRequest.header.statusName}</span>
+                      </span>
+                    </div>
+                    {selectedRequest.header.approvalByName && (
+                      <div className="ui-detail-info-item">
+                        <span className="ui-detail-info-label">Người phê duyệt</span>
+                        <span className="ui-detail-info-value">{selectedRequest.header.approvalByName}</span>
+                      </div>
                     )}
-                    {selectedRequest.header.approvalNote && <div className="ira-info-item ira-info-item-full"><strong>Ghi chú phê duyệt:</strong> {selectedRequest.header.approvalNote}</div>}
-                    {selectedRequest.header.note && <div className="ira-info-item ira-info-item-full"><strong>Ghi chú của người gửi:</strong> {selectedRequest.header.note}</div>}
+                    {selectedRequest.header.approvalAt && (
+                      <div className="ui-detail-info-item">
+                        <span className="ui-detail-info-label">Thời gian phê duyệt</span>
+                        <span className="ui-detail-info-value">{fmtDateTime(selectedRequest.header.approvalAt)}</span>
+                      </div>
+                    )}
+                    {selectedRequest.header.approvalNote && (
+                      <div className="ui-detail-info-item is-wide">
+                        <span className="ui-detail-info-label">Ghi chú phê duyệt</span>
+                        <span className="ui-detail-info-value">{selectedRequest.header.approvalNote}</span>
+                      </div>
+                    )}
+                    {selectedRequest.header.note && (
+                      <div className="ui-detail-info-item is-wide">
+                        <span className="ui-detail-info-label">Ghi chú của người gửi</span>
+                        <span className="ui-detail-info-value">{selectedRequest.header.note}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {selectedRequest.summary && (
-                  <div className="ui-section">
-                    <h3 className="ui-section-title">Tổng hợp vật tư</h3>
-                    <div className="ira-summary-grid">
-                      <div className="ira-summary-card">
-                        <div className="ira-summary-value">{selectedRequest.summary.totalMaterials}</div>
-                        <div className="ira-summary-label">Tổng loại</div>
-                      </div>
-                      <div className="ira-summary-card">
-                        <div className="ira-summary-value">{selectedRequest.summary.totalQuantity}</div>
-                        <div className="ira-summary-label">Tổng số lượng</div>
-                      </div>
-                      <div className="ira-summary-card">
-                        <div className="ira-summary-value">{selectedRequest.summary.newMaterials || 0}</div>
-                        <div className="ira-summary-label">Vật tư mới</div>
-                      </div>
-                    </div>
-
-                    {selectedRequest.summary.categoryBreakdown && (
-                      <div className="ira-category-breakdown">
-                        <h4>Phân loại</h4>
-                        <div className="ira-category-grid">
-                          {Object.entries(selectedRequest.summary.categoryBreakdown).map(([category, count]) => {
-                            const categoryInfo = getCategoryInfo(category);
-                            return (
-                              <div key={category} className="ira-category-card">
-                                <span className="ira-category-tag">{categoryInfo.label}</span>
-                                <span className="ira-category-count">{count} loại</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div className="ui-section">
                   <h3 className="ui-section-title">Danh sách vật tư</h3>
@@ -630,7 +629,6 @@ export default function IssueRequestApproval() {
                           <th>Đơn vị</th>
                           <th>Số lượng</th>
                           <th>Loại</th>
-                          <th>Trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -641,20 +639,13 @@ export default function IssueRequestApproval() {
                               <td className="text-center">{index + 1}</td>
                               <td>
                                 {detail.materialName}
-                                {detail.isNewMaterial && <span className="ira-new-badge">Mới</span>}
+                                {detail.isNewMaterial && <span className="ui-status-badge is-pending" style={{ marginLeft: 6, fontSize: '0.72rem' }}>Mới</span>}
                               </td>
                               <td>{detail.spec || "-"}</td>
                               <td>{detail.unitName}</td>
                               <td className="text-center">{detail.qtyRequested}</td>
                               <td className="text-center">
-                                <span className="ira-category-tag" title={categoryInfo.description}>{categoryInfo.label}</span>
-                              </td>
-                              <td className="text-center">
-                                {detail.isNewMaterial ? (
-                                  <span className="ui-status-badge is-pending">Vật tư mới</span>
-                                ) : (
-                                  <span className="ui-status-badge is-approved">Có sẵn</span>
-                                )}
+                                <span className="ui-status-badge is-info" title={categoryInfo.description}>{categoryInfo.label}</span>
                               </td>
                             </tr>
                           );
@@ -666,6 +657,11 @@ export default function IssueRequestApproval() {
 
                 {canActOnRequest(selectedRequest.header) && (
                   <div className="ui-modal-footer ira-modal-footer">
+                    {selectedRequest.summary && (
+                      <div className="ui-btn ui-btn-secondary" role="status">
+                        Tổng số hàng hóa: <strong>{selectedRequest.summary.totalQuantity}</strong>
+                      </div>
+                    )}
                     <div className="ira-detail-actions">
                       <button
                         className="ui-btn ui-btn-primary"

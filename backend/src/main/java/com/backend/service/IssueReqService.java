@@ -537,19 +537,12 @@ public class IssueReqService {
                 .map(IssueReqDetail::getQtyRequested)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Map<String, Long> categoryCount = header.getDetails().stream()
-                .collect(Collectors.groupingBy(
-                        d -> d.getMaterialCategory() == null ? "?" : d.getMaterialCategory().toString(),
-                        Collectors.counting()
-                ));
-
         long newMaterials = header.getDetails().stream()
                 .filter(d -> d.getMaterial() == null)
                 .count();
 
         summary.put("totalMaterials", totalMaterials);
         summary.put("totalQuantity", totalQty);
-        summary.put("categoryBreakdown", categoryCount);
         summary.put("newMaterials", newMaterials);
         summary.put("existingMaterials", totalMaterials - newMaterials);
 

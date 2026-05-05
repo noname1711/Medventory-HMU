@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./DashboardTabs.css";
 
 const API_URL = "http://localhost:8080/api";
@@ -9,13 +9,16 @@ export default function DashboardTabs({ active, setActive, onVisibleTabsChange }
 
   const [permCodes, setPermCodes] = useState([]);
   const [loadingPerms, setLoadingPerms] = useState(true);
+  const hasLoadedPerms = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchPerms() {
       try {
-        setLoadingPerms(true);
+        if (!hasLoadedPerms.current) {
+          setLoadingPerms(true);
+        }
 
         if (!userId) {
           if (!cancelled) setPermCodes([]);
@@ -40,7 +43,10 @@ export default function DashboardTabs({ active, setActive, onVisibleTabsChange }
       } catch {
         if (!cancelled) setPermCodes([]);
       } finally {
-        if (!cancelled) setLoadingPerms(false);
+        if (!cancelled) {
+          hasLoadedPerms.current = true;
+          setLoadingPerms(false);
+        }
       }
     }
 

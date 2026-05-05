@@ -49,7 +49,6 @@ export default function CreateIssueRequest() {
   const [units, setUnits] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [subDepartments, setSubDepartments] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -146,8 +145,6 @@ export default function CreateIssueRequest() {
           : [];
 
         setMaterials(validMaterials);
-        const uniqueCategories = extractCategoriesFromMaterials(validMaterials);
-        setCategories(uniqueCategories);
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -189,39 +186,6 @@ export default function CreateIssueRequest() {
     }
   };
 
-  // Hàm extract categories từ danh sách materials
-  const extractCategoriesFromMaterials = (materialsList) => {
-    if (!Array.isArray(materialsList)) return [];
-
-    const categorySet = new Set();
-
-    materialsList.forEach(material => {
-      if (material && material.category) {
-        categorySet.add(material.category);
-      }
-    });
-
-    const categoriesArray = Array.from(categorySet)
-      .filter(category => category)
-      .map(category => ({
-        value: category,
-        label: getCategoryLabel(category)
-      }));
-
-    const defaultCategories = ['A', 'B', 'C', 'D'];
-    defaultCategories.forEach(cat => {
-      if (!categorySet.has(cat)) {
-        categoriesArray.push({
-          value: cat,
-          label: getCategoryLabel(cat)
-        });
-      }
-    });
-
-    return categoriesArray.sort((a, b) => (a.value || '').localeCompare(b.value || ''));
-  };
-
-  // Hàm lấy label cho category
   const getCategoryLabel = (category) => {
     const labels = {
       'A': 'Loại A',
@@ -408,16 +372,6 @@ export default function CreateIssueRequest() {
     }));
   };
 
-  // Kiểm tra xem dòng có phải là vật tư mới không (dựa vào materialId)
-  const isNewMaterial = (detail) => {
-    return !detail.materialId;
-  };
-
-  // Kiểm tra mã code có tồn tại trong danh mục không
-  const isCodeExists = (code) => {
-    return materials.some(material => material.code === code);
-  };
-
   // Hàm xử lý khi blur khỏi ô mã code 
   const handleCodeBlur = (index, value) => {
     if (!value || !value.trim()) return;
@@ -445,22 +399,6 @@ export default function CreateIssueRequest() {
     }
   };
 
-  // Hàm xử lý thay đổi loại - CHỈ CHO PHÉP THAY ĐỔI KHI LÀ VẬT TƯ MỚI
-  const handleCategoryChange = (index, value) => {
-    // CHỈ cho phép thay đổi khi là vật tư mới
-    const currentDetail = formData.details[index];
-    if (currentDetail.materialId) {
-      return; // Không cho phép thay đổi nếu là vật tư có sẵn
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      details: prev.details.map((detail, i) =>
-        i === index ? { ...detail, category: value } : detail
-      )
-    }));
-  };
-
   const validateForm = () => {
     if (!currentUser?.departmentId) {
       setMessage("Không tìm thấy thông tin khoa phòng của bạn. Vui lòng liên hệ ban giám hiệu.");
@@ -474,18 +412,13 @@ export default function CreateIssueRequest() {
 
     const validDetails = formData.details.filter(detail => {
       const hasMaterialName = detail.materialName && detail.materialName.trim() !== "";
-      const hasSpec = detail.spec && detail.spec.trim() !== "";
-      const hasUnit = detail.unitId !== "";
+      const hasMaterialId = !!detail.materialId;
       const hasQty = detail.qtyRequested !== "" && parseFloat(detail.qtyRequested) > 0;
-      const hasCode = detail.proposedCode && detail.proposedCode.trim() !== "";
-      const hasManufacturer = detail.proposedManufacturer && detail.proposedManufacturer.trim() !== "";
-      const hasCategory = detail.category !== "";
-
-      return hasMaterialName && hasSpec && hasUnit && hasQty && hasCode && hasManufacturer && hasCategory;
+      return hasMaterialName && hasMaterialId && hasQty;
     });
 
     if (validDetails.length === 0) {
-      setMessage("Vui lòng nhập ít nhất một vật tư với đầy đủ thông tin");
+      setMessage("Vui lòng chọn ít nhất một vật tư từ danh mục và nhập số lượng");
       return false;
     }
 
@@ -493,16 +426,6 @@ export default function CreateIssueRequest() {
       const qtyValue = parseFloat(detail.qtyRequested);
       if (isNaN(qtyValue) || qtyValue <= 0) {
         setMessage("Số lượng phải là số lớn hơn 0");
-        return false;
-      }
-
-      if (isNewMaterial(detail) && isCodeExists(detail.proposedCode)) {
-        setMessage(`Mã code "${detail.proposedCode}" đã tồn tại trong danh mục. Vui lòng chọn mã khác.`);
-        return false;
-      }
-
-      if (categories.length > 0 && !categories.some(cat => cat.value === detail.category)) {
-        setMessage("Loại vật tư không hợp lệ");
         return false;
       }
     }
@@ -568,12 +491,8 @@ export default function CreateIssueRequest() {
         details: formData.details
           .filter(detail =>
             detail.materialName && detail.materialName.trim() !== "" &&
-            detail.spec && detail.spec.trim() !== "" &&
-            detail.unitId !== "" &&
-            detail.qtyRequested !== "" &&
-            detail.proposedCode && detail.proposedCode.trim() !== "" &&
-            detail.proposedManufacturer && detail.proposedManufacturer.trim() !== "" &&
-            detail.category !== ""
+            detail.materialId &&
+            detail.qtyRequested !== "" && parseFloat(detail.qtyRequested) > 0
           )
           .map(detail => ({
             materialId: detail.materialId || null,
@@ -797,35 +716,29 @@ export default function CreateIssueRequest() {
                 <thead>
                   <tr>
                     <th style={{ width: 50 }}>TT</th>
-                    <th>Mã code</th>
+                    <th style={{ width: 110 }}>Mã code</th>
                     <th>Tên vật tư hóa chất</th>
                     <th>Quy cách đóng gói</th>
-                    <th style={{ width: 120 }}>Đơn vị tính</th>
+                    <th style={{ width: 110 }}>Đơn vị tính</th>
                     <th style={{ width: 120 }}>Số lượng xin cấp</th>
                     <th>Hãng sản xuất</th>
-                    <th style={{ minWidth: 160 }}>Loại</th>
-                    <th style={{ width: 110 }}>Phân loại</th>
+                    <th style={{ width: 80 }}>Loại</th>
                     <th style={{ width: 80 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {formData.details.map((detail, index) => (
-                    <tr key={index} className={isNewMaterial(detail) ? 'new-material' : 'existing-material'}>
+                    <tr key={index}>
                       <td className="text-center" data-label="TT">{index + 1}</td>
                       <td data-label="Mã code">
-                        {isNewMaterial(detail) ? (
-                          <input
-                            type="text"
-                            value={detail.proposedCode || ""}
-                            onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
-                            onBlur={(e) => handleCodeBlur(index, e.target.value)}
-                            className="ui-input table-input"
-                            placeholder="Nhập mã code"
-                            required
-                          />
-                        ) : (
-                          <span style={{ fontSize: '13px', color: '#6b7280' }}>{detail.proposedCode || '—'}</span>
-                        )}
+                        <input
+                          type="text"
+                          value={detail.proposedCode || ""}
+                          onChange={(e) => handleDetailChange(index, "proposedCode", e.target.value)}
+                          onBlur={(e) => handleCodeBlur(index, e.target.value)}
+                          className="ui-input table-input"
+                          placeholder="Nhập mã"
+                        />
                       </td>
                       <td className="material-search-cell" data-label="Tên vật tư">
                         <MaterialSearchInput
@@ -840,31 +753,10 @@ export default function CreateIssueRequest() {
                         />
                       </td>
                       <td data-label="Quy cách">
-                        <input
-                          type="text"
-                          value={detail.spec || ""}
-                          onChange={(e) => handleDetailChange(index, "spec", e.target.value)}
-                          className="ui-input table-input"
-                          placeholder="Quy cách"
-                          required
-                          disabled={!isNewMaterial(detail)}
-                        />
+                        <input className="ui-input table-input" type="text" value={detail.spec || ""} readOnly />
                       </td>
                       <td data-label="Đơn vị">
-                        <select
-                          value={detail.unitId || ""}
-                          onChange={(e) => handleDetailChange(index, "unitId", e.target.value)}
-                          className="ui-select table-select"
-                          required
-                          disabled={!isNewMaterial(detail)}
-                        >
-                          <option value="">Chọn đơn vị</option>
-                          {units.map(unit => (
-                            <option key={unit.id} value={unit.id}>
-                              {unit.name}
-                            </option>
-                          ))}
-                        </select>
+                        <input className="ui-input table-input" type="text" value={units.find(u => u.id == detail.unitId)?.name || ""} readOnly />
                       </td>
                       <td data-label="Số lượng">
                         <input
@@ -873,44 +765,16 @@ export default function CreateIssueRequest() {
                           onChange={(e) => handleQtyChange(index, e.target.value)}
                           className="ui-input table-input number-input"
                           placeholder="0"
-                          required
                           inputMode="numeric"
                           pattern="[0-9]*"
                           title="Chỉ được nhập số nguyên"
                         />
                       </td>
                       <td data-label="Hãng SX">
-                        <input
-                          type="text"
-                          value={detail.proposedManufacturer || ""}
-                          onChange={(e) => handleDetailChange(index, "proposedManufacturer", e.target.value)}
-                          className="ui-input table-input"
-                          placeholder="Hãng sản xuất"
-                          required
-                          disabled={!isNewMaterial(detail)}
-                        />
+                        <input className="ui-input table-input" type="text" value={detail.proposedManufacturer || ""} readOnly />
                       </td>
                       <td data-label="Loại">
-                        <select
-                          value={detail.category || ""}
-                          onChange={(e) => handleCategoryChange(index, e.target.value)}
-                          className="ui-select table-select category-select"
-                          style={{ minWidth: '140px', width: '100%' }}
-                          required
-                          disabled={!isNewMaterial(detail)} // CHỈ CHO PHÉP THAY ĐỔI KHI LÀ VẬT TƯ MỚI
-                        >
-                          <option value="">Chọn loại</option>
-                          {categories.map(cat => (
-                            <option key={cat.value} value={cat.value}>
-                              {cat.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="text-center" data-label="Phân loại">
-                        <span className={`ui-status-badge ${isNewMaterial(detail) ? 'is-pending' : 'is-approved'}`}>
-                          {isNewMaterial(detail) ? 'Vật tư mới' : 'Vật tư có sẵn'}
-                        </span>
+                        <input className="ui-input table-input" type="text" value={detail.category ? getCategoryLabel(detail.category) : ""} readOnly />
                       </td>
                       <td className="text-center" data-label="Thao tác">
                         <button
@@ -927,6 +791,17 @@ export default function CreateIssueRequest() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className="cir-table-footer">
+              <button
+                type="button"
+                onClick={addNewRow}
+                className="ui-btn ui-btn-secondary ui-btn-sm btn-add-row"
+                disabled={loading}
+              >
+                + Thêm hàng
+              </button>
             </div>
 
             <div className="cir-help">
@@ -951,15 +826,7 @@ export default function CreateIssueRequest() {
             </div>
           </div>
 
-          <div className="form-actions">
-             <button
-              type="button"
-              onClick={addNewRow}
-              className="ui-btn ui-btn-primary btn-add-row"
-              disabled={loading}
-            >
-              Thêm hàng
-            </button>
+          <div className="ui-modal-footer">
             <button
               type="button"
               onClick={resetForm}
@@ -997,11 +864,9 @@ export default function CreateIssueRequest() {
           </div>
 
           {historyLoading ? (
-            <div className="loading-message">Đang tải lịch sử phiếu xin lĩnh...</div>
+            <div className="ui-empty">Đang tải lịch sử phiếu xin lĩnh...</div>
           ) : requestHistory.length === 0 ? (
-            <div className="empty-message">
-              <p>Chưa có phiếu xin lĩnh nào được gửi</p>
-            </div>
+            <div className="ui-empty">Chưa có phiếu xin lĩnh nào được gửi</div>
           ) : (
             <div className="ui-table-wrap table-container">
               <table className="ui-table history-table">
@@ -1081,79 +946,96 @@ export default function CreateIssueRequest() {
 
       {/* Modal chi tiết phiếu xin lĩnh */}
       {selectedRequest && (
-        <div className="modal-overlay" onClick={closeRequestDetails}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Chi tiết Phiếu Xin Lĩnh #{selectedRequest.id}</h3>
-            </div>
-            <div className="modal-body">
-              <div className="request-info">
-                <div className="info-row">
-                  <label>Mã phiếu:</label>
-                  <span>{selectedRequest.id}</span>
-                </div>
-                <div className="info-row">
-                  <label>Ngày gửi:</label>
-                  <span>{formatDate(selectedRequest.requestedAt)}</span>
-                </div>
-                <div className="info-row">
-                  <label>Mục đích sử dụng:</label>
-                  <span>{selectedRequest.note}</span>
-                </div>
-                <div className="info-row">
-                  <label>Trạng thái:</label>
-                  <span className={`ui-status-badge ${getStatusColor(selectedRequest.status)}`}>
-                    {getStatusLabel(selectedRequest.status)}
-                  </span>
-                </div>
-                {selectedRequest.approvalNote && (
-                  <div className="info-row">
-                    <label>Ghi chú phê duyệt:</label>
-                    <span>{selectedRequest.approvalNote}</span>
-                  </div>
-                )}
+        <div className="ui-modal-overlay" onClick={closeRequestDetails}>
+          <div className="ui-modal" style={{ width: "min(920px, 100%)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="ui-history-detail">
+              <div className="ui-history-detail-head">
+                Chi tiết Phiếu Xin Lĩnh #{selectedRequest.id}
               </div>
 
-              <div className="details-section">
-                <h4>Danh sách vật tư ({selectedRequest.details?.length || 0} vật tư)</h4>
-                <div className="ui-table-wrap table-container">
-                  <table className="ui-table details-table">
-                    <thead>
-                      <tr>
-                        <th width="50">TT</th>
-                        <th>Mã code</th>
-                        <th>Tên vật tư</th>
-                        <th>Quy cách</th>
-                        <th width="100">Đơn vị tính</th>
-                        <th width="100">Số lượng</th>
-                        <th>Hãng SX</th>
-                        <th width="80">Loại</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedRequest.details?.map((detail, index) => (
-                        <tr key={index}>
-                          <td className="text-center" data-label="TT">{index + 1}</td>
-                          <td data-label="Mã code">{detail.proposedCode || 'N/A'}</td>
-                          <td data-label="Tên vật tư">{getMaterialDisplayName(detail)}</td>
-                          <td data-label="Quy cách">{getMaterialDisplaySpec(detail)}</td>
-                          <td className="text-center" data-label="Đơn vị">
-                            {getUnitName(detail)}
-                          </td>
-                          <td className="text-center" data-label="Số lượng">{detail.qtyRequested || 'N/A'}</td>
-                          <td data-label="Hãng SX">{detail.proposedManufacturer || 'N/A'}</td>
-                          <td className="text-center" data-label="Loại">{detail.category || 'N/A'}</td>
+              <div className="ui-history-detail-body">
+                <div className="ui-history-info">
+                  <div className="ui-history-info-row">
+                    <span className="ui-history-info-label">Mã phiếu:</span>
+                    <span className="ui-history-info-value">{selectedRequest.id}</span>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <span className="ui-history-info-label">Ngày gửi:</span>
+                    <span className="ui-history-info-value">{formatDate(selectedRequest.requestedAt)}</span>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <span className="ui-history-info-label">Mục đích sử dụng:</span>
+                    <span className="ui-history-info-value">{selectedRequest.note}</span>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <span className="ui-history-info-label">Trạng thái:</span>
+                    <span className="ui-history-info-value">
+                      <span className={`ui-status-badge ${getStatusColor(selectedRequest.status)}`}>
+                        {getStatusLabel(selectedRequest.status)}
+                      </span>
+                    </span>
+                  </div>
+                  {selectedRequest.approvalNote && (
+                    <div className="ui-history-info-row">
+                      <span className="ui-history-info-label">Ghi chú phê duyệt:</span>
+                      <span className="ui-history-info-value">{selectedRequest.approvalNote}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="ui-section">
+                  <div className="ui-section-head">
+                    <div>
+                      <h3 className="ui-section-title">Danh sách vật tư</h3>
+                      <p className="ui-section-subtitle">{selectedRequest.details?.length || 0} vật tư</p>
+                    </div>
+                  </div>
+
+                  <div className="ui-table-wrap">
+                    <table className="ui-table details-table">
+                      <thead>
+                        <tr>
+                          <th width="50">TT</th>
+                          <th>Mã code</th>
+                          <th>Tên vật tư</th>
+                          <th>Quy cách</th>
+                          <th width="100">Đơn vị tính</th>
+                          <th width="100">Số lượng</th>
+                          <th>Hãng SX</th>
+                          <th width="80">Loại</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {selectedRequest.details?.map((detail, index) => (
+                          <tr key={index}>
+                            <td className="text-center" data-label="TT">{index + 1}</td>
+                            <td data-label="Mã code">{detail.proposedCode || 'N/A'}</td>
+                            <td data-label="Tên vật tư">{getMaterialDisplayName(detail)}</td>
+                            <td data-label="Quy cách">{getMaterialDisplaySpec(detail)}</td>
+                            <td className="text-center" data-label="Đơn vị">
+                              {getUnitName(detail)}
+                            </td>
+                            <td className="text-center" data-label="Số lượng">{detail.qtyRequested || 'N/A'}</td>
+                            <td data-label="Hãng SX">{detail.proposedManufacturer || 'N/A'}</td>
+                            <td className="text-center" data-label="Loại">{detail.category || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div className="ui-modal-footer">
+              <button type="button" className="ui-btn ui-btn-secondary" onClick={closeRequestDetails}>
+                Đóng
+              </button>
             </div>
           </div>
         </div>
       )}
-      </div>
     </div>
+  </div>
   );
 }

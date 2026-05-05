@@ -1227,22 +1227,20 @@ export default function IssuePage() {
       {previewOpen && selected
         ? createPortal(
             <div
-              className="issue-modal-backdrop"
+              className="ui-modal-overlay"
               style={{ zIndex: 8000 }}
               onMouseDown={closeDrawer}
             >
               <div
-                className="issue-modal"
+                className="ui-modal"
                 style={{ width: "min(980px, 100%)" }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 {/* Header */}
-                <div className="issue-modal-head">
+                <div className="ui-modal-header">
                   <div>
-                    <div className="issue-modal-title">Xem trước và xuất kho</div>
-                    <div className="issue-modal-subtitle">
-                      Phiếu #{selected.id} — {selected.subDepartmentName || "—"}
-                    </div>
+                    <h3>Xem trước và xuất kho</h3>
+                    <p>Phiếu #{selected.id} — {selected.subDepartmentName || "—"}</p>
                   </div>
                 </div>
 
@@ -1381,7 +1379,7 @@ export default function IssuePage() {
                                     <div className="issue-lot-list">
                                       {ln.lots.slice(0, 3).map((l, i) => (
                                         <div className="issue-lot-item" key={i}>
-                                          <span className="issue-lot-pill">{l.lotNumber}</span>
+                                          <span className="ui-status-badge is-info" style={{ borderRadius: '999px' }}>{l.lotNumber}</span>
                                           <span className="issue-lot-meta">
                                             HSD: {fmtDate(l.expDate)} | {qtyFmt.format(toNumber(l.availableStock))} → <b>{qtyFmt.format(toNumber(l.qtyOut))}</b>
                                           </span>
@@ -1428,7 +1426,7 @@ export default function IssuePage() {
 
                   {/* Chi tiết phiếu sau khi tạo */}
                   {createdIssueId ? (
-                    <div className="issue-detail-card" style={{ marginTop: 14 }}>
+                    <div className="ui-card" style={{ marginTop: 14 }}>
                       <div className="issue-detail-head">
                         <h3 className="issue-detail-title">Chi tiết phiếu xuất</h3>
                         <div className="issue-inline-actions">
@@ -1497,7 +1495,7 @@ export default function IssuePage() {
                 </div>
 
                 {/* Footer actions */}
-                <div className="issue-modal-actions">
+                <div className="ui-modal-footer">
                   <button
                     className="ui-btn ui-btn-secondary ui-btn-sm"
                     type="button"
@@ -1525,14 +1523,16 @@ export default function IssuePage() {
       {/* MODAL CHỌN LÔ */}
       {modalOpen && modalLine
         ? createPortal(
-            <div className="issue-modal-backdrop" onMouseDown={closeModal}>
-              <div className="issue-modal" onMouseDown={(e) => e.stopPropagation()}>
-                <div className="issue-modal-head">
+            <div className="ui-modal-overlay" onMouseDown={closeModal}>
+              <div
+                className="ui-modal"
+                style={{ width: "min(920px, 100%)" }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="ui-modal-header">
                   <div>
-                    <div className="issue-modal-title">Chọn lô (thủ công)</div>
-                    <div className="issue-modal-subtitle">
-                      {modalLine.code} - {modalLine.name}
-                    </div>
+                    <h3>Chọn lô (thủ công)</h3>
+                    <p>{modalLine.code} - {modalLine.name}</p>
                   </div>
                 </div>
 
@@ -1616,7 +1616,7 @@ export default function IssuePage() {
                   </table>
                 </div>
 
-                <div className="issue-modal-actions">
+                <div className="ui-modal-footer">
                   <button className="ui-btn ui-btn-primary ui-btn-sm" type="button" onClick={saveModalAllocation}>
                     Lưu
                   </button>

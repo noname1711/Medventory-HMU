@@ -100,111 +100,6 @@
   gap: 12px;
 }
 
-.ira-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.ira-info-item {
-  background: #f8fafc;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  padding: 12px;
-  color: var(--ui-text);
-  line-height: 1.5;
-}
-
-.ira-info-item-full {
-  grid-column: 1 / -1;
-}
-
-.ira-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.ira-summary-card {
-  background: #f8fafc;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  padding: 18px;
-  text-align: center;
-}
-
-.ira-summary-value {
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--ui-primary);
-  line-height: 1;
-}
-
-.ira-summary-label {
-  margin-top: 8px;
-  color: var(--ui-text-soft);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.ira-category-breakdown {
-  margin-top: 18px;
-}
-
-.ira-category-breakdown h4 {
-  margin: 0 0 10px;
-  color: var(--ui-text);
-}
-
-.ira-category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.ira-category-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-}
-
-.ira-category-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.ira-category-count {
-  color: var(--ui-text-soft);
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.ira-new-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
 .ira-detail-modal {
   border-radius: 12px;
 }
@@ -257,49 +152,6 @@
   font-weight: 700;
 }
 
-.ira-detail-modal .ira-info-grid {
-  display: block;
-}
-
-.ira-detail-modal .ira-info-item {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 16px;
-  padding: 8px 0;
-  border: 0;
-  border-bottom: 1px solid var(--ui-border);
-  border-radius: 0;
-  background: transparent;
-  color: var(--ui-text);
-  text-align: right;
-}
-
-.ira-detail-modal .ira-info-item:last-child {
-  border-bottom: 0;
-}
-
-.ira-detail-modal .ira-info-item strong {
-  color: var(--ui-text-soft);
-  font-weight: 600;
-  text-align: left;
-}
-
-.ira-detail-modal .ira-info-item .ui-status-badge {
-  width: fit-content;
-  min-width: 96px;
-  justify-self: end;
-}
-
-.ira-detail-modal .ira-summary-grid {
-  gap: 12px;
-}
-
-.ira-detail-modal .ira-summary-card,
-.ira-detail-modal .ira-category-card {
-  border-radius: 8px;
-  box-shadow: none;
-}
-
 .ira-detail-modal .ui-table-wrap {
   max-height: 320px;
   border-radius: 8px;
@@ -314,6 +166,10 @@
 }
 
 .ira-detail-modal .ira-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
   margin-top: 26px;
   padding-top: 16px;
   border-top: 1px solid var(--ui-border);
@@ -330,14 +186,6 @@
     align-items: stretch;
   }
 
-  .ira-info-grid,
-  .ira-summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .ira-detail-modal .ira-info-item .ui-status-badge {
-    justify-self: start;
-  }
 }
 
 @media (max-width: 720px) {
@@ -354,5 +202,11 @@
 @media (max-width: 640px) {
   .ira-modal-footer {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ira-detail-actions,
+  .ira-detail-actions .ui-btn {
+    width: 100%;
   }
 }
