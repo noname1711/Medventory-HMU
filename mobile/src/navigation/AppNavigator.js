@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import { colors } from '../theme/tokens';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
@@ -13,12 +14,12 @@ const Stack = createNativeStackNavigator();
 
 const THEME = {
   colors: {
-    primary: '#1565C0',
-    background: '#F5F7FA',
-    card: '#FFFFFF',
-    text: '#1A1A2E',
-    border: '#E0E6EF',
-    notification: '#E53935',
+    primary: colors.primary,
+    background: colors.bg,
+    card: colors.white,
+    text: colors.text,
+    border: colors.border,
+    notification: colors.danger,
   },
 };
 
@@ -27,8 +28,8 @@ export default function AppNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1565C0' }}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.authBg }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

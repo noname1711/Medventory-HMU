@@ -17,6 +17,8 @@ import Toast from 'react-native-toast-message';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../utils/storage';
 import { API_ENDPOINTS } from '../../api/apiConfig';
+import { colors, radius, shadow, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
@@ -79,22 +81,22 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoCircle}>
-            <Image
-              source={require('../../../assets/icon.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.title}>HMU Medical</Text>
-          <Text style={styles.subtitle}>Hệ thống quản lý vật tư y tế</Text>
-          <Text style={styles.subtext}>Bệnh viện Đại học Y Hà Nội</Text>
-        </View>
-
         {/* Card */}
         <View style={styles.card}>
+          {/* Header (inside card, matches web .auth-header) */}
+          <View style={styles.header}>
+            <View style={styles.logoCircle}>
+              <Image
+                source={require('../../../assets/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.title}>HMU Medical</Text>
+            <Text style={styles.subtitle}>Hệ thống quản lý vật tư y tế</Text>
+            <Text style={styles.subtext}>Bệnh viện Đại học Y Hà Nội</Text>
+          </View>
+
           <Text style={styles.cardTitle}>Đăng nhập</Text>
 
           <TextInput
@@ -173,45 +175,45 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1565C0' },
-  scroll: { flexGrow: 1, alignItems: 'center', paddingVertical: 48, paddingHorizontal: 20 },
-  header: { alignItems: 'center', marginBottom: 28 },
+  container: { flex: 1, backgroundColor: colors.authBg },
+  scroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 16 },
+  header: { alignItems: 'center', marginBottom: 20 },
   logoCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    elevation: 4,
+    marginBottom: 10,
+    ...shadow.soft,
   },
   logo: { width: 60, height: 60 },
-  title: { fontSize: 24, fontWeight: '700', color: '#FFF', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginBottom: 2 },
-  subtext: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  title: { fontSize: 22, fontFamily: fontFamily.extrabold, color: colors.text, marginBottom: 4 },
+  subtitle: { fontSize: fontSize.base, fontFamily: fontFamily.medium, color: colors.textSoft, marginBottom: 2 },
+  subtext: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
   card: {
     width: '100%',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 24,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    maxWidth: 400,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 28,
+    ...shadow.auth,
   },
-  cardTitle: { fontSize: 20, fontWeight: '700', color: '#1565C0', marginBottom: 20, textAlign: 'center' },
+  cardTitle: { fontSize: fontSize.lg, fontFamily: fontFamily.bold, color: colors.text, marginBottom: 18, textAlign: 'center' },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
-    color: '#1A1A2E',
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.regular,
+    color: colors.text,
     marginBottom: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.white,
   },
   inputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   eyeBtn: { padding: 10, marginLeft: 6 },
@@ -222,27 +224,27 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 2,
-    borderColor: '#1565C0',
-    borderRadius: 4,
+    borderColor: colors.primary,
+    borderRadius: radius.xs,
     marginRight: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: '#1565C0' },
-  checkmark: { color: '#FFF', fontSize: 12, fontWeight: '700' },
-  rememberText: { fontSize: 13, color: '#4B5563' },
-  forgotLink: { fontSize: 13, color: '#1565C0', fontWeight: '600' },
+  checkboxChecked: { backgroundColor: colors.primary },
+  checkmark: { color: colors.white, fontSize: 12, fontFamily: fontFamily.bold },
+  rememberText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.label },
+  forgotLink: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
   submitBtn: {
-    backgroundColor: '#1565C0',
-    borderRadius: 10,
-    paddingVertical: 14,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 13,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  submitBtnDisabled: { opacity: 0.7 },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitText: { color: colors.white, fontSize: fontSize.md, fontFamily: fontFamily.semibold },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { fontSize: 13, color: '#6B7280' },
-  linkText: { fontSize: 13, color: '#1565C0', fontWeight: '600' },
-  version: { marginTop: 20, fontSize: 12, color: 'rgba(255,255,255,0.5)' },
+  footerText: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.textSoft },
+  linkText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
+  version: { marginTop: 18, fontSize: fontSize.sm, fontFamily: fontFamily.regular, color: colors.textMuted },
 });

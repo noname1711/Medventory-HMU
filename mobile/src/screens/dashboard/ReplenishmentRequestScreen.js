@@ -1,26 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import {
+  PageFrame,
+  PageHead,
+  Section,
+  Tabs,
+  Field,
+  Input,
+  Button,
+  Badge,
+  Empty,
+  Pagination,
+} from '../../theme/ui';
 
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', color: '#F59E0B', bg: '#FEF3C7' },
-  APPROVED: { label: 'Đã duyệt', color: '#10B981', bg: '#D1FAE5' },
-  REJECTED: { label: 'Từ chối', color: '#EF4444', bg: '#FEE2E2' },
+  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
+  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
+  REJECTED: { label: 'Từ chối', variant: 'rejected' },
 };
+
+const PAGE_SIZE = 8;
 
 export default function ReplenishmentRequestScreen() {
   const [activeTab, setActiveTab] = useState('create');
@@ -31,6 +45,7 @@ export default function ReplenishmentRequestScreen() {
   const [loading, setLoading] = useState(false);
   const [histLoading, setHistLoading] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [page, setPage] = useState(1);
 
   const [form, setForm] = useState({
     note: '',
@@ -124,91 +139,153 @@ export default function ReplenishmentRequestScreen() {
     }
   };
 
-  const renderItem = ({ item }) => {
-    const status = STATUS_MAP[item.status] || { label: item.status, color: '#6B7280', bg: '#F3F4F6' };
-    return (
-      <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardId}>Phiếu dự trù #{item.id}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
-        </View>
-        <Text style={styles.cardDate}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}</Text>
-        {item.note && <Text style={styles.cardNote} numberOfLines={1}>{item.note}</Text>}
-        <Text style={styles.cardMeta}>{(item.details || []).length} vật tư</Text>
-      </TouchableOpacity>
-    );
-  };
+  // Pagination — reset to page 1 whenever the tab switches to history
+  useEffect(() => { setPage(1); }, [activeTab, history.length]);
+  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pagedHistory = history.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabs}>
-        {[['create', 'Tạo phiếu'], ['history', 'Lịch sử']].map(([key, label]) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.tab, activeTab === key && styles.tabActive]}
-            onPress={() => setActiveTab(key)}
-          >
-            <Text style={[styles.tabText, activeTab === key && styles.tabTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {activeTab === 'create' ? (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={styles.label}>Ghi chú</Text>
-          <TextInput
-            style={[styles.input, { height: 72, textAlignVertical: 'top' }]}
-            placeholder="Nhập ghi chú..."
-            placeholderTextColor="#9BA3AF"
-            value={form.note}
-            onChangeText={(v) => setForm((f) => ({ ...f, note: v }))}
-            multiline
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        activeTab === 'history' ? (
+          <RefreshControl
+            refreshing={histLoading}
+            onRefresh={() => currentUser?.id && fetchHistory(currentUser.id)}
           />
+        ) : undefined
+      }
+    >
+      <PageFrame>
+        <PageHead title="Tạo phiếu dự trù bổ sung vật tư" />
 
-          <Text style={styles.label}>Danh sách vật tư cần bổ sung</Text>
-          {form.details.map((row, i) => (
-            <View key={i} style={styles.rowCard}>
-              <View style={styles.rowHeader}>
-                <Text style={styles.rowTitle}>Vật tư #{i + 1}</Text>
-                {form.details.length > 1 && (
-                  <TouchableOpacity onPress={() => setForm((f) => ({ ...f, details: f.details.filter((_, idx) => idx !== i) }))}>
-                    <Text style={styles.removeText}>✕ Xóa</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <TextInput style={styles.input} placeholder="Tên vật tư" placeholderTextColor="#9BA3AF" value={row.materialName} onChangeText={(v) => updateRow(i, 'materialName', v)} />
-              <TextInput style={styles.input} placeholder="Số lượng yêu cầu" placeholderTextColor="#9BA3AF" value={row.qtyRequested} onChangeText={(v) => updateRow(i, 'qtyRequested', v)} keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Lý do bổ sung" placeholderTextColor="#9BA3AF" value={row.reason} onChangeText={(v) => updateRow(i, 'reason', v)} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {units.map((u) => (
-                  <TouchableOpacity key={u.id} style={[styles.chip, row.unitId === String(u.id) && styles.chipActive]} onPress={() => updateRow(i, 'unitId', String(u.id))}>
-                    <Text style={[styles.chipText, row.unitId === String(u.id) && styles.chipTextActive]}>{u.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addBtn} onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}>
-            <Text style={styles.addBtnText}>+ Thêm vật tư</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.submitBtn, loading && { opacity: 0.7 }]} onPress={handleSubmit} disabled={loading}>
-            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Gửi phiếu dự trù</Text>}
-          </TouchableOpacity>
-        </ScrollView>
-      ) : (
-        <FlatList
-          data={history}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={histLoading} onRefresh={() => currentUser?.id && fetchHistory(currentUser.id)} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Chưa có phiếu dự trù nào</Text>}
+        <Tabs
+          tabs={[
+            { key: 'create', label: 'Tạo phiếu' },
+            { key: 'history', label: 'Lịch sử' },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
         />
-      )}
+
+        {activeTab === 'create' ? (
+          <>
+            <Section title="Thông tin phiếu">
+              <Field label="Ghi chú">
+                <Input
+                  placeholder="Nhập ghi chú..."
+                  value={form.note}
+                  onChangeText={(v) => setForm((f) => ({ ...f, note: v }))}
+                  multiline
+                />
+              </Field>
+            </Section>
+
+            <Section title="Danh sách vật tư cần bổ sung">
+              {form.details.map((row, i) => (
+                <View key={i} style={styles.rowCard}>
+                  <View style={styles.rowHeader}>
+                    <Text style={styles.rowTitle}>Vật tư #{i + 1}</Text>
+                    {form.details.length > 1 && (
+                      <TouchableOpacity
+                        onPress={() =>
+                          setForm((f) => ({ ...f, details: f.details.filter((_, idx) => idx !== i) }))
+                        }
+                      >
+                        <Text style={styles.removeText}>✕ Xóa</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Field label="Tên vật tư">
+                    <Input
+                      placeholder="Tên vật tư"
+                      value={row.materialName}
+                      onChangeText={(v) => updateRow(i, 'materialName', v)}
+                    />
+                  </Field>
+                  <Field label="Số lượng yêu cầu">
+                    <Input
+                      placeholder="Số lượng yêu cầu"
+                      value={row.qtyRequested}
+                      onChangeText={(v) => updateRow(i, 'qtyRequested', v)}
+                      keyboardType="numeric"
+                    />
+                  </Field>
+                  <Field label="Lý do bổ sung">
+                    <Input
+                      placeholder="Lý do bổ sung"
+                      value={row.reason}
+                      onChangeText={(v) => updateRow(i, 'reason', v)}
+                    />
+                  </Field>
+                  <Field label="Đơn vị tính">
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                      {units.map((u) => {
+                        const on = row.unitId === String(u.id);
+                        return (
+                          <TouchableOpacity
+                            key={u.id}
+                            style={[styles.chip, on && styles.chipActive]}
+                            onPress={() => updateRow(i, 'unitId', String(u.id))}
+                          >
+                            <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </Field>
+                </View>
+              ))}
+
+              <Button
+                title="+ Thêm vật tư"
+                variant="secondary"
+                onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}
+                style={styles.addBtn}
+              />
+              <Button title={loading ? '' : 'Gửi phiếu dự trù'} onPress={handleSubmit} disabled={loading}>
+                {loading ? <ActivityIndicator color={colors.white} /> : null}
+              </Button>
+            </Section>
+          </>
+        ) : (
+          <Section title="Lịch sử phiếu dự trù">
+            {history.length === 0 ? (
+              <Empty>Chưa có phiếu dự trù nào</Empty>
+            ) : (
+              <>
+                {pagedHistory.map((item) => {
+                  const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
+                  return (
+                    <TouchableOpacity key={String(item.id)} style={styles.histRow} onPress={() => setSelected(item)}>
+                      <View style={styles.histInfo}>
+                        <Text style={styles.histId}>Phiếu dự trù #{item.id}</Text>
+                        <Text style={styles.histDate}>
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
+                        </Text>
+                        {!!item.note && (
+                          <Text style={styles.histNote} numberOfLines={1}>{item.note}</Text>
+                        )}
+                        <Text style={styles.histMeta}>{(item.details || []).length} vật tư</Text>
+                      </View>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </TouchableOpacity>
+                  );
+                })}
+                <Pagination
+                  page={pageSafe}
+                  totalPages={totalPages}
+                  onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                />
+              </>
+            )}
+          </Section>
+        )}
+      </PageFrame>
 
       <Modal visible={!!selected} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
@@ -230,59 +307,64 @@ export default function ReplenishmentRequestScreen() {
                     {d.reason && <Text style={styles.detailMeta}>Lý do: {d.reason}</Text>}
                   </View>
                 ))}
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelected(null)}>
-                  <Text style={styles.closeBtnText}>Đóng</Text>
-                </TouchableOpacity>
+                <Button title="Đóng" variant="secondary" onPress={() => setSelected(null)} style={{ marginTop: 16 }} />
               </ScrollView>
             )}
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  tabs: { flexDirection: 'row', backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E0E6EF' },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: '#1565C0' },
-  tabText: { fontSize: 14, color: '#6B7280' },
-  tabTextActive: { color: '#1565C0', fontWeight: '700' },
-  scroll: { padding: 16, paddingBottom: 40 },
-  list: { padding: 12, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  input: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#1A1A2E', marginBottom: 10, backgroundColor: '#FFF' },
-  chip: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginRight: 6 },
-  chipActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  chipText: { fontSize: 13, color: '#6B7280' },
-  chipTextActive: { color: '#FFF', fontWeight: '600' },
-  rowCard: { backgroundColor: '#FFF', borderRadius: 10, padding: 14, marginBottom: 10, elevation: 1 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  label: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.label, marginBottom: 6 },
+  chipRow: { gap: 8, paddingVertical: 2 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
+  chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
+  rowCard: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    padding: 12,
+    marginBottom: 10,
+  },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  rowTitle: { fontSize: 14, fontWeight: '700', color: '#1565C0' },
-  removeText: { fontSize: 13, color: '#EF4444' },
-  addBtn: { borderWidth: 1.5, borderColor: '#1565C0', borderRadius: 10, borderStyle: 'dashed', paddingVertical: 12, alignItems: 'center', marginBottom: 16 },
-  addBtnText: { color: '#1565C0', fontWeight: '700', fontSize: 14 },
-  submitBtn: { backgroundColor: '#1565C0', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardId: { fontSize: 15, fontWeight: '700', color: '#1565C0' },
-  statusBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  cardDate: { fontSize: 12, color: '#9CA3AF', marginBottom: 2 },
-  cardNote: { fontSize: 12, color: '#6B7280', marginBottom: 2 },
-  cardMeta: { fontSize: 12, color: '#9CA3AF' },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
+  rowTitle: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
+  removeText: { fontSize: fontSize.sm, color: colors.danger, fontFamily: fontFamily.semibold },
+  addBtn: { marginBottom: 10 },
+  histRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 12,
+  },
+  histInfo: { flex: 1 },
+  histId: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 2 },
+  histDate: { fontSize: fontSize.sm, color: colors.textMuted, marginBottom: 2 },
+  histNote: { fontSize: fontSize.sm, color: colors.textSoft, marginBottom: 2 },
+  histMeta: { fontSize: fontSize.sm, color: colors.textMuted },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 16, textAlign: 'center' },
-  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  infoKey: { fontSize: 13, color: '#6B7280', width: 100 },
-  infoVal: { fontSize: 13, color: '#1A1A2E', flex: 1, fontWeight: '500' },
-  detailItem: { backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, marginBottom: 8 },
-  detailName: { fontSize: 14, fontWeight: '600', color: '#1A1A2E', marginBottom: 4 },
-  detailMeta: { fontSize: 12, color: '#6B7280' },
-  closeBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 16 },
-  closeBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
+  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  infoKey: { fontSize: 13, color: colors.textSoft, width: 100 },
+  infoVal: { fontSize: 13, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
+  detailItem: { backgroundColor: colors.bg, borderRadius: 8, padding: 10, marginBottom: 8 },
+  detailName: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 4 },
+  detailMeta: { fontSize: 12, color: colors.textSoft },
 });

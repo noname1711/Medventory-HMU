@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS } from '../../api/apiConfig';
+import { colors, radius, shadow, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -135,45 +137,53 @@ export default function ForgotPasswordScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1565C0' },
-  scroll: { flexGrow: 1, padding: 20, paddingTop: 48 },
-  backBtn: { marginBottom: 16 },
-  backText: { color: '#FFF', fontSize: 16 },
-  card: { backgroundColor: '#FFF', borderRadius: 16, padding: 24, elevation: 6 },
-  cardTitle: { fontSize: 20, fontWeight: '700', color: '#1565C0', marginBottom: 12, textAlign: 'center' },
-  desc: { fontSize: 14, color: '#6B7280', marginBottom: 20, lineHeight: 20, textAlign: 'center' },
+  container: { flex: 1, backgroundColor: colors.authBg },
+  scroll: { flexGrow: 1, padding: 16, paddingTop: 40 },
+  backBtn: { marginBottom: 14 },
+  backText: { color: colors.primary, fontSize: fontSize.md, fontFamily: fontFamily.semibold },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 24,
+    ...shadow.auth,
+  },
+  cardTitle: { fontSize: fontSize.lg, fontFamily: fontFamily.bold, color: colors.text, marginBottom: 12, textAlign: 'center' },
+  desc: { fontSize: fontSize.base, fontFamily: fontFamily.regular, color: colors.textSoft, marginBottom: 20, lineHeight: 20, textAlign: 'center' },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
-    color: '#1A1A2E',
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.regular,
+    color: colors.text,
     marginBottom: 20,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.white,
   },
   submitBtn: {
-    backgroundColor: '#1565C0',
-    borderRadius: 10,
-    paddingVertical: 14,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 13,
     alignItems: 'center',
   },
-  submitBtnDisabled: { opacity: 0.7 },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitText: { color: colors.white, fontSize: fontSize.md, fontFamily: fontFamily.semibold },
   successBox: { alignItems: 'center', paddingVertical: 12 },
   successIcon: { fontSize: 48, marginBottom: 12 },
-  successTitle: { fontSize: 18, fontWeight: '700', color: '#16A34A', marginBottom: 8 },
-  successDesc: { fontSize: 14, color: '#4B5563', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  emailHighlight: { fontWeight: '700', color: '#1565C0' },
+  successTitle: { fontSize: fontSize.lg, fontFamily: fontFamily.bold, color: colors.success, marginBottom: 8 },
+  successDesc: { fontSize: fontSize.base, fontFamily: fontFamily.regular, color: colors.label, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  emailHighlight: { fontFamily: fontFamily.bold, color: colors.primary },
   countdownBox: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginBottom: 16,
   },
-  countdownText: { fontSize: 13, color: '#1565C0' },
+  countdownText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary },
   resendBtn: { paddingVertical: 10 },
-  resendText: { fontSize: 14, color: '#1565C0', fontWeight: '600' },
+  resendText: { fontSize: fontSize.base, fontFamily: fontFamily.semibold, color: colors.primary },
 });

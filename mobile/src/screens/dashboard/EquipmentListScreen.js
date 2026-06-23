@@ -1,30 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS } from '../../api/apiConfig';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import { PageFrame, PageHead, Section, StatCard, Field, Input, Button, Badge, Empty, Pagination } from '../../theme/ui';
 
-const CATEGORIES = ['A', 'B', 'C'];
+const CATEGORIES = ['A', 'B', 'C', 'D'];
+const PAGE_SIZE = 8;
 
 export default function EquipmentListScreen() {
   const [stockItems, setStockItems] = useState([]);
   const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [form, setForm] = useState({
     materialCode: '',
@@ -78,6 +77,12 @@ export default function EquipmentListScreen() {
     return code.includes(kw) || name.includes(kw);
   });
 
+  // Pagination — reset to page 1 whenever the search changes
+  useEffect(() => { setPage(1); }, [keyword]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
   const totalItems = stockItems.length;
   const lowStock = stockItems.filter((i) => Number(i.closingStock) > 0 && Number(i.closingStock) < 10).length;
   const outOfStock = stockItems.filter((i) => Number(i.closingStock) <= 0).length;
@@ -98,7 +103,6 @@ export default function EquipmentListScreen() {
       if (!res.ok) throw new Error(data.error || 'Không thể thêm vật tư');
       Toast.show({ type: 'success', text1: 'Thêm vật tư thành công!' });
       setForm({ materialCode: '', materialName: '', specification: '', unitId: '', manufacturer: '', category: 'C' });
-      setShowAddModal(false);
       fetchStockItems();
     } catch (e) {
       Toast.show({ type: 'error', text1: e.message });
@@ -107,257 +111,158 @@ export default function EquipmentListScreen() {
     }
   };
 
-  const getStockColor = (qty) => {
+  const stockVariant = (qty) => {
     const n = Number(qty);
-    if (n <= 0) return '#EF4444';
-    if (n < 10) return '#F59E0B';
-    return '#10B981';
+    if (n <= 0) return 'zero';
+    if (n < 10) return 'low';
+    return 'ok';
   };
-
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <View style={styles.cardInfo}>
-          <Text style={styles.materialCode}>[{item.materialCode}]</Text>
-          <Text style={styles.materialName} numberOfLines={2}>{item.materialName}</Text>
-          {item.specification ? (
-            <Text style={styles.spec} numberOfLines={1}>{item.specification}</Text>
-          ) : null}
-        </View>
-        <View style={[styles.stockBadge, { backgroundColor: getStockColor(item.closingStock) + '20' }]}>
-          <Text style={[styles.stockNum, { color: getStockColor(item.closingStock) }]}>
-            {item.closingStock ?? 0}
-          </Text>
-          <Text style={[styles.stockLabel, { color: getStockColor(item.closingStock) }]}>
-            {item.unitName || ''}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.cardMeta}>
-        <Text style={styles.metaText}>Loại: {item.category || '—'}</Text>
-        {item.manufacturer ? <Text style={styles.metaText}>NSX: {item.manufacturer}</Text> : null}
-      </View>
-    </View>
-  );
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#1565C0" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Summary cards */}
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { borderLeftColor: '#1565C0' }]}>
-          <Text style={styles.summaryNum}>{totalItems}</Text>
-          <Text style={styles.summaryLabel}>Tổng vật tư</Text>
-        </View>
-        <View style={[styles.summaryCard, { borderLeftColor: '#F59E0B' }]}>
-          <Text style={[styles.summaryNum, { color: '#F59E0B' }]}>{lowStock}</Text>
-          <Text style={styles.summaryLabel}>Sắp hết</Text>
-        </View>
-        <View style={[styles.summaryCard, { borderLeftColor: '#EF4444' }]}>
-          <Text style={[styles.summaryNum, { color: '#EF4444' }]}>{outOfStock}</Text>
-          <Text style={styles.summaryLabel}>Hết hàng</Text>
-        </View>
-      </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <PageFrame>
+        <PageHead title="Quản lý vật tư kho" />
 
-      {/* Search + Add */}
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Tìm mã hoặc tên vật tư..."
-          placeholderTextColor="#9BA3AF"
-          value={keyword}
-          onChangeText={setKeyword}
-        />
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
-          <Text style={styles.addBtnText}>+ Thêm</Text>
-        </TouchableOpacity>
-      </View>
+        {/* KPI stat cards (web .ui-stat-grid) */}
+        <StatCard variant="primary" label="Tổng mặt hàng" value={totalItems} note="Số lượng mã vật tư đang có trong kho" />
+        <StatCard variant="warning" label="Sắp hết hàng" value={lowStock} note="Các mã có tồn kho lớn hơn 0 và nhỏ hơn 10" />
+        <StatCard variant="danger" label="Hết hàng" value={outOfStock} note="Các mã vật tư hiện không còn tồn kho" />
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.materialId || item.id)}
-        renderItem={renderItem}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Không có vật tư nào</Text>
-        }
-      />
+        {/* Add material form (web "Thêm vật tư mới" section) — collapsible */}
+        <Section title="Thêm vật tư mới" collapsible defaultOpen={false}>
+          <Field label="Mã vật tư">
+            <Input placeholder="VD: VT001" value={form.materialCode}
+              onChangeText={(v) => setForm((f) => ({ ...f, materialCode: v }))} />
+          </Field>
+          <Field label="Tên vật tư">
+            <Input placeholder="Nhập tên vật tư" value={form.materialName}
+              onChangeText={(v) => setForm((f) => ({ ...f, materialName: v }))} />
+          </Field>
+          <Field label="Quy cách đóng gói">
+            <Input placeholder="VD: Hộp 50 chiếc" value={form.specification}
+              onChangeText={(v) => setForm((f) => ({ ...f, specification: v }))} />
+          </Field>
+          <Field label="Đơn vị tính">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {units.map((u) => {
+                const on = form.unitId === String(u.id);
+                return (
+                  <TouchableOpacity key={u.id} onPress={() => setForm((f) => ({ ...f, unitId: String(u.id) }))}
+                    style={[styles.chip, on && styles.chipActive]}>
+                    <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </Field>
+          <Field label="Hãng sản xuất">
+            <Input placeholder="Nhập hãng sản xuất" value={form.manufacturer}
+              onChangeText={(v) => setForm((f) => ({ ...f, manufacturer: v }))} />
+          </Field>
+          <Field label="Phân loại">
+            <View style={styles.chipRowWrap}>
+              {CATEGORIES.map((c) => {
+                const on = form.category === c;
+                return (
+                  <TouchableOpacity key={c} onPress={() => setForm((f) => ({ ...f, category: c }))}
+                    style={[styles.chip, on && styles.chipActive]}>
+                    <Text style={[styles.chipText, on && styles.chipTextActive]}>Loại {c}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Field>
+          <Button title={addLoading ? '' : 'Thêm vật tư'} onPress={handleAdd} disabled={addLoading}>
+            {addLoading ? <ActivityIndicator color={colors.white} /> : null}
+          </Button>
+        </Section>
 
-      {/* Add Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowAddModal(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalTitle}>Thêm vật tư mới</Text>
-
-              {[
-                { label: 'Mã vật tư *', key: 'materialCode' },
-                { label: 'Tên vật tư *', key: 'materialName' },
-                { label: 'Quy cách', key: 'specification' },
-                { label: 'Nhà sản xuất', key: 'manufacturer' },
-              ].map(({ label, key }) => (
-                <View key={key} style={styles.fieldRow}>
-                  <Text style={styles.fieldLabel}>{label}</Text>
-                  <TextInput
-                    style={styles.fieldInput}
-                    value={form[key]}
-                    onChangeText={(v) => setForm((f) => ({ ...f, [key]: v }))}
-                    placeholder={label}
-                    placeholderTextColor="#9BA3AF"
-                  />
+        {/* Inventory list (web "Danh sách vật tư tồn kho" section) */}
+        <Section title="Danh sách vật tư tồn kho">
+          <Input
+            placeholder="Tìm theo mã hoặc tên vật tư..."
+            value={keyword}
+            onChangeText={setKeyword}
+            style={{ marginBottom: 14 }}
+          />
+          {filtered.length === 0 ? (
+            <Empty>
+              {keyword
+                ? `Không tìm thấy vật tư phù hợp với "${keyword}"`
+                : 'Chưa có vật tư nào trong kho.'}
+            </Empty>
+          ) : (
+            <>
+              {paged.map((item) => (
+                <View key={String(item.materialId || item.id)} style={styles.row}>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.code}>[{item.materialCode}]</Text>
+                    <Text style={styles.name} numberOfLines={2}>{item.materialName}</Text>
+                    <Text style={styles.meta}>
+                      {item.unitName || '—'}{item.category ? ` · Loại ${item.category}` : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.rowStock}>
+                    <Badge variant={stockVariant(item.closingStock)}>
+                      {item.closingStock ?? 0}
+                    </Badge>
+                  </View>
                 </View>
               ))}
-
-              <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Đơn vị tính *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {units.map((u) => (
-                    <TouchableOpacity
-                      key={u.id}
-                      style={[styles.chip, form.unitId === String(u.id) && styles.chipActive]}
-                      onPress={() => setForm((f) => ({ ...f, unitId: String(u.id) }))}
-                    >
-                      <Text style={[styles.chipText, form.unitId === String(u.id) && styles.chipTextActive]}>
-                        {u.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Phân loại</Text>
-                <View style={styles.chipRow}>
-                  {CATEGORIES.map((c) => (
-                    <TouchableOpacity
-                      key={c}
-                      style={[styles.chip, form.category === c && styles.chipActive]}
-                      onPress={() => setForm((f) => ({ ...f, category: c }))}
-                    >
-                      <Text style={[styles.chipText, form.category === c && styles.chipTextActive]}>
-                        Loại {c}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.submitBtn, addLoading && styles.submitBtnDisabled]}
-                onPress={handleAdd}
-                disabled={addLoading}
-              >
-                {addLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Lưu vật tư</Text>}
-              </TouchableOpacity>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+              <Pagination
+                page={pageSafe}
+                totalPages={totalPages}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              />
+            </>
+          )}
+        </Section>
+      </PageFrame>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  summaryRow: { flexDirection: 'row', padding: 12, gap: 8 },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    padding: 12,
-    borderLeftWidth: 4,
-    elevation: 2,
-  },
-  summaryNum: { fontSize: 22, fontWeight: '700', color: '#1565C0' },
-  summaryLabel: { fontSize: 11, color: '#6B7280', marginTop: 2 },
-  searchRow: { flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    backgroundColor: '#FFF',
-    color: '#1A1A2E',
-  },
-  addBtn: {
-    backgroundColor: '#1565C0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-  },
-  addBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
-  list: { paddingHorizontal: 12, paddingBottom: 20 },
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    elevation: 2,
-  },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardInfo: { flex: 1, marginRight: 12 },
-  materialCode: { fontSize: 12, color: '#1565C0', fontWeight: '600', marginBottom: 2 },
-  materialName: { fontSize: 15, fontWeight: '600', color: '#1A1A2E', marginBottom: 2 },
-  spec: { fontSize: 12, color: '#6B7280' },
-  stockBadge: { alignItems: 'center', borderRadius: 8, padding: 8, minWidth: 60 },
-  stockNum: { fontSize: 20, fontWeight: '700' },
-  stockLabel: { fontSize: 11, marginTop: 2 },
-  cardMeta: { flexDirection: 'row', gap: 16, marginTop: 8 },
-  metaText: { fontSize: 12, color: '#9CA3AF' },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 16, textAlign: 'center' },
-  fieldRow: { marginBottom: 14 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  fieldInput: {
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1A1A2E',
-    backgroundColor: '#F8FAFC',
-  },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  chipRow: { gap: 8, paddingVertical: 2 },
+  chipRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginRight: 8,
+    paddingVertical: 8,
   },
-  chipActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  chipText: { fontSize: 13, color: '#6B7280' },
-  chipTextActive: { color: '#FFF', fontWeight: '600' },
-  submitBtn: {
-    backgroundColor: '#1565C0',
-    borderRadius: 10,
-    paddingVertical: 14,
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
+  chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 12,
   },
-  submitBtnDisabled: { opacity: 0.7 },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  rowInfo: { flex: 1 },
+  code: { fontSize: fontSize.sm, color: colors.primary, fontFamily: fontFamily.bold, marginBottom: 2 },
+  name: { fontSize: fontSize.base, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 2 },
+  meta: { fontSize: fontSize.sm, color: colors.textMuted },
+  rowStock: { alignItems: 'flex-end' },
 });

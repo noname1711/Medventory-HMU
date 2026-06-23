@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { useAuth } from '../../context/AuthContext';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
+import { colors } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
 
 import EquipmentListScreen from './EquipmentListScreen';
 import CreateIssueRequestScreen from './CreateIssueRequestScreen';
@@ -38,12 +41,13 @@ function tabIcon(name) {
 
 function tabLabel(name) {
   return ({ focused, color }) => (
-    <Text style={{ fontSize: 10, color, textAlign: 'center' }} numberOfLines={1}>{name}</Text>
+    <Text style={{ fontSize: 10, color, textAlign: 'center', fontFamily: focused ? fontFamily.bold : fontFamily.medium }} numberOfLines={1}>{name}</Text>
   );
 }
 
 export default function DashboardScreen() {
   const { user, isAdmin } = useAuth();
+  const insets = useSafeAreaInsets();
   const [permCodes, setPermCodes] = useState([]);
   const [loadingPerms, setLoadingPerms] = useState(true);
 
@@ -76,18 +80,19 @@ export default function DashboardScreen() {
   const screenOptions = {
     headerShown: false,
     tabBarStyle: {
-      backgroundColor: '#FFF',
-      borderTopColor: '#E0E6EF',
+      backgroundColor: colors.white,
+      borderTopColor: colors.border,
       borderTopWidth: 1,
-      height: 62,
-      paddingBottom: 6,
+      height: 62 + insets.bottom,
+      paddingBottom: 6 + insets.bottom,
+      paddingTop: 6,
     },
-    tabBarActiveTintColor: '#1565C0',
-    tabBarInactiveTintColor: '#9CA3AF',
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.textMuted,
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
       <Tab.Navigator screenOptions={screenOptions}>
         <Tab.Screen

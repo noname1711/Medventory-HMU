@@ -1,26 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import {
+  PageFrame,
+  PageHead,
+  Section,
+  StatCard,
+  Field,
+  Input,
+  Button,
+  Badge,
+  Tabs,
+  Empty,
+  Pagination,
+} from '../../theme/ui';
 
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', color: '#F59E0B', bg: '#FEF3C7' },
-  APPROVED: { label: 'Đã duyệt', color: '#10B981', bg: '#D1FAE5' },
-  REJECTED: { label: 'Từ chối', color: '#EF4444', bg: '#FEE2E2' },
+  PENDING: { label: 'Chờ duyệt', color: colors.warning, bg: colors.warningBg, variant: 'pending' },
+  APPROVED: { label: 'Đã duyệt', color: colors.success, bg: colors.successBg, variant: 'approved' },
+  REJECTED: { label: 'Từ chối', color: colors.danger, bg: colors.dangerBg, variant: 'rejected' },
 };
+
+const PAGE_SIZE = 8;
 
 export default function ForecastApprovalScreen() {
   const [forecasts, setForecasts] = useState([]);
@@ -32,6 +46,7 @@ export default function ForecastApprovalScreen() {
   const [filterStatus, setFilterStatus] = useState('PENDING');
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     storage.getUser().then((u) => {
@@ -43,6 +58,9 @@ export default function ForecastApprovalScreen() {
   useEffect(() => {
     if (currentUser?.id) loadForecasts(currentUser.id);
   }, [filterStatus]);
+
+  // Reset to first page whenever the status filter changes
+  useEffect(() => { setPage(1); }, [filterStatus]);
 
   async function loadForecasts(userId) {
     setLoading(true);
@@ -114,46 +132,70 @@ export default function ForecastApprovalScreen() {
     }
   };
 
-  const renderItem = ({ item }) => {
-    const status = STATUS_MAP[item.status] || { label: item.status, color: '#6B7280', bg: '#F3F4F6' };
-    return (
-      <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardId}>Dự trù #{item.id}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
-        </View>
-        <Text style={styles.cardBy}>Người lập: {item.requestedByName || item.requestedBy?.fullName || '—'}</Text>
-        <Text style={styles.cardDate}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}</Text>
-        <Text style={styles.cardMeta}>{(item.details || []).length} vật tư</Text>
-      </TouchableOpacity>
-    );
+  // Pagination over the loaded list
+  const totalPages = Math.max(1, Math.ceil(forecasts.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = forecasts.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
+  const TAB_LABELS = {
+    PENDING: STATUS_MAP.PENDING.label,
+    APPROVED: STATUS_MAP.APPROVED.label,
+    REJECTED: STATUS_MAP.REJECTED.label,
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-        {Object.entries(STATUS_MAP).map(([key, val]) => (
-          <TouchableOpacity key={key} style={[styles.filterChip, filterStatus === key && styles.filterChipActive]} onPress={() => setFilterStatus(key)}>
-            <Text style={[styles.filterText, filterStatus === key && styles.filterTextActive]}>{val.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <PageFrame>
+        <PageHead title="Phê duyệt dự trù" />
 
-      {loading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#1565C0" /></View>
-      ) : (
-        <FlatList
-          data={forecasts}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Không có phiếu dự trù nào</Text>}
-        />
-      )}
+        <Section title="Danh sách dự trù">
+          <Tabs
+            tabs={Object.keys(STATUS_MAP).map((key) => ({ key, label: TAB_LABELS[key] }))}
+            active={filterStatus}
+            onChange={setFilterStatus}
+          />
 
+          {loading ? (
+            <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
+          ) : forecasts.length === 0 ? (
+            <Empty>Không có phiếu dự trù nào</Empty>
+          ) : (
+            <>
+              {paged.map((item) => {
+                const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
+                return (
+                  <Pressable key={String(item.id)} style={styles.row} onPress={() => setSelected(item)}>
+                    <View style={styles.rowTop}>
+                      <Text style={styles.rowId}>Dự trù #{item.id}</Text>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </View>
+                    <Text style={styles.rowBy}>
+                      Người lập: {item.requestedByName || item.requestedBy?.fullName || '—'}
+                    </Text>
+                    <Text style={styles.rowMeta}>
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
+                      {'  ·  '}{(item.details || []).length} vật tư
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pagination
+                page={pageSafe}
+                totalPages={totalPages}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              />
+            </>
+          )}
+        </Section>
+      </PageFrame>
+
+      {/* Chi tiết dự trù */}
       <Modal visible={!!selected} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
           <Pressable style={styles.modalSheet} onPress={() => {}}>
@@ -177,81 +219,88 @@ export default function ForecastApprovalScreen() {
                 ))}
                 {selected.status === 'PENDING' && (
                   <View style={styles.actionRow}>
-                    <TouchableOpacity style={[styles.approveBtn, actionLoading && { opacity: 0.7 }]} onPress={handleApprove} disabled={actionLoading}>
-                      {actionLoading ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.actionBtnText}>✓ Phê duyệt</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.rejectBtn, actionLoading && { opacity: 0.7 }]} onPress={() => setShowRejectModal(true)} disabled={actionLoading}>
-                      <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>✕ Từ chối</Text>
-                    </TouchableOpacity>
+                    <Button
+                      style={styles.actionBtn}
+                      variant="primary"
+                      title={actionLoading ? '' : '✓ Phê duyệt'}
+                      onPress={handleApprove}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? <ActivityIndicator color={colors.white} size="small" /> : null}
+                    </Button>
+                    <Button
+                      style={styles.actionBtn}
+                      variant="danger"
+                      title="✕ Từ chối"
+                      onPress={() => setShowRejectModal(true)}
+                      disabled={actionLoading}
+                    />
                   </View>
                 )}
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelected(null)}>
-                  <Text style={styles.closeBtnText}>Đóng</Text>
-                </TouchableOpacity>
+                <Button
+                  style={{ marginTop: 12 }}
+                  variant="secondary"
+                  title="Đóng"
+                  onPress={() => setSelected(null)}
+                />
               </ScrollView>
             )}
           </Pressable>
         </Pressable>
       </Modal>
 
+      {/* Lý do từ chối */}
       <Modal visible={showRejectModal} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setShowRejectModal(false)}>
           <Pressable style={[styles.modalSheet, { maxHeight: '50%' }]} onPress={() => {}}>
             <Text style={styles.modalTitle}>Lý do từ chối</Text>
-            <TextInput
-              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
-              placeholder="Nhập lý do từ chối..."
-              placeholderTextColor="#9BA3AF"
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              multiline
-              autoFocus
-            />
-            <TouchableOpacity style={[styles.rejectConfirmBtn, actionLoading && { opacity: 0.7 }]} onPress={handleReject} disabled={actionLoading}>
-              {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Xác nhận từ chối</Text>}
-            </TouchableOpacity>
+            <Field label="Lý do từ chối">
+              <Input
+                placeholder="Nhập lý do từ chối..."
+                value={rejectReason}
+                onChangeText={setRejectReason}
+                multiline
+                autoFocus
+              />
+            </Field>
+            <Button
+              variant="danger"
+              title={actionLoading ? '' : 'Xác nhận từ chối'}
+              onPress={handleReject}
+              disabled={actionLoading}
+            >
+              {actionLoading ? <ActivityIndicator color={colors.white} /> : null}
+            </Button>
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  filterRow: { backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E0E6EF' },
-  filterChip: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginRight: 8 },
-  filterChipActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  filterText: { fontSize: 13, color: '#6B7280' },
-  filterTextActive: { color: '#FFF', fontWeight: '700' },
-  list: { padding: 12, paddingBottom: 40 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardId: { fontSize: 15, fontWeight: '700', color: '#1565C0' },
-  statusBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  cardBy: { fontSize: 13, color: '#374151', marginBottom: 2 },
-  cardDate: { fontSize: 12, color: '#9CA3AF', marginBottom: 2 },
-  cardMeta: { fontSize: 12, color: '#9CA3AF' },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  centered: { justifyContent: 'center', alignItems: 'center', paddingVertical: 32 },
+  row: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  rowId: { fontSize: fontSize.md, fontFamily: fontFamily.bold, color: colors.primary },
+  rowBy: { fontSize: fontSize.base, color: colors.label, marginBottom: 2 },
+  rowMeta: { fontSize: fontSize.sm, color: colors.textMuted },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 16, textAlign: 'center' },
-  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  infoKey: { fontSize: 13, color: '#6B7280', width: 100 },
-  infoVal: { fontSize: 13, color: '#1A1A2E', flex: 1, fontWeight: '500' },
-  sectionLabel: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 8 },
-  detailItem: { backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, marginBottom: 8 },
-  detailName: { fontSize: 14, fontWeight: '600', color: '#1A1A2E', marginBottom: 4 },
-  detailMeta: { fontSize: 12, color: '#6B7280' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
+  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  infoKey: { fontSize: fontSize.base, color: colors.textSoft, width: 100 },
+  infoVal: { fontSize: fontSize.base, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
+  sectionLabel: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.label, marginBottom: 8 },
+  detailItem: { backgroundColor: colors.bg, borderRadius: radius.sm, padding: 10, marginBottom: 8 },
+  detailName: { fontSize: fontSize.base, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 4 },
+  detailMeta: { fontSize: fontSize.sm, color: colors.textSoft },
   actionRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
-  approveBtn: { flex: 1, backgroundColor: '#10B981', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  rejectBtn: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  actionBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
-  closeBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
-  closeBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  input: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#1A1A2E', marginBottom: 14, backgroundColor: '#F8FAFC' },
-  rejectConfirmBtn: { backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  actionBtn: { flex: 1 },
 });

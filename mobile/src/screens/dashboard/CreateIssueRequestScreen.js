@@ -1,27 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import {
+  PageFrame,
+  PageHead,
+  Section,
+  Field,
+  Input,
+  Button,
+  Badge,
+  Empty,
+  Tabs,
+  Pagination,
+} from '../../theme/ui';
 
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', color: '#F59E0B', bg: '#FEF3C7' },
-  APPROVED: { label: 'Đã duyệt', color: '#10B981', bg: '#D1FAE5' },
-  REJECTED: { label: 'Từ chối', color: '#EF4444', bg: '#FEE2E2' },
+  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
+  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
+  REJECTED: { label: 'Từ chối', variant: 'rejected' },
 };
+
+const PAGE_SIZE = 8;
 
 export default function CreateIssueRequestScreen() {
   const [activeTab, setActiveTab] = useState('create');
@@ -33,6 +46,7 @@ export default function CreateIssueRequestScreen() {
   const [requestHistory, setRequestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [page, setPage] = useState(1);
 
   const [formData, setFormData] = useState({
     subDepartmentId: '',
@@ -171,148 +185,161 @@ export default function CreateIssueRequestScreen() {
     }
   };
 
-  const renderHistory = ({ item }) => {
-    const status = STATUS_MAP[item.status] || { label: item.status, color: '#6B7280', bg: '#F3F4F6' };
-    return (
-      <TouchableOpacity
-        style={styles.histCard}
-        onPress={() => setSelectedRequest(item)}
-      >
-        <View style={styles.histTop}>
-          <Text style={styles.histId}>#{item.id}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
-        </View>
-        <Text style={styles.histDept} numberOfLines={1}>
-          {item.subDepartmentName || item.subDepartment?.name || '—'}
-        </Text>
-        <Text style={styles.histDate}>
-          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
-        </Text>
-        {item.note ? <Text style={styles.histNote} numberOfLines={1}>Ghi chú: {item.note}</Text> : null}
-      </TouchableOpacity>
-    );
-  };
+  // History pagination — reset to page 1 when the list changes
+  useEffect(() => { setPage(1); }, [requestHistory.length]);
+  const totalPages = Math.max(1, Math.ceil(requestHistory.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pagedHistory = requestHistory.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   return (
-    <View style={styles.container}>
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        {['create', 'history'].map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tab, activeTab === t && styles.tabActive]}
-            onPress={() => setActiveTab(t)}
-          >
-            <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
-              {t === 'create' ? 'Tạo phiếu' : 'Lịch sử'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {activeTab === 'create' ? (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* Sub department */}
-          <Text style={styles.label}>Phòng/Khoa xin lĩnh *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-            {subDepartments.map((d) => (
-              <TouchableOpacity
-                key={d.id}
-                style={[styles.chip, formData.subDepartmentId === String(d.id) && styles.chipActive]}
-                onPress={() => setFormData((f) => ({ ...f, subDepartmentId: String(d.id) }))}
-              >
-                <Text style={[styles.chipText, formData.subDepartmentId === String(d.id) && styles.chipTextActive]} numberOfLines={1}>
-                  {d.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Note */}
-          <Text style={styles.label}>Ghi chú</Text>
-          <TextInput
-            style={[styles.input, { height: 72, textAlignVertical: 'top' }]}
-            placeholder="Nhập ghi chú..."
-            placeholderTextColor="#9BA3AF"
-            value={formData.note}
-            onChangeText={(v) => setFormData((f) => ({ ...f, note: v }))}
-            multiline
-          />
-
-          {/* Detail rows */}
-          <Text style={styles.label}>Danh sách vật tư</Text>
-          {formData.details.map((detail, index) => (
-            <View key={index} style={styles.detailCard}>
-              <View style={styles.detailHeader}>
-                <Text style={styles.detailTitle}>Vật tư #{index + 1}</Text>
-                {formData.details.length > 1 && (
-                  <TouchableOpacity onPress={() => removeDetailRow(index)}>
-                    <Text style={styles.removeBtn}>✕ Xóa</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <TextInput
-                style={styles.input}
-                placeholder="Tên vật tư"
-                placeholderTextColor="#9BA3AF"
-                value={detail.materialName}
-                onChangeText={(v) => updateDetail(index, 'materialName', v)}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Quy cách"
-                placeholderTextColor="#9BA3AF"
-                value={detail.spec}
-                onChangeText={(v) => updateDetail(index, 'spec', v)}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Số lượng yêu cầu *"
-                placeholderTextColor="#9BA3AF"
-                value={detail.qtyRequested}
-                onChangeText={(v) => updateDetail(index, 'qtyRequested', v)}
-                keyboardType="numeric"
-              />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {units.slice(0, 8).map((u) => (
-                  <TouchableOpacity
-                    key={u.id}
-                    style={[styles.chip, detail.unitId === String(u.id) && styles.chipActive]}
-                    onPress={() => updateDetail(index, 'unitId', String(u.id))}
-                  >
-                    <Text style={[styles.chipText, detail.unitId === String(u.id) && styles.chipTextActive]}>
-                      {u.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addRowBtn} onPress={addDetailRow}>
-            <Text style={styles.addRowText}>+ Thêm vật tư</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Gửi phiếu xin lĩnh</Text>}
-          </TouchableOpacity>
-        </ScrollView>
-      ) : (
-        <FlatList
-          data={requestHistory}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderHistory}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={historyLoading} onRefresh={() => currentUser?.id && fetchHistory(currentUser.id)} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Chưa có phiếu xin lĩnh nào</Text>}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={historyLoading}
+          onRefresh={() => currentUser?.id && fetchHistory(currentUser.id)}
         />
-      )}
+      }
+    >
+      <PageFrame>
+        <PageHead title="Tạo phiếu xin lĩnh" />
+
+        <Tabs
+          tabs={[
+            { key: 'create', label: 'Tạo phiếu xin lĩnh' },
+            { key: 'history', label: `Lịch sử đã gửi (${requestHistory.length})` },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+
+        {activeTab === 'create' ? (
+          <Section title="Phiếu xin lĩnh">
+            {/* Sub department */}
+            <Field label="Phòng/Khoa xin lĩnh *">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                {subDepartments.map((d) => {
+                  const on = formData.subDepartmentId === String(d.id);
+                  return (
+                    <TouchableOpacity
+                      key={d.id}
+                      style={[styles.chip, on && styles.chipActive]}
+                      onPress={() => setFormData((f) => ({ ...f, subDepartmentId: String(d.id) }))}
+                    >
+                      <Text style={[styles.chipText, on && styles.chipTextActive]} numberOfLines={1}>
+                        {d.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </Field>
+
+            {/* Note */}
+            <Field label="Ghi chú">
+              <Input
+                placeholder="Nhập ghi chú..."
+                value={formData.note}
+                onChangeText={(v) => setFormData((f) => ({ ...f, note: v }))}
+                multiline
+              />
+            </Field>
+
+            {/* Detail rows */}
+            <Field label="Danh sách vật tư" />
+            {formData.details.map((detail, index) => (
+              <View key={index} style={styles.detailCard}>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.detailTitle}>Vật tư #{index + 1}</Text>
+                  {formData.details.length > 1 && (
+                    <TouchableOpacity onPress={() => removeDetailRow(index)}>
+                      <Text style={styles.removeBtn}>✕ Xóa</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Input
+                  placeholder="Tên vật tư"
+                  value={detail.materialName}
+                  onChangeText={(v) => updateDetail(index, 'materialName', v)}
+                  style={styles.detailInput}
+                />
+                <Input
+                  placeholder="Quy cách"
+                  value={detail.spec}
+                  onChangeText={(v) => updateDetail(index, 'spec', v)}
+                  style={styles.detailInput}
+                />
+                <Input
+                  placeholder="Số lượng yêu cầu *"
+                  value={detail.qtyRequested}
+                  onChangeText={(v) => updateDetail(index, 'qtyRequested', v)}
+                  keyboardType="numeric"
+                  style={styles.detailInput}
+                />
+                <View style={styles.chipRowWrap}>
+                  {units.slice(0, 8).map((u) => {
+                    const on = detail.unitId === String(u.id);
+                    return (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={[styles.chip, on && styles.chipActive]}
+                        onPress={() => updateDetail(index, 'unitId', String(u.id))}
+                      >
+                        <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+
+            <Button title="+ Thêm vật tư" variant="secondary" onPress={addDetailRow} style={{ marginBottom: 12 }} />
+
+            <Button title={loading ? '' : 'Gửi phiếu xin lĩnh'} onPress={handleSubmit} disabled={loading}>
+              {loading ? <ActivityIndicator color={colors.white} /> : null}
+            </Button>
+          </Section>
+        ) : (
+          <Section title="Lịch sử phiếu xin lĩnh đã gửi">
+            {requestHistory.length === 0 ? (
+              <Empty>Chưa có phiếu xin lĩnh nào</Empty>
+            ) : (
+              <>
+                {pagedHistory.map((item) => {
+                  const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
+                  return (
+                    <TouchableOpacity
+                      key={String(item.id)}
+                      style={styles.histRow}
+                      onPress={() => setSelectedRequest(item)}
+                    >
+                      <View style={styles.histInfo}>
+                        <Text style={styles.histId}>#{item.id}</Text>
+                        <Text style={styles.histDept} numberOfLines={1}>
+                          {item.subDepartmentName || item.subDepartment?.name || '—'}
+                        </Text>
+                        <Text style={styles.histDate}>
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
+                        </Text>
+                        {item.note ? <Text style={styles.histNote} numberOfLines={1}>Ghi chú: {item.note}</Text> : null}
+                      </View>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </TouchableOpacity>
+                  );
+                })}
+                <Pagination
+                  page={pageSafe}
+                  totalPages={totalPages}
+                  onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                />
+              </>
+            )}
+          </Section>
+        )}
+      </PageFrame>
 
       {/* Detail modal */}
       <Modal visible={!!selectedRequest} transparent animationType="slide">
@@ -322,11 +349,16 @@ export default function CreateIssueRequestScreen() {
               <ScrollView>
                 <Text style={styles.modalTitle}>Chi tiết phiếu #{selectedRequest.id}</Text>
                 <View style={styles.detailRow}><Text style={styles.detailKey}>Phòng/Khoa:</Text><Text style={styles.detailVal}>{selectedRequest.subDepartmentName || '—'}</Text></View>
-                <View style={styles.detailRow}><Text style={styles.detailKey}>Trạng thái:</Text><Text style={[styles.detailVal, { color: STATUS_MAP[selectedRequest.status]?.color }]}>{STATUS_MAP[selectedRequest.status]?.label || selectedRequest.status}</Text></View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Trạng thái:</Text>
+                  <Badge variant={(STATUS_MAP[selectedRequest.status] || { variant: 'info' }).variant}>
+                    {STATUS_MAP[selectedRequest.status]?.label || selectedRequest.status}
+                  </Badge>
+                </View>
                 <View style={styles.detailRow}><Text style={styles.detailKey}>Ngày tạo:</Text><Text style={styles.detailVal}>{selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleDateString('vi-VN') : '—'}</Text></View>
                 {selectedRequest.note && <View style={styles.detailRow}><Text style={styles.detailKey}>Ghi chú:</Text><Text style={styles.detailVal}>{selectedRequest.note}</Text></View>}
-                {selectedRequest.rejectReason && <View style={styles.detailRow}><Text style={styles.detailKey}>Lý do từ chối:</Text><Text style={[styles.detailVal, { color: '#EF4444' }]}>{selectedRequest.rejectReason}</Text></View>}
-                <Text style={[styles.label, { marginTop: 12 }]}>Danh sách vật tư:</Text>
+                {selectedRequest.rejectReason && <View style={styles.detailRow}><Text style={styles.detailKey}>Lý do từ chối:</Text><Text style={[styles.detailVal, { color: colors.danger }]}>{selectedRequest.rejectReason}</Text></View>}
+                <Text style={[styles.sheetLabel, { marginTop: 12 }]}>Danh sách vật tư:</Text>
                 {(selectedRequest.details || []).map((d, i) => (
                   <View key={i} style={styles.detailCard}>
                     <Text style={styles.detailTitle}>{d.materialName || `Vật tư #${i + 1}`}</Text>
@@ -334,68 +366,57 @@ export default function CreateIssueRequestScreen() {
                     {d.qtyApproved != null && <Text style={styles.metaText}>SL duyệt: {d.qtyApproved}</Text>}
                   </View>
                 ))}
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedRequest(null)}>
-                  <Text style={styles.closeBtnText}>Đóng</Text>
-                </TouchableOpacity>
+                <Button title="Đóng" variant="secondary" onPress={() => setSelectedRequest(null)} style={{ marginTop: 16 }} />
               </ScrollView>
             )}
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  tabs: { flexDirection: 'row', backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E0E6EF' },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: '#1565C0' },
-  tabText: { fontSize: 14, color: '#6B7280' },
-  tabTextActive: { color: '#1565C0', fontWeight: '700' },
-  scroll: { padding: 16, paddingBottom: 40 },
-  list: { padding: 12, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1A1A2E',
-    marginBottom: 10,
-    backgroundColor: '#FFF',
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  chipRow: { gap: 8, paddingVertical: 2 },
+  chipRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  chip: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginRight: 6 },
-  chipActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  chipText: { fontSize: 13, color: '#6B7280' },
-  chipTextActive: { color: '#FFF', fontWeight: '600' },
-  detailCard: { backgroundColor: '#FFF', borderRadius: 10, padding: 14, marginBottom: 10, elevation: 1 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
+  chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
+  detailCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, marginBottom: 10, backgroundColor: colors.white },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  detailTitle: { fontSize: 14, fontWeight: '700', color: '#1565C0' },
-  removeBtn: { fontSize: 13, color: '#EF4444' },
-  addRowBtn: { borderWidth: 1.5, borderColor: '#1565C0', borderRadius: 10, borderStyle: 'dashed', paddingVertical: 12, alignItems: 'center', marginBottom: 16 },
-  addRowText: { color: '#1565C0', fontWeight: '700', fontSize: 14 },
-  submitBtn: { backgroundColor: '#1565C0', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
-  submitBtnDisabled: { opacity: 0.7 },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  histCard: { backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  histTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  histId: { fontSize: 15, fontWeight: '700', color: '#1565C0' },
-  statusBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  histDept: { fontSize: 13, color: '#374151', marginBottom: 4 },
-  histDate: { fontSize: 12, color: '#9CA3AF' },
-  histNote: { fontSize: 12, color: '#6B7280', marginTop: 4 },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
+  detailTitle: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
+  detailInput: { marginBottom: 8 },
+  removeBtn: { fontSize: fontSize.sm, color: colors.danger, fontFamily: fontFamily.semibold },
+  // History rows
+  histRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 12,
+  },
+  histInfo: { flex: 1 },
+  histId: { fontSize: fontSize.md, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 2 },
+  histDept: { fontSize: fontSize.sm, color: colors.label, marginBottom: 2 },
+  histDate: { fontSize: fontSize.xs, color: colors.textMuted },
+  histNote: { fontSize: fontSize.xs, color: colors.textSoft, marginTop: 4 },
+  // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 16, textAlign: 'center' },
-  detailRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  detailKey: { fontSize: 13, color: '#6B7280', width: 110 },
-  detailVal: { fontSize: 13, color: '#1A1A2E', flex: 1, fontWeight: '500' },
-  metaText: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  closeBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 16 },
-  closeBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
+  detailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  detailKey: { fontSize: fontSize.sm, color: colors.textSoft, width: 110 },
+  detailVal: { fontSize: fontSize.sm, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
+  sheetLabel: { color: colors.label, fontSize: fontSize.base, fontFamily: fontFamily.bold, marginBottom: 6 },
+  metaText: { fontSize: fontSize.xs, color: colors.textSoft, marginTop: 2 },
 });

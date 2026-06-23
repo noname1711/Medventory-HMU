@@ -1,7 +1,38 @@
-// Web browser / Expo web: dùng localhost
-// Android emulator: dùng 10.0.2.2
-// Thiết bị thật: dùng IP LAN của máy, ví dụ 'http://192.168.1.10:8080/api'
-export const API_BASE_URL = 'http://10.161.190.71:8080/api';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+// Cổng của backend Spring Boot
+const BACKEND_PORT = 8080;
+
+// Nếu không tự dò được IP (vd. build production), dùng IP này làm dự phòng.
+// Để trống nếu không cần.
+const FALLBACK_HOST = '';
+
+// Tự động lấy IP LAN của máy chạy server từ kết nối Expo.
+// Nhờ vậy mọi thiết bị trong cùng mạng Wi-Fi đều truy cập được mà
+// không cần sửa IP thủ công mỗi khi đổi mạng.
+function resolveHost() {
+  // hostUri ví dụ: "172.19.187.10:8081"
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.expoGoConfig?.debuggerHost ||
+    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
+    Constants.manifest?.debuggerHost ||
+    '';
+
+  const host = hostUri.split(':')[0];
+
+  if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    return host;
+  }
+
+  // Trên Android emulator, localhost của máy là 10.0.2.2
+  if (Platform.OS === 'android') return '10.0.2.2';
+
+  return FALLBACK_HOST || 'localhost';
+}
+
+export const API_BASE_URL = `http://${resolveHost()}:${BACKEND_PORT}/api`;
 
 export const API_ENDPOINTS = {
   // Auth

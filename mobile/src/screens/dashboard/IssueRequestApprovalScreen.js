@@ -1,27 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import {
+  PageFrame,
+  PageHead,
+  Section,
+  StatCard,
+  Field,
+  Input,
+  Button,
+  Badge,
+  Tabs,
+  Empty,
+  Pagination,
+} from '../../theme/ui';
 
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', color: '#F59E0B', bg: '#FEF3C7' },
-  APPROVED: { label: 'Đã duyệt', color: '#10B981', bg: '#D1FAE5' },
-  REJECTED: { label: 'Từ chối', color: '#EF4444', bg: '#FEE2E2' },
+  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
+  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
+  REJECTED: { label: 'Từ chối', variant: 'rejected' },
 };
+
+const PAGE_SIZE = 8;
 
 export default function IssueRequestApprovalScreen() {
   const [requests, setRequests] = useState([]);
@@ -33,6 +46,7 @@ export default function IssueRequestApprovalScreen() {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState('PENDING');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     storage.getUser().then((u) => {
@@ -58,6 +72,9 @@ export default function IssueRequestApprovalScreen() {
   useEffect(() => {
     if (currentUser?.id) loadRequests(currentUser.id);
   }, [filterStatus]);
+
+  // Pagination — reset to page 1 whenever the filter changes
+  useEffect(() => { setPage(1); }, [filterStatus]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -118,56 +135,82 @@ export default function IssueRequestApprovalScreen() {
     }
   };
 
-  const renderItem = ({ item }) => {
-    const status = STATUS_MAP[item.status] || { label: item.status, color: '#6B7280', bg: '#F3F4F6' };
+  // KPI summary (web .ui-stat-grid)
+  const total = requests.length;
+  const pendingCount = requests.filter((r) => r.status === 'PENDING').length;
+  const processedCount = requests.filter((r) => r.status === 'APPROVED' || r.status === 'REJECTED').length;
+
+  // Pagination over the current list
+  const totalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = requests.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
+  const renderRow = (item) => {
+    const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
     return (
-      <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardId}>Phiếu #{item.id}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+      <Pressable key={String(item.id)} style={styles.row} onPress={() => setSelected(item)}>
+        <View style={styles.rowInfo}>
+          <View style={styles.rowTop}>
+            <Text style={styles.rowId}>Phiếu #{item.id}</Text>
+            <Badge variant={status.variant}>{status.label}</Badge>
           </View>
+          <Text style={styles.rowDept} numberOfLines={1}>
+            {item.subDepartmentName || item.subDepartment?.name || '—'}
+          </Text>
+          <Text style={styles.rowMeta}>
+            Người tạo: {item.requestedByName || item.requestedBy?.fullName || '—'}
+          </Text>
+          <Text style={styles.rowMeta}>
+            {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
+          </Text>
         </View>
-        <Text style={styles.cardDept} numberOfLines={1}>
-          {item.subDepartmentName || item.subDepartment?.name || '—'}
-        </Text>
-        <Text style={styles.cardUser}>Người tạo: {item.requestedByName || item.requestedBy?.fullName || '—'}</Text>
-        <Text style={styles.cardDate}>
-          {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
-        </Text>
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Filter tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-        {Object.entries(STATUS_MAP).map(([key, val]) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.filterChip, filterStatus === key && styles.filterChipActive]}
-            onPress={() => setFilterStatus(key)}
-          >
-            <Text style={[styles.filterText, filterStatus === key && styles.filterTextActive]}>
-              {val.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <PageFrame>
+        <PageHead title="Phê duyệt Phiếu xin lĩnh" />
 
-      {loading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#1565C0" /></View>
-      ) : (
-        <FlatList
-          data={requests}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Không có phiếu nào</Text>}
+        {/* KPI stat cards (web .ui-stat-grid) */}
+        <StatCard variant="primary" label="Tổng phiếu" value={total} note="Theo bộ lọc hiện tại" />
+        <StatCard variant="warning" label="Chờ phê duyệt" value={pendingCount} note="Cần xử lý ngay" />
+        <StatCard variant="neutral" label="Đã xử lý" value={processedCount} note="Đã duyệt hoặc từ chối" />
+
+        {/* Status filter tabs (web .ui-tabs) */}
+        <Tabs
+          tabs={Object.entries(STATUS_MAP).map(([key, val]) => ({ key, label: val.label }))}
+          active={filterStatus}
+          onChange={setFilterStatus}
         />
-      )}
+
+        {/* Requests list (web table section) */}
+        <Section title="Danh sách phiếu">
+          {loading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : requests.length === 0 ? (
+            <Empty>Không có phiếu nào</Empty>
+          ) : (
+            <>
+              {paged.map(renderRow)}
+              <Pagination
+                page={pageSafe}
+                totalPages={totalPages}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              />
+            </>
+          )}
+        </Section>
+      </PageFrame>
 
       {/* Detail + Action Modal */}
       <Modal visible={!!selected} transparent animationType="slide">
@@ -176,49 +219,58 @@ export default function IssueRequestApprovalScreen() {
             {selected && (
               <ScrollView>
                 <Text style={styles.modalTitle}>Chi tiết phiếu #{selected.id}</Text>
-                {[
-                  ['Phòng/Khoa', selected.subDepartmentName || '—'],
-                  ['Người tạo', selected.requestedByName || '—'],
-                  ['Ngày tạo', selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : '—'],
-                  ['Ghi chú', selected.note || '—'],
-                ].map(([key, val]) => (
-                  <View key={key} style={styles.row}>
-                    <Text style={styles.rowKey}>{key}:</Text>
-                    <Text style={styles.rowVal}>{val}</Text>
-                  </View>
-                ))}
 
-                <Text style={styles.sectionTitle}>Danh sách vật tư:</Text>
-                {(selected.details || []).map((d, i) => (
-                  <View key={i} style={styles.detailItem}>
-                    <Text style={styles.detailName}>{d.materialName || `Vật tư #${i + 1}`}</Text>
-                    <Text style={styles.detailMeta}>SL: {d.qtyRequested} {d.unitName || ''}</Text>
-                    {d.specification ? <Text style={styles.detailMeta}>Quy cách: {d.specification}</Text> : null}
-                  </View>
-                ))}
+                <Section title="Thông tin chung">
+                  {[
+                    ['Phòng/Khoa', selected.subDepartmentName || '—'],
+                    ['Người tạo', selected.requestedByName || '—'],
+                    ['Ngày tạo', selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : '—'],
+                    ['Ghi chú', selected.note || '—'],
+                  ].map(([key, val]) => (
+                    <View key={key} style={styles.infoRow}>
+                      <Text style={styles.infoKey}>{key}:</Text>
+                      <Text style={styles.infoVal}>{val}</Text>
+                    </View>
+                  ))}
+                </Section>
+
+                <Section title="Danh sách vật tư">
+                  {(selected.details || []).map((d, i) => (
+                    <View key={i} style={styles.detailItem}>
+                      <Text style={styles.detailName}>{d.materialName || `Vật tư #${i + 1}`}</Text>
+                      <Text style={styles.detailMeta}>SL: {d.qtyRequested} {d.unitName || ''}</Text>
+                      {d.specification ? <Text style={styles.detailMeta}>Quy cách: {d.specification}</Text> : null}
+                    </View>
+                  ))}
+                </Section>
 
                 {selected.status === 'PENDING' && (
                   <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={[styles.approveBtn, actionLoading && { opacity: 0.7 }]}
+                    <Button
+                      title="✓ Phê duyệt"
+                      variant="primary"
                       onPress={handleApprove}
                       disabled={actionLoading}
+                      style={styles.actionBtn}
                     >
-                      {actionLoading ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.actionBtnText}>✓ Phê duyệt</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.rejectBtn, actionLoading && { opacity: 0.7 }]}
+                      {actionLoading ? <ActivityIndicator color={colors.white} size="small" /> : null}
+                    </Button>
+                    <Button
+                      title="✕ Từ chối"
+                      variant="danger"
                       onPress={() => setShowRejectModal(true)}
                       disabled={actionLoading}
-                    >
-                      <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>✕ Từ chối</Text>
-                    </TouchableOpacity>
+                      style={styles.actionBtn}
+                    />
                   </View>
                 )}
 
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelected(null)}>
-                  <Text style={styles.closeBtnText}>Đóng</Text>
-                </TouchableOpacity>
+                <Button
+                  title="Đóng"
+                  variant="secondary"
+                  onPress={() => setSelected(null)}
+                  style={{ marginTop: 12 }}
+                />
               </ScrollView>
             )}
           </Pressable>
@@ -230,74 +282,58 @@ export default function IssueRequestApprovalScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowRejectModal(false)}>
           <Pressable style={[styles.modalSheet, { maxHeight: '50%' }]} onPress={() => {}}>
             <Text style={styles.modalTitle}>Lý do từ chối</Text>
-            <TextInput
-              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
-              placeholder="Nhập lý do từ chối..."
-              placeholderTextColor="#9BA3AF"
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              multiline
-              autoFocus
-            />
-            <TouchableOpacity
-              style={[styles.rejectConfirmBtn, actionLoading && { opacity: 0.7 }]}
+            <Field label="Lý do từ chối">
+              <Input
+                placeholder="Nhập lý do từ chối..."
+                value={rejectReason}
+                onChangeText={setRejectReason}
+                multiline
+                autoFocus
+              />
+            </Field>
+            <Button
+              title="Xác nhận từ chối"
+              variant="danger"
               onPress={handleReject}
               disabled={actionLoading}
             >
-              {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Xác nhận từ chối</Text>}
-            </TouchableOpacity>
+              {actionLoading ? <ActivityIndicator color={colors.white} /> : null}
+            </Button>
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  filterRow: { backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E0E6EF' },
-  filterChip: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginRight: 8 },
-  filterChipActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  filterText: { fontSize: 13, color: '#6B7280' },
-  filterTextActive: { color: '#FFF', fontWeight: '700' },
-  list: { padding: 12, paddingBottom: 40 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardId: { fontSize: 15, fontWeight: '700', color: '#1565C0' },
-  statusBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  cardDept: { fontSize: 13, color: '#374151', marginBottom: 4 },
-  cardUser: { fontSize: 12, color: '#6B7280', marginBottom: 2 },
-  cardDate: { fontSize: 12, color: '#9CA3AF' },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 16, textAlign: 'center' },
-  row: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  rowKey: { fontSize: 13, color: '#6B7280', width: 100 },
-  rowVal: { fontSize: 13, color: '#1A1A2E', flex: 1, fontWeight: '500' },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#374151', marginTop: 14, marginBottom: 8 },
-  detailItem: { backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, marginBottom: 8 },
-  detailName: { fontSize: 14, fontWeight: '600', color: '#1A1A2E', marginBottom: 4 },
-  detailMeta: { fontSize: 12, color: '#6B7280' },
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
-  approveBtn: { flex: 1, backgroundColor: '#10B981', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  rejectBtn: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  actionBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
-  closeBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
-  closeBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#E0E6EF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1A1A2E',
-    marginBottom: 14,
-    backgroundColor: '#F8FAFC',
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  centered: { justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
+  // List rows (web table rows)
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 12,
   },
-  rejectConfirmBtn: { backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  rowInfo: { flex: 1 },
+  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  rowId: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
+  rowDept: { fontSize: fontSize.base, color: colors.label, marginBottom: 2 },
+  rowMeta: { fontSize: fontSize.sm, color: colors.textMuted },
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
+  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  infoKey: { fontSize: fontSize.sm, color: colors.textSoft, width: 100 },
+  infoVal: { fontSize: fontSize.sm, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
+  detailItem: { backgroundColor: colors.bg, borderRadius: radius.md, padding: 10, marginBottom: 8 },
+  detailName: { fontSize: fontSize.base, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 4 },
+  detailMeta: { fontSize: fontSize.sm, color: colors.textSoft },
+  actionRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  actionBtn: { flex: 1 },
 });

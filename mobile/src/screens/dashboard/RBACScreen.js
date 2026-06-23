@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,6 +13,9 @@ import {
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import { PageFrame, PageHead, Section, Badge, Empty } from '../../theme/ui';
 
 export default function RBACScreen() {
   const [roles, setRoles] = useState([]);
@@ -83,39 +84,50 @@ export default function RBACScreen() {
     }
   };
 
-  const renderRole = ({ item }) => (
-    <TouchableOpacity style={styles.roleCard} onPress={() => openRole(item)}>
-      <View style={styles.roleLeft}>
-        <View style={[styles.roleIcon, { backgroundColor: getRoleColor(item.code) + '20' }]}>
-          <Text style={[styles.roleIconText, { color: getRoleColor(item.code) }]}>
-            {(item.displayName || item.name || item.code || '?')[0].toUpperCase()}
-          </Text>
-        </View>
-        <View>
-          <Text style={styles.roleName}>{item.displayName || item.name || item.code}</Text>
-          <Text style={styles.roleCode}>{item.code}</Text>
-        </View>
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
-      <Text style={styles.permCount}>{(item.permissions || []).length} quyền</Text>
-    </TouchableOpacity>
-  );
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {loading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#1565C0" /></View>
-      ) : (
-        <FlatList
-          data={roles}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderRole}
-          contentContainerStyle={styles.list}
-          ListHeaderComponent={
-            <Text style={styles.sectionTitle}>Danh sách vai trò</Text>
-          }
-          ListEmptyComponent={<Text style={styles.emptyText}>Không có vai trò nào</Text>}
-        />
-      )}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <PageFrame>
+        <PageHead title="Phân quyền vai trò" />
+
+        <Section title="Danh sách vai trò">
+          {roles.length === 0 ? (
+            <Empty>Không có vai trò nào</Empty>
+          ) : (
+            roles.map((item) => (
+              <TouchableOpacity
+                key={String(item.id)}
+                style={styles.roleCard}
+                onPress={() => openRole(item)}
+              >
+                <View style={styles.roleLeft}>
+                  <View style={[styles.roleIcon, { backgroundColor: getRoleColor(item.code) + '20' }]}>
+                    <Text style={[styles.roleIconText, { color: getRoleColor(item.code) }]}>
+                      {(item.displayName || item.name || item.code || '?')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.roleName}>{item.displayName || item.name || item.code}</Text>
+                    <Text style={styles.roleCode}>{item.code}</Text>
+                  </View>
+                </View>
+                <Badge variant="info">{(item.permissions || []).length} quyền</Badge>
+              </TouchableOpacity>
+            ))
+          )}
+        </Section>
+      </PageFrame>
 
       {/* Permission editor modal */}
       <Modal visible={!!selected} transparent animationType="slide">
@@ -139,8 +151,8 @@ export default function RBACScreen() {
                         <Switch
                           value={hasPerm}
                           onValueChange={() => togglePerm(permId)}
-                          trackColor={{ false: '#E0E6EF', true: '#93C5FD' }}
-                          thumbColor={hasPerm ? '#1565C0' : '#9CA3AF'}
+                          trackColor={{ false: colors.border, true: '#93C5FD' }}
+                          thumbColor={hasPerm ? colors.primary : colors.textMuted}
                           disabled={actionLoading}
                         />
                       </View>
@@ -155,37 +167,42 @@ export default function RBACScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 function getRoleColor(code) {
-  if (!code) return '#6B7280';
+  if (!code) return colors.textSoft;
   if (code.toLowerCase().includes('bgh') || code.toLowerCase().includes('lanhdao')) return '#7C3AED';
-  if (code.toLowerCase().includes('thukho')) return '#2563EB';
-  return '#059669';
+  if (code.toLowerCase().includes('thukho')) return colors.statBlue;
+  return colors.statGreen;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list: { padding: 12, paddingBottom: 40 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#374151', marginBottom: 12 },
-  roleCard: { backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  roleLeft: { flexDirection: 'row', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  roleCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 12,
+  },
+  roleLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   roleIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  roleIconText: { fontSize: 18, fontWeight: '700' },
-  roleName: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
-  roleCode: { fontSize: 12, color: '#9CA3AF' },
-  permCount: { fontSize: 13, color: '#1565C0', fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
+  roleIconText: { fontSize: 18, fontFamily: fontFamily.bold },
+  roleName: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.text },
+  roleCode: { fontSize: fontSize.sm, color: colors.textMuted },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 16, textAlign: 'center' },
-  permRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
+  permRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
   permInfo: { flex: 1, marginRight: 12 },
-  permCode: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
-  permDesc: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  closeBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 16 },
-  closeBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  permCode: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
+  permDesc: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
+  closeBtn: { backgroundColor: colors.borderSoft, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 16 },
+  closeBtnText: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.label },
 });

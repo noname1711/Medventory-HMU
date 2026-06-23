@@ -2,23 +2,37 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
+import { colors, radius, fontSize } from '../../theme/tokens';
+import { fontFamily } from '../../theme/typography';
+import {
+  PageFrame,
+  PageHead,
+  Section,
+  StatCard,
+  Field,
+  Input,
+  Label,
+  Button,
+  Badge,
+  Empty,
+  Pagination,
+} from '../../theme/ui';
 
 const ROLES = ['lanhdao', 'thukho', 'canbo'];
 const ROLE_LABELS = { lanhdao: 'Lãnh đạo', thukho: 'Thủ kho', canbo: 'Cán bộ' };
+const PAGE_SIZE = 8;
 
 export default function AdminScreen() {
   const [users, setUsers] = useState([]);
@@ -30,6 +44,7 @@ export default function AdminScreen() {
   const [editModal, setEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ role: '', department: '' });
   const [actionLoading, setActionLoading] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     storage.getUser().then((u) => {
@@ -122,63 +137,105 @@ export default function AdminScreen() {
     );
   });
 
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(item.fullName || 'U')[0].toUpperCase()}</Text>
-        </View>
-        <View style={styles.cardInfo}>
-          <Text style={styles.userName}>{item.fullName || '—'}</Text>
-          <Text style={styles.userEmail} numberOfLines={1}>{item.email || '—'}</Text>
-          <Text style={styles.userDept} numberOfLines={1}>{item.department?.name || item.department || '—'}</Text>
-        </View>
-        <View style={[styles.roleBadge, { backgroundColor: getRoleColor(item.role) + '20' }]}>
-          <Text style={[styles.roleText, { color: getRoleColor(item.role) }]}>{ROLE_LABELS[item.role] || item.role || '—'}</Text>
-        </View>
+  // Pagination — reset to page 1 whenever the search changes
+  useEffect(() => { setPage(1); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
+  // KPI counts (web .ui-stat-grid)
+  const totalCount = users.length;
+  const activeCount = users.filter((u) => u.active !== false).length;
+  const inactiveCount = users.filter((u) => u.active === false).length;
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
-      <View style={styles.cardActions}>
-        <TouchableOpacity style={styles.editBtn} onPress={() => handleOpenEdit(item)}>
-          <Text style={styles.editBtnText}>✏️ Sửa vai trò</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleBtn, item.active === false && styles.toggleBtnActive]}
-          onPress={() => handleToggleActive(item)}
-        >
-          <Text style={[styles.toggleBtnText, item.active === false && styles.toggleBtnTextActive]}>
-            {item.active === false ? '✓ Kích hoạt' : '⊘ Khóa'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Tìm theo tên, email, khoa..."
-          placeholderTextColor="#9BA3AF"
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <PageFrame>
+        <PageHead title="Quản lý người dùng" subtitle={`${filtered.length} người dùng`} />
 
-      <Text style={styles.countText}>{filtered.length} người dùng</Text>
+        {/* KPI stat cards (web .ui-stat-grid) */}
+        <StatCard variant="primary" label="Tổng tài khoản" value={totalCount} note="Toàn bộ người dùng đang quản lý" />
+        <StatCard variant="success" label="Đang hoạt động" value={activeCount} note="Tài khoản đang được kích hoạt" />
+        <StatCard variant="danger" label="Đã khóa" value={inactiveCount} note="Tài khoản đang bị vô hiệu hóa" />
 
-      {loading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#1565C0" /></View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Không có người dùng nào</Text>}
-        />
-      )}
+        {/* User list (web "Danh sách tài khoản" section) */}
+        <Section title="Danh sách tài khoản">
+          <Field label="Tìm kiếm">
+            <Input
+              placeholder="Tìm theo tên, email, khoa..."
+              value={search}
+              onChangeText={setSearch}
+            />
+          </Field>
+
+          {filtered.length === 0 ? (
+            <Empty>
+              {search
+                ? `Không tìm thấy người dùng phù hợp với "${search}"`
+                : 'Không có người dùng nào'}
+            </Empty>
+          ) : (
+            <>
+              {paged.map((item) => (
+                <View key={String(item.id)} style={styles.card}>
+                  <View style={styles.cardTop}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{(item.fullName || 'U')[0].toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.userName} numberOfLines={1}>{item.fullName || '—'}</Text>
+                      <Text style={styles.userEmail} numberOfLines={1}>{item.email || '—'}</Text>
+                      <Text style={styles.userDept} numberOfLines={1}>{item.department?.name || item.department || '—'}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.badgeRow}>
+                    <Badge variant="info">{ROLE_LABELS[item.role] || item.role || '—'}</Badge>
+                    <Badge variant={item.active === false ? 'rejected' : 'approved'}>
+                      {item.active === false ? 'Đã khóa' : 'Hoạt động'}
+                    </Badge>
+                  </View>
+                  <View style={styles.cardActions}>
+                    <Button
+                      title="Sửa vai trò"
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => handleOpenEdit(item)}
+                      style={styles.actionBtn}
+                    />
+                    <Button
+                      title={item.active === false ? 'Kích hoạt' : 'Khóa'}
+                      variant={item.active === false ? 'primary' : 'danger'}
+                      size="sm"
+                      onPress={() => handleToggleActive(item)}
+                      style={styles.actionBtn}
+                    />
+                  </View>
+                </View>
+              ))}
+
+              <Pagination
+                page={pageSafe}
+                totalPages={totalPages}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              />
+            </>
+          )}
+        </Section>
+      </PageFrame>
 
       {/* Edit Modal */}
       <Modal visible={editModal} transparent animationType="slide">
@@ -188,7 +245,7 @@ export default function AdminScreen() {
             {selected && (
               <Text style={styles.editSubtitle}>{selected.fullName}</Text>
             )}
-            <Text style={styles.label}>Vai trò</Text>
+            <Label>Vai trò</Label>
             <View style={styles.roleRow}>
               {ROLES.map((r) => (
                 <TouchableOpacity
@@ -200,61 +257,50 @@ export default function AdminScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity
-              style={[styles.submitBtn, actionLoading && { opacity: 0.7 }]}
+            <Button
+              title={actionLoading ? '' : 'Lưu thay đổi'}
               onPress={handleUpdate}
               disabled={actionLoading}
             >
-              {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Lưu thay đổi</Text>}
-            </TouchableOpacity>
+              {actionLoading ? <ActivityIndicator color={colors.white} /> : null}
+            </Button>
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
-function getRoleColor(role) {
-  if (role === 'lanhdao') return '#7C3AED';
-  if (role === 'thukho') return '#2563EB';
-  return '#059669';
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  searchRow: { padding: 12, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E0E6EF' },
-  searchInput: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, backgroundColor: '#F8FAFC', color: '#1A1A2E' },
-  countText: { fontSize: 12, color: '#9CA3AF', paddingHorizontal: 14, paddingVertical: 6 },
-  list: { paddingHorizontal: 12, paddingBottom: 40 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#1565C0', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 24 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  // User row card
+  card: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    padding: 12,
+    marginBottom: 10,
+  },
+  cardTop: { flexDirection: 'row', alignItems: 'center' },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  avatarText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
   cardInfo: { flex: 1 },
-  userName: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
-  userEmail: { fontSize: 12, color: '#6B7280' },
-  userDept: { fontSize: 12, color: '#9CA3AF' },
-  roleBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
-  roleText: { fontSize: 12, fontWeight: '600' },
-  cardActions: { flexDirection: 'row', gap: 8 },
-  editBtn: { flex: 1, backgroundColor: '#EFF6FF', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
-  editBtnText: { fontSize: 13, color: '#1565C0', fontWeight: '600' },
-  toggleBtn: { flex: 1, backgroundColor: '#FEF2F2', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
-  toggleBtnActive: { backgroundColor: '#ECFDF5' },
-  toggleBtnText: { fontSize: 13, color: '#EF4444', fontWeight: '600' },
-  toggleBtnTextActive: { color: '#10B981' },
-  emptyText: { textAlign: 'center', color: '#9BA3AF', paddingVertical: 40, fontSize: 15 },
+  userName: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.text },
+  userEmail: { fontSize: fontSize.sm, color: colors.textSoft },
+  userDept: { fontSize: fontSize.sm, color: colors.textMuted },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  actionBtn: { flex: 1 },
+  // Edit modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1565C0', marginBottom: 4, textAlign: 'center' },
-  editSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 16, textAlign: 'center' },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 10 },
-  roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  roleChip: { borderWidth: 1.5, borderColor: '#E0E6EF', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
-  roleChipActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  roleChipText: { fontSize: 14, color: '#6B7280' },
-  roleChipTextActive: { color: '#FFF', fontWeight: '700' },
-  submitBtn: { backgroundColor: '#1565C0', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 4, textAlign: 'center' },
+  editSubtitle: { fontSize: 14, color: colors.textSoft, marginBottom: 16, textAlign: 'center' },
+  roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, marginTop: 6 },
+  roleChip: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  roleChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  roleChipText: { fontSize: 14, color: colors.textSoft },
+  roleChipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
 });
