@@ -13,6 +13,23 @@ const API_ENDPOINTS = {
 
 const moneyFmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 function toNumber(value) {
   if (value === null || value === undefined) return 0;
   const s = String(value).replace(/,/g, ".").trim();
@@ -214,8 +231,8 @@ export default function ReceiptPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyErr, setHistoryErr] = useState("");
   const [historyItems, setHistoryItems] = useState([]);
-  const [historyAfterId, setHistoryAfterId] = useState(null);
-  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [historySearch, setHistorySearch] = useState("");
   const HISTORY_LIMIT = 20;
 
@@ -246,7 +263,7 @@ export default function ReceiptPage() {
   useEffect(() => {
     if (activeTab !== "history") return;
     if (!currentUser?.id) return;
-    loadHistory(true);
+    loadHistory(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentUser?.id]);
 
@@ -512,7 +529,7 @@ export default function ReceiptPage() {
       setMessage({ type: "success", text: "Đã lưu phiếu nhập thành công." });
 
       if (activeTab === "history") {
-        await loadHistory(true);
+        await loadHistory(historyPage);
       }
     } catch (error) {
       setMessage({ type: "error", text: error?.message || "Có lỗi xảy ra" });
@@ -537,30 +554,24 @@ export default function ReceiptPage() {
       filtered = filtered.filter((item) => Number(item.createdBy.id) === Number(currentUser?.id));
     }
 
-    const hasMore =
-      typeof data?.hasMore === "boolean" ? data.hasMore : filtered.length >= HISTORY_LIMIT;
+    const summary = data?.summary || {};
+    const currentPage = Number(summary?.currentPage ?? data?.currentPage ?? 0);
+    const totalPages = Math.max(1, Number(summary?.totalPages ?? data?.totalPages ?? 1));
 
-    const nextAfterId =
-      data?.nextAfterId ??
-      data?.lastId ??
-      (filtered.length ? filtered[filtered.length - 1]?.id : null);
-
-    return { list: filtered, hasMore, nextAfterId };
+    return { list: filtered, currentPage, totalPages };
   }
 
-  async function loadHistory(reset = false) {
+  async function loadHistory(page = 0) {
     if (!currentUser?.id) return;
 
     setHistoryErr("");
     setHistoryLoading(true);
 
     try {
-      const afterId = reset ? null : historyAfterId;
+      const nextPage = Math.max(0, Number(page) || 0);
       const qs = new URLSearchParams();
       qs.set("limit", String(HISTORY_LIMIT));
-      if (afterId !== null && afterId !== undefined && afterId !== "") {
-        qs.set("afterId", String(afterId));
-      }
+      qs.set("page", String(nextPage));
 
       const res = await fetch(`${API_ENDPOINTS.RECEIPTS}/feed?${qs.toString()}`, {
         headers: { "X-User-Id": String(currentUser.id) },
@@ -569,10 +580,10 @@ export default function ReceiptPage() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
 
-      const { list, hasMore, nextAfterId } = normalizeFeed(data);
-      setHistoryItems((prev) => (reset ? list : [...prev, ...list]));
-      setHistoryHasMore(Boolean(hasMore));
-      setHistoryAfterId(nextAfterId ?? null);
+      const { list, currentPage, totalPages } = normalizeFeed(data);
+      setHistoryItems(list);
+      setHistoryPage(currentPage);
+      setHistoryTotalPages(totalPages);
     } catch (error) {
       setHistoryErr(error?.message || "Không thể tải lịch sử phiếu nhập");
     } finally {
@@ -589,13 +600,13 @@ export default function ReceiptPage() {
       });
 
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+      if (!res.ok || !data?.success) throw new Error(data?.message || `HTTP ${res.status}`);
 
       const headerObj = data?.receipt || data?.header || data?.data?.receipt || data?.data?.header || data?.data || {};
       const details = data?.details || data?.items || data?.lines || data?.data?.details || [];
 
       const hId = headerObj?.id ?? receiptId;
-      const hDate = headerObj?.receiptDate ?? headerObj?.receipt_date ?? "";
+      const hDate = fmtDate(headerObj?.receiptDate ?? headerObj?.receipt_date ?? "");
       const hFrom = headerObj?.receivedFrom ?? headerObj?.received_from ?? "";
       const hReason = headerObj?.reason ?? "";
       const hTotal = headerObj?.totalAmount ?? headerObj?.total_amount ?? 0;
@@ -606,21 +617,21 @@ export default function ReceiptPage() {
               const name = detail?.name || detail?.materialName || "";
               const code = detail?.code || "";
               const lot = detail?.lotNumber || detail?.lot_number || "";
-              const exp = detail?.expDate || detail?.exp_date || "";
+              const exp = fmtDate(detail?.expDate || detail?.exp_date || "");
               const qty = detail?.qtyActual ?? detail?.qty_actual ?? 0;
               const price = detail?.price ?? 0;
               const total = detail?.total ?? Number(qty) * Number(price);
 
               return `
                 <tr>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${index + 1}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(name)}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(code)}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(lot)}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;">${escapeHtml(exp)}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;text-align:right;">${escapeHtml(moneyFmt.format(qty))}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;text-align:right;">${escapeHtml(moneyFmt.format(price))}</td>
-                  <td style="padding:6px 8px;border-top:1px solid #e5e7eb;text-align:right;">${escapeHtml(moneyFmt.format(total))}</td>
+                  <td class="text-center">${index + 1}</td>
+                  <td>${escapeHtml(name)}</td>
+                  <td>${escapeHtml(code)}</td>
+                  <td>${escapeHtml(lot)}</td>
+                  <td>${escapeHtml(exp)}</td>
+                  <td class="text-right">${escapeHtml(moneyFmt.format(toNumber(qty)))}</td>
+                  <td class="text-right">${escapeHtml(moneyFmt.format(toNumber(price)))}</td>
+                  <td class="text-right">${escapeHtml(moneyFmt.format(toNumber(total)))}</td>
                 </tr>
               `;
             })
@@ -628,40 +639,68 @@ export default function ReceiptPage() {
         : "";
 
       const html = `
-        <div style="text-align:left;font-size:14px;">
-          <div><b>Mã phiếu:</b> #${escapeHtml(hId)}</div>
-          <div><b>Ngày nhập:</b> ${escapeHtml(hDate)}</div>
-          <div><b>Nhà cung cấp / người giao:</b> ${escapeHtml(hFrom)}</div>
-          <div><b>Lý do:</b> ${escapeHtml(hReason)}</div>
-          <div style="margin-top:8px;"><b>Tổng tiền:</b> ${escapeHtml(moneyFmt.format(hTotal))}</div>
+        <div class="ui-history-detail">
+          <div class="ui-history-detail-head">Chi tiết Phiếu Nhập #${escapeHtml(hId)}</div>
+          <div class="ui-history-detail-body">
+            <div class="ui-history-info">
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Mã phiếu:</div>
+                <div class="ui-history-info-value">#${escapeHtml(hId)}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Ngày nhập:</div>
+                <div class="ui-history-info-value">${escapeHtml(hDate)}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Nhà cung cấp / người giao:</div>
+                <div class="ui-history-info-value">${escapeHtml(hFrom || "—")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Lý do nhập:</div>
+                <div class="ui-history-info-value">${escapeHtml(hReason || "—")}</div>
+              </div>
+              <div class="ui-history-info-row">
+                <div class="ui-history-info-label">Tổng tiền:</div>
+                <div class="ui-history-info-value">${escapeHtml(moneyFmt.format(toNumber(hTotal)))}</div>
+              </div>
+            </div>
 
-          <div style="margin-top:12px;">
-            <b>Chi tiết vật tư:</b>
-            <div style="overflow:auto;max-height:320px;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px;">
-              <table style="width:100%;border-collapse:collapse;">
+            <div class="ui-section">
+              <div class="ui-section-head">
+                <div>
+                  <h3 class="ui-section-title">Danh sách vật tư</h3>
+                  <p class="ui-section-subtitle">${Array.isArray(details) ? details.length : 0} vật tư</p>
+                </div>
+              </div>
+              <div class="ui-table-wrap">
+                <table class="ui-table">
                 <thead>
-                  <tr style="background:#f8fafc;">
-                    <th style="padding:8px;text-align:left;">#</th>
-                    <th style="padding:8px;text-align:left;">Tên</th>
-                    <th style="padding:8px;text-align:left;">Mã</th>
-                    <th style="padding:8px;text-align:left;">Số lô</th>
-                    <th style="padding:8px;text-align:left;">Hạn dùng</th>
-                    <th style="padding:8px;text-align:right;">SL</th>
-                    <th style="padding:8px;text-align:right;">Đơn giá</th>
-                    <th style="padding:8px;text-align:right;">Thành tiền</th>
+                  <tr>
+                    <th>TT</th>
+                    <th>Tên vật tư</th>
+                    <th>Mã code</th>
+                    <th>Số lô</th>
+                    <th>Hạn dùng</th>
+                    <th class="text-right">SL nhập</th>
+                    <th class="text-right">Đơn giá</th>
+                    <th class="text-right">Thành tiền</th>
                   </tr>
                 </thead>
-                <tbody>${rowsHtml}</tbody>
-              </table>
+                  <tbody>${rowsHtml || '<tr><td colspan="8" class="text-center">Không có vật tư</td></tr>'}</tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
       `;
 
       await Swal.fire({
-        title: `Chi tiết phiếu nhập #${hId}`,
         html,
-        width: 900,
+        width: 960,
+        customClass: {
+          popup: "ui-history-detail-popup",
+        },
+        showConfirmButton: false,
         confirmButtonText: "Đóng",
       });
     } catch (error) {
@@ -968,7 +1007,7 @@ export default function ReceiptPage() {
                 <button
                   type="button"
                   className="ui-btn ui-btn-secondary"
-                  onClick={() => loadHistory(true)}
+                  onClick={() => loadHistory(historyPage)}
                   disabled={historyLoading}
                 >
                   Tải lại
@@ -995,7 +1034,7 @@ export default function ReceiptPage() {
                   {filteredHistory.length > 0 ? (
                     filteredHistory.map((item) => {
                       const id = item?.id;
-                      const date = item?.receiptDate ?? item?.receipt_date ?? "";
+                      const date = fmtDate(item?.receiptDate ?? item?.receipt_date ?? "");
                       const from = item?.receivedFrom ?? item?.received_from ?? "";
                       const reason = item?.reason ?? "";
                       const total = item?.totalAmount ?? item?.total_amount ?? 0;
@@ -1031,15 +1070,35 @@ export default function ReceiptPage() {
               </table>
             </div>
 
-            <div className="receipt-history-footer">
+            <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu nhập">
               <button
                 type="button"
-                className="ui-btn ui-btn-secondary"
-                onClick={() => loadHistory(false)}
-                disabled={historyLoading || !historyHasMore}
-                title={!historyHasMore ? "Không còn dữ liệu" : ""}
+                className="ui-pagination-btn"
+                onClick={() => loadHistory(historyPage - 1)}
+                disabled={historyLoading || historyPage <= 0}
               >
-                {historyLoading ? "Đang tải..." : "Tải thêm"}
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(historyTotalPages, historyPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === historyPage ? "is-active" : ""}`}
+                  onClick={() => loadHistory(page)}
+                  disabled={historyLoading || page === historyPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => loadHistory(historyPage + 1)}
+                disabled={historyLoading || historyPage >= historyTotalPages - 1}
+              >
+                Trang sau
               </button>
             </div>
           </div>

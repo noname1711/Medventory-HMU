@@ -6,7 +6,9 @@ import com.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -79,6 +81,7 @@ public class ReceiptService {
         }
     }
 
+    @Transactional(readOnly = true)
     public ReceiptResponseDTO getReceiptDetail(Long receiptId, Long userId) {
         try {
             User user = userRepository.findById(userId)
@@ -99,10 +102,8 @@ public class ReceiptService {
             }
 
             List<ReceiptDetail> details = receiptDetailRepository.findByHeaderId(receiptId);
-            header.setDetails(details);
-
-            ReceiptHeaderDTO headerDTO = convertHeaderToDTO(header);
-            Map<String, Object> summary = createSummary(header);
+            ReceiptHeaderDTO headerDTO = convertHeaderToDTO(header, details);
+            Map<String, Object> summary = createSummaryFromDetails(header, details);
 
             return ReceiptResponseDTO.success("Lấy chi tiết phiếu nhập thành công", headerDTO, headerDTO.getDetails(), summary);
 
@@ -286,25 +287,33 @@ public class ReceiptService {
     }
 
     private Map<String, Object> createSummary(ReceiptHeader header) {
-        Map<String, Object> summary = new HashMap<>();
-
         List<ReceiptDetail> details = header.getDetails() != null ? header.getDetails()
                 : receiptDetailRepository.findByHeaderId(header.getId());
+        return createSummaryFromDetails(header, details);
+    }
 
-        long totalLines = details.size();
-        BigDecimal totalQty = details.stream()
-                .map(d -> nvl(d.getQtyActual()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    private ReceiptHeaderDTO convertHeaderToDTO(ReceiptHeader header, List<ReceiptDetail> details) {
+        ReceiptHeaderDTO dto = new ReceiptHeaderDTO();
+        dto.setId(header.getId());
+        if (header.getCreatedBy() != null) {
+            dto.setCreatedById(header.getCreatedBy().getId());
+            dto.setCreatedByName(header.getCreatedBy().getFullName());
+        }
+        dto.setReceivedFrom(header.getReceivedFrom());
+        dto.setReason(header.getReason());
+        dto.setReceiptDate(header.getReceiptDate());
+        dto.setTotalAmount(header.getTotalAmount());
+        dto.setDetails(details.stream().map(this::convertDetailToDTO).collect(Collectors.toList()));
+        return dto;
+    }
 
-        BigDecimal totalAmount = details.stream()
-                .map(d -> nvl(d.getTotal()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        summary.put("totalLines", totalLines);
+    private Map<String, Object> createSummaryFromDetails(ReceiptHeader header, List<ReceiptDetail> details) {
+        Map<String, Object> summary = new HashMap<>();
+        BigDecimal totalQty = details.stream().map(d -> nvl(d.getQtyActual())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalAmount = details.stream().map(d -> nvl(d.getTotal())).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        summary.put("totalLines", (long) details.size());
         summary.put("totalQuantity", totalQty);
         summary.put("totalAmount", totalAmount);
-
         return summary;
     }
 
@@ -316,37 +325,64 @@ public class ReceiptService {
         return s == null ? "" : s.trim();
     }
 
-    public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId) {
+    @Transactional(readOnly = true)
+    public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId, Integer page) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
             if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
 
-            long aid = (afterId == null || afterId < 0) ? 0 : afterId;
             int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);
 
+            if (page != null) {
+                int pageNumber = Math.max(0, page);
+                Page<ReceiptHeader> pageResult = receiptHeaderRepository
+                        .findAll(PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
+
+                List<ReceiptFeedItemDTO> items = pageResult.getContent().stream().map(this::toReceiptFeedItemDTO).toList();
+
+                return ReceiptFeedResponseDTO.success(
+                        items.isEmpty() ? "Không có phiếu nhập mới" : "Có phiếu nhập mới",
+                        items,
+                        Map.of(
+                                "currentPage", pageNumber,
+                                "pageSize", size,
+                                "totalPages", pageResult.getTotalPages(),
+                                "totalElements", pageResult.getTotalElements(),
+                                "hasPrevious", pageResult.hasPrevious(),
+                                "hasNext", pageResult.hasNext(),
+                                "count", items.size()
+                        )
+                );
+            }
+
+            long cursor = (afterId == null || afterId <= 0) ? Long.MAX_VALUE : afterId;
             List<ReceiptHeader> headers = receiptHeaderRepository
-                    .findByIdGreaterThanOrderByIdAsc(aid, PageRequest.of(0, size));
+                    .findByIdLessThanOrderByIdDesc(cursor, PageRequest.of(0, size));
 
-            List<ReceiptFeedItemDTO> items = headers.stream().map(h -> {
-                ReceiptFeedItemDTO x = new ReceiptFeedItemDTO();
-                x.setId(h.getId());
-                x.setReceiptDate(h.getReceiptDate());
-                x.setReceivedFrom(h.getReceivedFrom());
-                x.setTotalAmount(h.getTotalAmount());
-                return x;
-            }).toList();
+            List<ReceiptFeedItemDTO> items = headers.stream().map(this::toReceiptFeedItemDTO).toList();
 
-            Long maxId = items.isEmpty() ? aid : items.get(items.size() - 1).getId();
+            Long nextCursor = items.isEmpty() ? cursor : items.get(items.size() - 1).getId();
+            boolean hasMore = items.size() == size;
 
             return ReceiptFeedResponseDTO.success(
                     items.isEmpty() ? "Không có phiếu nhập mới" : "Có phiếu nhập mới",
                     items,
-                    Map.of("afterId", aid, "maxId", maxId, "count", items.size())
+                    Map.of("nextAfterId", nextCursor, "hasMore", hasMore, "count", items.size())
             );
 
         } catch (Exception e) {
             return ReceiptFeedResponseDTO.error("Không thể lấy feed phiếu nhập: " + e.getMessage());
         }
+    }
+
+    private ReceiptFeedItemDTO toReceiptFeedItemDTO(ReceiptHeader h) {
+        ReceiptFeedItemDTO x = new ReceiptFeedItemDTO();
+        x.setId(h.getId());
+        x.setReceiptDate(h.getReceiptDate());
+        x.setReceivedFrom(h.getReceivedFrom());
+        x.setReason(h.getReason());
+        x.setTotalAmount(h.getTotalAmount());
+        return x;
     }
 }

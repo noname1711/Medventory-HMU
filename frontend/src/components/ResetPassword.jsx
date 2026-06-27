@@ -83,9 +83,8 @@ export default function ResetPassword() {
       } else {
         toast.error(data.message || "Mã không hợp lệ hoặc đã hết hạn!");
       }
-    } catch (error) {
+    } catch {
       toast.error("Không thể kết nối đến server!");
-      console.error("Error:", error);
     } finally {
       setIsLoading(false);
     }

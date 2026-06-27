@@ -71,10 +71,11 @@ Hệ thống hỗ trợ quản lý nghiệp vụ vật tư y tế:
 ```txt
 Medventory-HMU/
 ├── backend/                         # Spring Boot REST API
+│   ├── .mvn/                        # Maven Wrapper metadata
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/backend/
-│   │   │   │   ├── config/          # Cấu hình CORS
+│   │   │   │   ├── config/          # Cấu hình backend
 │   │   │   │   ├── controller/      # REST controllers
 │   │   │   │   ├── dto/             # Request/response DTO
 │   │   │   │   ├── entity/          # Entity ánh xạ bảng database
@@ -89,28 +90,61 @@ Medventory-HMU/
 │   │       │   └── BackendApplicationTests.java
 │   │       └── resources/
 │   │           └── application.properties
+│   ├── target/                      # Output build/test Maven, sinh tự động
 │   ├── mvnw
 │   ├── mvnw.cmd
+│   ├── .gitattributes
+│   ├── .gitignore
 │   └── pom.xml
 ├── frontend/                        # React/Vite SPA
 │   ├── src/
-│   │   ├── components/              # Tất cả các component React
-│   │   ├── assets/
+│   │   ├── components/
+│   │   │   ├── dashboard-ui.css     # Style chung cho dashboard/table/modal/button/input
+│   │   │   ├── Dashboard*.jsx/css   # Layout dashboard, header, tabs
+│   │   │   ├── AuthForm.jsx/css     # Đăng nhập/đăng ký
+│   │   │   ├── ForgotPassword.jsx/css
+│   │   │   ├── ResetPassword.jsx
+│   │   │   ├── EquipmentList.jsx/css
+│   │   │   ├── ReplenishmentRequest.jsx/css
+│   │   │   ├── ForecastApproval.jsx/css
+│   │   │   ├── CreateIssueRequest.jsx/css
+│   │   │   ├── IssueRequestApproval.jsx/css
+│   │   │   ├── ReceiptPage.jsx/css
+│   │   │   ├── IssuePage.jsx/css
+│   │   │   ├── Admin.jsx/css
+│   │   │   ├── RBACSection.jsx/css
+│   │   │   ├── MaterialSearchInput.jsx/css
+│   │   │   ├── ExportEquipment.jsx
+│   │   │   └── dashboardConstants.js
+│   │   ├── assets/                  # Static assets của React
 │   │   ├── App.jsx
 │   │   ├── App.css
 │   │   ├── main.jsx
 │   │   └── index.css
-│   ├── public/
+│   ├── public/                      # Public static files cho Vite
+│   ├── dist/                        # Output `npm run build`, sinh tự động
+│   ├── node_modules/                # Dependencies npm, sinh tự động
 │   ├── index.html
 │   ├── package.json
+│   ├── package-lock.json
+│   ├── taiwind.config.js
 │   ├── vite.config.js
-│   └── eslint.config.js
+│   ├── eslint.config.js
+│   ├── .gitignore
+│   ├── vite-dev.err.log
+│   └── vite-dev.out.log
 ├── database/                        # SQL khởi tạo database
 │   └── final_database.sql
 ├── report/                          # Báo cáo và slide
 │   ├── BCCK.pdf
 │   ├── BCCK.pptx
 │   └── SETUP.pdf
+├── test_screenshots/                # Script và ảnh chụp UI phục vụ kiểm thử giao diện
+│   ├── capture_remaining_ui.py
+│   └── *.png
+├── AC2070_Medventory_HMU_Filled.xlsx
+├── AC2070_Report_Tables_Checklist_Template.xlsx
+├── .gitignore
 └── README.md
 ```
 
@@ -150,6 +184,8 @@ spring.jpa.properties.hibernate.format_sql=true
 logging.level.org.hibernate=DEBUG
 
 spring.web.cors.allowed-origins=http://localhost:5173
+
+medventory.issue-req.auto-approve-enabled=false
 ```
 
 Tạo database:
@@ -284,7 +320,7 @@ Tất cả API backend nằm dưới prefix `/api`.
 | `AdminController` | `/api/admin` | Duyệt user, quản lý user, vai trò và phân quyền |
 | `MaterialController` | `/api/materials` | Danh mục vật tư, tìm kiếm vật tư, feed vật tư |
 | `IssueReqController` | `/api/issue-requests` | Tạo, xem, duyệt, từ chối phiếu xin lĩnh |
-| `IssueController` | `/api/issues` | Xem trước và tạo phiếu xuất kho |
+| `IssueController` | `/api/issues` | Xem trước, kiểm tra điều kiện và tạo phiếu xuất kho |
 | `ReceiptController` | `/api/receipts` | Tạo và xem phiếu nhập kho |
 | `SuppForecastController` | `/api/supp-forecast` | Phiếu dự trù bổ sung và phê duyệt dự trù |
 | `NotificationController` | `/api/notifications` | Thông báo và đánh dấu đã đọc |
@@ -303,24 +339,55 @@ Một số endpoint tiêu biểu:
 - `GET /api/admin/users/all`
 - `POST /api/admin/users/{userId}/approve`
 - `POST /api/admin/users/{userId}/reject`
+- `DELETE /api/admin/users/{userId}`
+- `PUT /api/admin/users/{userId}/role`
+- `GET /api/admin/settings/issue-req-auto-approve`
+- `PUT /api/admin/settings/issue-req-auto-approve`
 - `GET /api/admin/rbac/roles`
 - `GET /api/admin/rbac/permissions`
+- `GET /api/admin/rbac/roles/{roleCode}/permissions`
 - `PUT /api/admin/rbac/roles/{roleCode}/permissions`
+- `POST /api/admin/rbac/roles/{roleCode}/permissions/reset`
+- `GET /api/admin/rbac/users/{userId}/permissions`
+- `PUT /api/admin/rbac/users/{userId}/permissions`
+- `POST /api/admin/rbac/users/{userId}/permissions/grant`
+- `POST /api/admin/rbac/users/{userId}/permissions/remove`
+- `DELETE /api/admin/rbac/users/{userId}/permissions`
 - `GET /api/materials`
 - `GET /api/materials/search`
+- `GET /api/materials/categories`
+- `GET /api/materials/feed`
 - `POST /api/materials`
 - `POST /api/issue-requests/canbo/create`
+- `GET /api/issue-requests/canbo/my-requests`
+- `GET /api/issue-requests/canbo/previous`
 - `GET /api/issue-requests/leader/pending`
+- `GET /api/issue-requests/leader/processed`
+- `GET /api/issue-requests/{id}/detail`
 - `POST /api/issue-requests/{id}/approve`
+- `POST /api/issue-requests/{id}/reject`
 - `POST /api/receipts/create`
 - `GET /api/receipts/feed`
+- `GET /api/receipts/{id}/detail`
+- `GET /api/issues/feed`
+- `GET /api/issues/preview`
 - `GET /api/issues/eligible-requests`
+- `GET /api/issues/eligible-requests-with-reasons`
+- `GET /api/issues/{id}/detail`
+- `GET /api/issues/materials/{materialId}/lots`
 - `POST /api/issues/create-from-issue-req`
 - `POST /api/supp-forecast`
 - `GET /api/supp-forecast/bgh/pending`
+- `GET /api/supp-forecast/bgh/processed`
+- `GET /api/supp-forecast/bgh/stats`
+- `GET /api/supp-forecast/my`
+- `GET /api/supp-forecast/previous`
+- `GET /api/supp-forecast/{id}`
 - `POST /api/supp-forecast/approve`
 - `GET /api/notifications/my`
 - `POST /api/notifications/{id}/read`
+- `POST /api/notifications/read-all`
+- `POST /api/notifications/issue-req/{issueReqId}/schedule`
 
 ## Tài khoản mẫu
 
@@ -334,6 +401,12 @@ Một số email mẫu:
 
 | Email | Vai trò | Trạng thái |
 | --- | --- | --- |
+| `admin@gmail.com` | Admin | Đã duyệt |
+| `hieutruong@gmail.com` | BGH | Đã duyệt |
+| `phohieutruong1@gmail.com` | BGH | Đã duyệt |
+| `phohieutruong2@gmail.com` | BGH | Đã duyệt |
+| `phohieutruong3@gmail.com` | BGH | Đã duyệt |
+| `phohieutruong4@gmail.com` | BGH | Đã duyệt |
 | `lanhdao@gmail.com` | Lãnh đạo | Đã duyệt |
 | `pholanhdao@gmail.com` | Lãnh đạo | Đã duyệt |
 | `thukho@gmail.com` | Thủ kho | Đã duyệt |
@@ -348,19 +421,21 @@ Một số email mẫu:
 ### Quản lý người dùng
 
 ```txt
-Người dùng đăng ký -> PENDING -> Admin/Lãnh đạo duyệt -> APPROVED
+Người dùng đăng ký -> PENDING -> ADMIN duyệt hoặc từ chối -> APPROVED/REJECTED
 ```
 
-Người dùng thuộc vai trò BGH có thể được xem như nhóm quản trị cấp cao trong nghiệp vụ.
+ADMIN quản lý tài khoản và phân quyền hệ thống. BGH xử lý nghiệp vụ phê duyệt dự trù theo quyền được seed trong database.
 
 ### Phiếu xin lĩnh và xuất kho
 
 ```txt
 CAN_BO tạo phiếu xin lĩnh
--> LANH_DAO phê duyệt/từ chối/yêu cầu chỉnh sửa
+-> LANH_DAO phê duyệt hoặc từ chối
 -> THU_KHO tạo phiếu xuất kho
 -> Hệ thống cập nhật tồn kho và lô vật tư
 ```
+
+Hệ thống có cơ chế giữ chỗ tồn kho (`issue_reservations`) để bảo vệ lượng tồn đã dùng cho phiếu xin lĩnh được tự động duyệt. Cơ chế tự động duyệt phiếu xin lĩnh khi đủ tồn kho được điều khiển bằng setting `issue_req.auto_approve_enabled`, mặc định tắt trong `database/final_database.sql` và `application.properties`.
 
 ### Phiếu dự trù bổ sung
 
@@ -382,6 +457,7 @@ THU_KHO tạo phiếu nhập kho
 
 Vai trò chính:
 
+- `ADMIN`: Quản trị hệ thống, quản lý người dùng và phân quyền.
 - `BGH`: Ban Giám Hiệu / nhóm lãnh đạo cấp cao.
 - `LANH_DAO`: Lãnh đạo khoa/phòng.
 - `THU_KHO`: Thủ kho.
@@ -400,8 +476,19 @@ Mã quyền chính:
 | `MATERIAL.MANAGE` | Quản lý/theo dõi vật tư | Các màn hình vật tư |
 | `USERS.MANAGE` | Quản lý người dùng | `Admin` |
 | `PERMISSIONS.MANAGE` | Phân quyền vai trò | `RBACSection` |
+| `NOTIF.MANAGE` | Quản lý thông báo | Header/thông báo nghiệp vụ |
 
-Quyền mặc định theo vai trò được hardcode trong `RbacService.DEFAULT_ROLE_PERMS`. Ngoài quyền mặc định, hệ thống có bảng `user_permissions` để grant/revoke quyền riêng cho từng người dùng.
+Quyền mặc định theo vai trò được định nghĩa trong `RbacService.DEFAULT_ROLE_PERMS` và seed vào bảng `role_permissions` trong `database/final_database.sql`. Ngoài quyền theo vai trò, hệ thống có bảng `user_permissions` để grant/revoke quyền riêng cho từng người dùng.
+
+Phân quyền seed mặc định:
+
+| Role | Quyền mặc định |
+| --- | --- |
+| `ADMIN` | `USERS.MANAGE`, `PERMISSIONS.MANAGE` |
+| `BGH` | `MATERIAL.VIEW`, `SUPP_FORECAST.APPROVE`, `NOTIF.MANAGE` |
+| `LANH_DAO` | `MATERIAL.VIEW`, `ISSUE_REQ.APPROVE`, `NOTIF.MANAGE` |
+| `THU_KHO` | `MATERIAL.VIEW`, `SUPP_FORECAST.CREATE`, `RECEIPT.CREATE`, `ISSUE.CREATE`, `MATERIAL.MANAGE`, `NOTIF.MANAGE` |
+| `CAN_BO` | `MATERIAL.VIEW`, `ISSUE_REQ.CREATE` |
 
 ## Kiểm thử và build
 
@@ -447,6 +534,7 @@ Frontend hiện chưa có test suite riêng.
 - Login trả token dạng `user-token-{userId}` và token được lưu in-memory, restart server sẽ mất token.
 - Mật khẩu trong dữ liệu hiện đang lưu plaintext. Không tự ý thêm BCrypt nếu chưa có migration plan cho dữ liệu cũ.
 - `spring.jpa.hibernate.ddl-auto=update`, nên Hibernate có thể tự cập nhật schema khi app chạy.
-- `final_database.sql` là script seed đầy đủ hơn `database.sql` và nên được ưu tiên sử dụng.
-- Danh sách equipment trong `Dashboard.jsx` có một phần dữ liệu khởi tạo hardcoded trong React state, không phải toàn bộ đều persist qua backend.
+- `database/final_database.sql` là script reset/seed chính, có tạo role, permission, user mẫu, system settings, notification, phiếu mẫu, thẻ kho và reservation.
+- `issue_req.auto_approve_enabled` mặc định `false`; có thể bật/tắt qua màn hình phân quyền/admin hoặc API admin settings.
+- Tồn kho hiển thị ở frontend lấy từ `/api/inventory/materials`, đã trừ lượng reservation đang active.
 

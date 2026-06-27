@@ -3,10 +3,10 @@ package com.backend.controller;
 import com.backend.dto.UpdateRolePermissionsRequestDTO;
 import com.backend.dto.UserDTO;
 import com.backend.service.RbacService;
+import com.backend.service.SystemSettingsService;
 import com.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,7 +22,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "http://localhost:5173")
 public class AdminController {
 
     @Autowired
@@ -30,6 +29,9 @@ public class AdminController {
 
     @Autowired
     private RbacService rbacService;
+
+    @Autowired
+    private SystemSettingsService systemSettingsService;
 
     @GetMapping("/users/pending")
     public ResponseEntity<?> getPendingUsers(
@@ -69,13 +71,13 @@ public class AdminController {
             requireUsersManage(auth, actorId);
             boolean success = userService.updateUserStatus(userId, "approved");
             if (success) {
-                return ResponseEntity.ok(Map.of("message", "Da duyet tai khoan thanh cong"));
+                return ResponseEntity.ok(Map.of("message", "Đã duyệt tài khoản thành công"));
             }
-            return ResponseEntity.badRequest().body(Map.of("error", "Khong tim thay nguoi dung"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Không tìm thấy người dùng"));
         } catch (SecurityException se) {
             return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Loi khi duyet tai khoan: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "Lỗi khi duyệt tài khoản: " + e.getMessage()));
         }
     }
 
@@ -89,13 +91,13 @@ public class AdminController {
             requireUsersManage(auth, actorId);
             boolean success = userService.deleteUser(userId);
             if (success) {
-                return ResponseEntity.ok(Map.of("message", "Da tu choi va xoa tai khoan"));
+                return ResponseEntity.ok(Map.of("message", "Đã từ chối và xóa tài khoản"));
             }
-            return ResponseEntity.badRequest().body(Map.of("error", "Khong tim thay nguoi dung"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Không tìm thấy người dùng"));
         } catch (SecurityException se) {
             return ResponseEntity.status(403).body(Map.of("error", se.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Loi khi tu choi tai khoan: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "Lỗi khi từ chối tài khoản: " + e.getMessage()));
         }
     }
 
@@ -109,13 +111,13 @@ public class AdminController {
             requireUsersManage(auth, actorId);
             boolean success = userService.deleteUser(userId);
             if (success) {
-                return ResponseEntity.ok().body("Xoa nguoi dung thanh cong");
+                return ResponseEntity.ok().body("Xóa người dùng thành công");
             }
-            return ResponseEntity.badRequest().body("Khong tim thay nguoi dung");
+            return ResponseEntity.badRequest().body("Không tìm thấy người dùng");
         } catch (SecurityException se) {
             return forbidden(se);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Loi khi xoa nguoi dung: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Lỗi khi xóa người dùng: " + e.getMessage());
         }
     }
 
@@ -131,25 +133,29 @@ public class AdminController {
             String newRole = request == null ? null : (String) request.get("role");
 
             if (newRole == null || newRole.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body("Role khong duoc de trong");
+                return ResponseEntity.badRequest().body("Role không được để trống");
             }
 
-            if (newRole.equalsIgnoreCase("BGH")
+            if (newRole.equalsIgnoreCase("ADMIN")
+                    || newRole.equalsIgnoreCase("BGH")
+                    || newRole.equalsIgnoreCase("Admin")
+                    || newRole.equalsIgnoreCase("Quản trị hệ thống")
+                    || newRole.equalsIgnoreCase("Quan tri he thong")
                     || newRole.equals("Ban Giam Hieu")
                     || newRole.equals("Ban Giám Hiệu")
                     || newRole.equals("0")) {
-                return ResponseEntity.badRequest().body("Khong the cap nhat thanh Ban Giam Hieu");
+                return ResponseEntity.badRequest().body("Không thể cập nhật thành Admin/Ban Giám Hiệu");
             }
 
             boolean success = userService.updateUserRole(userId, newRole);
             if (success) {
-                return ResponseEntity.ok().body("Cap nhat quyen thanh cong");
+                return ResponseEntity.ok().body("Cập nhật quyền thành công");
             }
             return ResponseEntity.notFound().build();
         } catch (SecurityException se) {
             return forbidden(se);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Loi khi cap nhat quyen: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Lỗi khi cập nhật quyền: " + e.getMessage());
         }
     }
 
@@ -158,7 +164,7 @@ public class AdminController {
         try {
             return ResponseEntity.ok(userService.getAllDepartments());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Loi khi lay danh sach khoa: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Lỗi khi lấy danh sách khoa: " + e.getMessage());
         }
     }
 
@@ -177,6 +183,36 @@ public class AdminController {
     public ResponseEntity<?> listPermissions(@RequestHeader(value = "Authorization", required = false) String auth) {
         try {
             return ResponseEntity.ok(rbacService.listPermissions(auth));
+        } catch (SecurityException se) {
+            return forbidden(se);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/settings/issue-req-auto-approve")
+    public ResponseEntity<?> getIssueReqAutoApproveSetting(
+            @RequestHeader(value = "Authorization", required = false) String auth
+    ) {
+        try {
+            requireSettingsManage(auth);
+            return ResponseEntity.ok(systemSettingsService.getIssueReqAutoApproveSetting());
+        } catch (SecurityException se) {
+            return forbidden(se);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/settings/issue-req-auto-approve")
+    public ResponseEntity<?> updateIssueReqAutoApproveSetting(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestBody Map<String, Object> request
+    ) {
+        try {
+            requireSettingsManage(auth);
+            boolean enabled = request != null && Boolean.TRUE.equals(request.get("enabled"));
+            return ResponseEntity.ok(systemSettingsService.updateIssueReqAutoApproveSetting(enabled));
         } catch (SecurityException se) {
             return forbidden(se);
         } catch (Exception e) {
@@ -305,12 +341,17 @@ public class AdminController {
     }
 
     private void requireUsersManage(String auth, Long actorId) {
-        String message = "Ban khong co quyen " + RbacService.PERM_USERS_MANAGE;
+        String message = "Bạn không có quyền " + RbacService.PERM_USERS_MANAGE;
         if (actorId != null) {
             rbacService.requirePermission(actorId, RbacService.PERM_USERS_MANAGE, message);
             return;
         }
         rbacService.requirePermissionFromAuth(auth, RbacService.PERM_USERS_MANAGE, message);
+    }
+
+    private void requireSettingsManage(String auth) {
+        String message = "Ban khong co quyen " + RbacService.PERM_PERMISSIONS_MANAGE;
+        rbacService.requirePermissionFromAuth(auth, RbacService.PERM_PERMISSIONS_MANAGE, message);
     }
 
     private ResponseEntity<Map<String, String>> forbidden(SecurityException se) {

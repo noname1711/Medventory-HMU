@@ -9,5 +9,5 @@ import java.util.List;
 
 public interface ReceiptHeaderRepository extends JpaRepository<ReceiptHeader, Long> {
     List<ReceiptHeader> findByReceiptDateOrderByIdDesc(LocalDate receiptDate);
-    List<ReceiptHeader> findByIdGreaterThanOrderByIdAsc(Long afterId, Pageable pageable);
+    List<ReceiptHeader> findByIdLessThanOrderByIdDesc(Long beforeId, Pageable pageable);
 }

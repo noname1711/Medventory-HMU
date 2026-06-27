@@ -83,9 +83,8 @@ export default function ForgotPassword() {
             : "Gmail không tồn tại trong hệ thống!");
         toast.error(errorMessage);
       }
-    } catch (error) {
+    } catch {
       toast.error("Không thể kết nối đến server!");
-      console.error("Error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -96,10 +95,6 @@ export default function ForgotPassword() {
     toast.success("✅ Đã copy mã vào clipboard!");
     setShowTokenModal(false);
     navigate(`/reset-password?token=${encodeURIComponent(resetToken)}`);
-  };
-
-  const handleCloseModal = () => {
-    setShowTokenModal(false);
   };
 
   return (
@@ -155,8 +150,8 @@ export default function ForgotPassword() {
 
       {/* Token Modal với Countdown */}
       {showTokenModal && (
-        <div className="modal-overlay">
-          <div className="token-modal">
+        <div className="modal-overlay" onMouseDown={() => setShowTokenModal(false)}>
+          <div className="token-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-icon">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,9 +173,6 @@ export default function ForgotPassword() {
               </div>
 
               <div className="modal-actions">
-                <button onClick={handleCloseModal} className="close-btn">
-                  Đóng ngay
-                </button>
                 <button onClick={handleCopyToken} className="copy-action-btn">
                   <svg className="copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />

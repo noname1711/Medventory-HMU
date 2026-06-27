@@ -32,7 +32,7 @@
 }
 
 .ira-table {
-  min-width: 860px;
+  min-width: 0;
 }
 
 .ira-cell-id {
@@ -58,51 +58,15 @@
   font-size: 0.9rem;
 }
 
-.ira-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 1000;
-}
-
-.ira-modal {
-  background: #fff;
-  border-radius: 14px;
-  width: 100%;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-  border: 1px solid var(--ui-border);
-  overflow: hidden;
-}
-
 .ira-detail-modal {
+  width: min(980px, 100%);
   max-width: 980px;
   max-height: 90vh;
   overflow-y: auto;
 }
 
 .ira-approval-modal {
-  max-width: 640px;
-}
-
-.ira-modal-header {
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--ui-border);
-  background: #f8fafc;
-}
-
-.ira-modal-header h2 {
-  margin: 0;
-  color: var(--ui-text);
-  font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.ira-modal-body {
-  padding: 20px;
+  width: min(640px, 100%);
 }
 
 .ira-modal-loading {
@@ -126,122 +90,93 @@
   font-style: italic;
 }
 
-.ira-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ui-border);
-}
-
 .ira-modal-footer.single {
   justify-content: center;
 }
 
-.ira-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.ira-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
-.ira-info-item {
-  background: #f8fafc;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  padding: 12px;
-  color: var(--ui-text);
-  line-height: 1.5;
+.ira-detail-modal {
+  border-radius: 12px;
 }
 
-.ira-info-item-full {
-  grid-column: 1 / -1;
-}
-
-.ira-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.ira-summary-card {
-  background: #f8fafc;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  padding: 18px;
+.ira-detail-modal .ira-modal-header {
+  margin: 30px 30px 0;
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
   text-align: center;
 }
 
-.ira-summary-value {
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--ui-primary);
-  line-height: 1;
-}
-
-.ira-summary-label {
-  margin-top: 8px;
-  color: var(--ui-text-soft);
-  font-size: 0.9rem;
+.ira-detail-modal .ira-modal-header h2 {
+  color: #ffffff;
+  font-size: 1.15rem;
   font-weight: 700;
 }
 
-.ira-category-breakdown {
-  margin-top: 18px;
+.ira-detail-modal .ira-modal-body {
+  padding: 24px 30px 30px;
 }
 
-.ira-category-breakdown h4 {
-  margin: 0 0 10px;
-  color: var(--ui-text);
+.ira-detail-modal .ui-section {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
-.ira-category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.ira-category-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #f8fafc;
+.ira-detail-modal .ui-section:first-child {
   border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 20px;
+}
+
+.ira-detail-modal .ui-section:first-child .ui-section-head {
+  display: none;
+}
+
+.ira-detail-modal .ui-section + .ui-section {
+  margin-top: 22px;
+}
+
+.ira-detail-modal .ui-section-title {
+  margin: 0 0 14px;
+  color: var(--ui-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ira-detail-modal .ui-table-wrap {
+  max-height: 320px;
   border-radius: 8px;
 }
 
-.ira-category-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 0.82rem;
-  font-weight: 700;
+.ira-detail-modal .ui-table th {
+  font-size: 0.875rem;
 }
 
-.ira-category-count {
-  color: var(--ui-text-soft);
-  font-size: 0.88rem;
-  font-weight: 700;
+.ira-detail-modal .ui-table td {
+  vertical-align: top;
 }
 
-.ira-new-badge {
-  display: inline-flex;
+.ira-detail-modal .ira-modal-footer {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 0.72rem;
-  font-weight: 700;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ira-detail-modal .ira-modal-footer.single {
+  justify-content: flex-end;
 }
 
 @media (max-width: 900px) {
@@ -251,10 +186,6 @@
     align-items: stretch;
   }
 
-  .ira-info-grid,
-  .ira-summary-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 720px) {
@@ -269,16 +200,13 @@
 }
 
 @media (max-width: 640px) {
-  .ira-modal-overlay {
-    padding: 12px;
-  }
-
-  .ira-modal-body,
-  .ira-modal-header {
-    padding: 16px;
-  }
-
   .ira-modal-footer {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ira-detail-actions,
+  .ira-detail-actions .ui-btn {
+    width: 100%;
   }
 }

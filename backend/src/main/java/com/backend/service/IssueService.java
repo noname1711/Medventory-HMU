@@ -4,7 +4,9 @@ import com.backend.dto.*;
 import com.backend.entity.*;
 import com.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
@@ -368,6 +370,63 @@ public class IssueService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public IssueFeedResponseDTO feedIssues(Long afterId, Integer limit, Long userId, Integer page) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+            if (!user.isApproved()) {
+                throw new RuntimeException("Tài khoản chưa được kích hoạt");
+            }
+
+            if (!rbacService.hasPermission(user, RbacService.PERM_ISSUE_CREATE)) {
+                throw new RuntimeException("Bạn không có quyền xem lịch sử xuất kho");
+            }
+
+            int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);
+
+            if (page != null) {
+                int pageNumber = Math.max(0, page);
+                Page<IssueHeader> pageResult = issueHeaderRepository
+                        .findAll(PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
+
+                List<IssueFeedItemDTO> items = pageResult.getContent().stream().map(this::toIssueFeedItemDTO).toList();
+
+                return IssueFeedResponseDTO.success(
+                        items.isEmpty() ? "Không có phiếu xuất mới" : "Có phiếu xuất mới",
+                        items,
+                        Map.of(
+                                "currentPage", pageNumber,
+                                "pageSize", size,
+                                "totalPages", pageResult.getTotalPages(),
+                                "totalElements", pageResult.getTotalElements(),
+                                "hasPrevious", pageResult.hasPrevious(),
+                                "hasNext", pageResult.hasNext(),
+                                "count", items.size()
+                        )
+                );
+            }
+
+            long cursor = (afterId == null || afterId <= 0) ? Long.MAX_VALUE : afterId;
+            List<IssueHeader> headers = issueHeaderRepository
+                    .findByIdLessThanOrderByIdDesc(cursor, PageRequest.of(0, size));
+
+            List<IssueFeedItemDTO> items = headers.stream().map(this::toIssueFeedItemDTO).toList();
+
+            Long nextCursor = items.isEmpty() ? cursor : items.get(items.size() - 1).getId();
+            boolean hasMore = items.size() == size;
+
+            return IssueFeedResponseDTO.success(
+                    items.isEmpty() ? "Không có phiếu xuất mới" : "Có phiếu xuất mới",
+                    items,
+                    Map.of("nextAfterId", nextCursor, "hasMore", hasMore, "count", items.size())
+            );
+        } catch (Exception e) {
+            return IssueFeedResponseDTO.error("Không thể lấy feed phiếu xuất: " + e.getMessage());
+        }
+    }
+
     /**
      * Trả danh sách lô còn khả dụng (đã trừ TẤT CẢ reservation ACTIVE).
      * Dùng cho UI chọn lô thủ công.
@@ -653,6 +712,35 @@ public class IssueService {
 
         List<IssueDetail> details = issueDetailRepository.findByHeaderId(header.getId());
         dto.setDetails(details.stream().map(this::toIssueDetailDTO).collect(Collectors.toList()));
+        return dto;
+    }
+
+    private IssueFeedItemDTO toIssueFeedItemDTO(IssueHeader header) {
+        IssueFeedItemDTO dto = new IssueFeedItemDTO();
+        dto.setId(header.getId());
+        dto.setIssueDate(header.getIssueDate());
+        dto.setReceiverName(header.getReceiverName());
+        dto.setTotalAmount(header.getTotalAmount());
+
+        if (header.getCreatedBy() != null) {
+            dto.setCreatedById(header.getCreatedBy().getId());
+            dto.setCreatedByName(header.getCreatedBy().getFullName());
+        }
+
+        if (header.getDepartment() != null) {
+            dto.setDepartmentId(header.getDepartment().getId());
+            dto.setDepartmentName(header.getDepartment().getName());
+        }
+
+        if (header.getIssueReq() != null) {
+            IssueReqHeader req = header.getIssueReq();
+            dto.setIssueReqId(req.getId());
+            if (req.getSubDepartment() != null) {
+                dto.setSubDepartmentId(req.getSubDepartment().getId());
+                dto.setSubDepartmentName(req.getSubDepartment().getName());
+            }
+        }
+
         return dto;
     }
 
@@ -1194,13 +1282,6 @@ public class IssueService {
 
                 if (isAlreadyIssued(req)) {
                     rejectedAlreadyIssued++;
-                    ineligible.add(IneligibleIssueReqDTO.of(
-                            reqDTO,
-                            "ALREADY_ISSUED",
-                            "Phiếu đã được xuất kho trước đó",
-                            null,
-                            null
-                    ));
                     continue;
                 }
 

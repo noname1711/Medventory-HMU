@@ -11,7 +11,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/units")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
 public class UnitController {
 
     private final UnitRepository unitRepository;

@@ -6,7 +6,6 @@ import com.backend.entity.SuppForecastHeader;
 import com.backend.service.SuppForecastService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +18,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/supp-forecast")
-@CrossOrigin(origins = "http://localhost:5173")
 public class SuppForecastController {
 
     @Autowired
@@ -62,15 +60,20 @@ public class SuppForecastController {
             SuppForecastHeader header = forecastService.createForecast(request);
             return ResponseEntity.ok().body(Map.of(
                     "success", true,
-                    "message", "Tao phieu du tru thanh cong",
+                    "message", "Tạo phiếu dự trù thành công",
                     "headerId", header.getId()
             ));
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
-                    "message", "Loi khi tao phieu: " + ex.getMessage()
+                    "message", "Lỗi khi tạo phiếu: " + ex.getMessage()
             ));
         }
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyForecasts(@RequestParam Long userId) {
+        return forecastService.getMyForecasts(userId);
     }
 
     @GetMapping("/previous")

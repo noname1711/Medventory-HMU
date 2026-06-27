@@ -23,4 +23,6 @@ public interface SuppForecastHeaderRepository extends JpaRepository<SuppForecast
             @Param("year") String year,
             @Param("deptId") Long deptId
     );
+
+    List<SuppForecastHeader> findByCreatedBy_IdOrderByCreatedAtDesc(Long userId);
 }

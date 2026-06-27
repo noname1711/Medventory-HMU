@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Pageable;
+import java.util.List;
 import java.util.Optional;
 
 public interface IssueHeaderRepository extends JpaRepository<IssueHeader, Long> {
@@ -14,4 +16,6 @@ public interface IssueHeaderRepository extends JpaRepository<IssueHeader, Long> 
     boolean existsByReceiverMarker(@Param("marker") String marker);
 
     Optional<IssueHeader> findByIssueReqId(Long issueReqId);
+
+    List<IssueHeader> findByIdLessThanOrderByIdDesc(Long beforeId, Pageable pageable);
 }

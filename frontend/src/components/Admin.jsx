@@ -6,11 +6,24 @@ import "./Admin.css";
 
 const API_URL = "http://localhost:8080/api";
 
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function Admin() {
+  const PAGE_SIZE = 10;
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [newRole, setNewRole] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -96,7 +109,7 @@ export default function Admin() {
         setAdminInfo(userData);
         await fetchUsers();
       } catch {
-        if (userData?.isBanGiamHieu) {
+        if (userData?.isAdmin) {
           setIsAuthenticated(true);
           setAdminInfo(userData);
           await fetchUsers();
@@ -123,7 +136,7 @@ export default function Admin() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json();
-      const filteredData = (Array.isArray(data) ? data : []).filter((user) => !user.isBanGiamHieu);
+      const filteredData = (Array.isArray(data) ? data : []).filter((user) => !user.isAdmin && !user.isBanGiamHieu);
       setUsers(filteredData);
       filterUsersByStatus(filteredData, activeTab);
     } catch (error) {
@@ -154,6 +167,7 @@ export default function Admin() {
     } else {
       setFilteredUsers((userList || []).filter((user) => user.statusValue === 1));
     }
+    setCurrentPage(0);
   };
 
   useEffect(() => {
@@ -163,10 +177,30 @@ export default function Admin() {
   const approvedCount = useMemo(() => users.filter((u) => u.statusValue === 1).length, [users]);
   const pendingCount = useMemo(() => users.filter((u) => u.statusValue === 0).length, [users]);
   const totalCount = users.length;
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1);
+  const pagedUsers = filteredUsers.slice(
+    safeCurrentPage * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
+  );
 
 
-  const approveUser = async (id) => {
+  const approveUser = async (id, roleBeforeApprove = null) => {
     try {
+      if (roleBeforeApprove) {
+        const roleResponse = await fetch(API_ENDPOINTS.USER_ROLE(id), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ role: roleBeforeApprove }),
+        });
+
+        if (roleResponse.status === 403) throw new Error("FORBIDDEN");
+        if (!roleResponse.ok) {
+          const errorText = await roleResponse.text();
+          throw new Error(errorText || "KhÃ´ng thá»ƒ cáº­p nháº­t quyá»n trÆ°á»›c khi duyá»‡t");
+        }
+      }
+
       const response = await fetch(API_ENDPOINTS.USER_APPROVE(id), {
         method: "POST",
         headers: { ...authHeaders() },
@@ -176,9 +210,17 @@ export default function Admin() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const user = users.find((u) => u.id === id);
-      const nextUsers = users.map((u) => (u.id === id ? { ...u, statusValue: 1, status: "Đã duyệt" } : u));
+      const nextUsers = users.map((u) => (
+        u.id === id
+          ? { ...u, role: roleBeforeApprove || u.role, statusValue: 1, status: "Đã duyệt" }
+          : u
+      ));
       setUsers(nextUsers);
       filterUsersByStatus(nextUsers, activeTab);
+      if (editingUser?.id === id) {
+        setEditingUser(null);
+        setNewRole("");
+      }
 
       Swal.fire({
         title: "✅ Đã duyệt!",
@@ -192,7 +234,7 @@ export default function Admin() {
         Swal.fire({ title: "Không có quyền", text: "Bạn không có quyền thực hiện thao tác này.", icon: "error", timer: 2500 });
         return;
       }
-      Swal.fire({ title: "❌ Lỗi!", text: "Không thể duyệt người dùng", icon: "error", timer: 2000 });
+      Swal.fire({ title: "❌ Lỗi!", text: error?.message || "Không thể duyệt người dùng", icon: "error", timer: 2500 });
     }
   };
 
@@ -233,6 +275,10 @@ export default function Admin() {
       const nextUsers = users.filter((u) => u.id !== id);
       setUsers(nextUsers);
       filterUsersByStatus(nextUsers, activeTab);
+      if (editingUser?.id === id) {
+        setEditingUser(null);
+        setNewRole("");
+      }
 
       Swal.fire({
         title: isPending ? "❌ Đã từ chối & xóa!" : "✅ Đã xóa!",
@@ -309,6 +355,12 @@ export default function Admin() {
     if (editingUser && newRole) changeUserRole(editingUser.id, newRole);
   };
 
+  const handleApproveEditingUser = () => {
+    if (!editingUser) return;
+    const roleBeforeApprove = newRole && newRole !== editingUser.role ? newRole : null;
+    approveUser(editingUser.id, roleBeforeApprove);
+  };
+
   if (isCheckingAuth) {
     return (
       <div className="ui-page">
@@ -359,20 +411,26 @@ export default function Admin() {
               <div>
                 <h2 className="ui-section-title">Danh sách tài khoản</h2>
               </div>
-              <div className="admin-count-chip">{filteredUsers.length} tài khoản</div>
+              <div className="ui-status-badge is-info">{filteredUsers.length} tài khoản</div>
             </div>
 
             <div className="ui-tabs">
               <button
                 className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`}
-                onClick={() => setActiveTab("pending")}
+                onClick={() => {
+                  setActiveTab("pending");
+                  setCurrentPage(0);
+                }}
                 type="button"
               >
                 Chờ duyệt ({pendingCount})
               </button>
               <button
                 className={`ui-tab ${activeTab === "approved" ? "is-active" : ""}`}
-                onClick={() => setActiveTab("approved")}
+                onClick={() => {
+                  setActiveTab("approved");
+                  setCurrentPage(0);
+                }}
                 type="button"
               >
                 Đã duyệt ({approvedCount})
@@ -388,12 +446,12 @@ export default function Admin() {
                     <th>Phòng ban</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th className="text-center">Thao tác</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((u) => (
+                  {pagedUsers.length > 0 ? (
+                    pagedUsers.map((u) => (
                       <tr key={u.id}>
                         <td data-label="Họ tên">
                           <div className="admin-cell-main">{u.fullName}</div>
@@ -402,7 +460,7 @@ export default function Admin() {
                         <td data-label="Phòng ban">{u.department}</td>
                         <td data-label="Vai trò">{u.role}</td>
                         <td data-label="Trạng thái">
-                          <span className={`admin-status-pill ${u.statusValue === 1 ? "approved" : "pending"}`}>
+                          <span className={`ui-status-badge ${u.statusValue === 1 ? "is-approved" : "is-pending"}`}>
                             {u.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
                           </span>
                         </td>
@@ -414,15 +472,7 @@ export default function Admin() {
                               title="Thay đổi quyền"
                               type="button"
                             >
-                              Sửa
-                            </button>
-                            {u.statusValue === 0 && (
-                              <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => approveUser(u.id)} type="button">
-                                Duyệt
-                              </button>
-                            )}
-                            <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => deleteUser(u.id)} type="button">
-                              {u.statusValue === 0 ? "Từ chối" : "Xóa"}
+                              Xem
                             </button>
                           </div>
                         </td>
@@ -440,39 +490,72 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+            {filteredUsers.length > 0 ? (
+              <div className="ui-pagination" aria-label="Phân trang danh sách tài khoản">
+                <button
+                  type="button"
+                  className="ui-pagination-btn"
+                  onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                  disabled={safeCurrentPage <= 0}
+                >
+                  Trang trước
+                </button>
+
+                {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
+                    onClick={() => setCurrentPage(page)}
+                    disabled={page === safeCurrentPage}
+                  >
+                    {page + 1}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  className="ui-pagination-btn"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
+                  disabled={safeCurrentPage >= totalPages - 1}
+                >
+                  Trang sau
+                </button>
+              </div>
+            ) : null}
         </section>
       </div>
 
       {editingUser && (
-        <div className="admin-modal-overlay" onMouseDown={closeRoleChangeModal}>
-          <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
+        <div className="ui-modal-overlay admin-modal-overlay" onMouseDown={closeRoleChangeModal}>
+          <div className="ui-modal admin-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ui-modal-header admin-modal-header">
               <div>
-                <h3>Thay đổi quyền người dùng</h3>
-                <p>Điều chỉnh vai trò và giữ nguyên trạng thái tài khoản hiện tại.</p>
+                <h3>Chi tiết tài khoản</h3>
+                <p>Xem thông tin, điều chỉnh vai trò và xử lý trạng thái tài khoản.</p>
               </div>
-              <span className={`admin-status-pill ${editingUser.statusValue === 1 ? "approved" : "pending"}`}>
+              <span className={`ui-status-badge ${editingUser.statusValue === 1 ? "is-approved" : "is-pending"}`}>
                 {editingUser.statusValue === 1 ? "Đã duyệt" : "Chờ duyệt"}
               </span>
             </div>
 
-            <div className="admin-modal-content">
-              <div className="admin-modal-grid">
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Họ tên</div>
-                  <div className="admin-info-value">{editingUser.fullName}</div>
+            <div className="ui-modal-body admin-modal-content">
+              <div className="ui-history-info admin-modal-info">
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Họ tên</div>
+                  <div className="ui-history-info-value">{editingUser.fullName}</div>
                 </div>
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Email</div>
-                  <div className="admin-info-value">{editingUser.email}</div>
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Email</div>
+                  <div className="ui-history-info-value">{editingUser.email}</div>
                 </div>
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Phòng ban</div>
-                  <div className="admin-info-value">{editingUser.department}</div>
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Phòng ban</div>
+                  <div className="ui-history-info-value">{editingUser.department}</div>
                 </div>
-                <div className="admin-info-box">
-                  <div className="admin-info-label">Vai trò hiện tại</div>
-                  <div className="admin-info-value">{editingUser.role}</div>
+                <div className="ui-history-info-row">
+                  <div className="ui-history-info-label">Vai trò hiện tại</div>
+                  <div className="ui-history-info-value">{editingUser.role}</div>
                 </div>
               </div>
 
@@ -495,18 +578,33 @@ export default function Admin() {
               </div>
             </div>
 
-            <div className="admin-modal-footer">
-              <button className="ui-btn ui-btn-secondary" onClick={closeRoleChangeModal} type="button">
-                Hủy
-              </button>
-              <button
-                className="ui-btn ui-btn-primary"
-                onClick={handleRoleChange}
-                type="button"
-                disabled={!newRole || newRole === editingUser.role}
-              >
-                Cập nhật quyền
-              </button>
+            <div className="ui-modal-footer admin-modal-footer">
+              <div className="admin-modal-danger-actions">
+                {editingUser.statusValue === 0 ? (
+                  <>
+                    <button className="ui-btn ui-btn-danger" onClick={() => deleteUser(editingUser.id)} type="button">
+                      Từ chối
+                    </button>
+                    <button className="ui-btn ui-btn-primary" onClick={handleApproveEditingUser} type="button">
+                      Duyệt
+                    </button>
+                  </>
+                ) : (
+                  <button className="ui-btn ui-btn-danger" onClick={() => deleteUser(editingUser.id)} type="button">
+                    Xóa
+                  </button>
+                )}
+              </div>
+              {editingUser.statusValue === 1 && (
+                <button
+                  className="ui-btn ui-btn-primary"
+                  onClick={handleRoleChange}
+                  type="button"
+                  disabled={!newRole || newRole === editingUser.role}
+                >
+                  Cập nhật quyền
+                </button>
+              )}
             </div>
           </div>
         </div>

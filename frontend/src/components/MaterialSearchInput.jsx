@@ -13,6 +13,7 @@ import './MaterialSearchInput.css';
  *   placeholder  string   — default "Tên vật tư"
  *   disabled     boolean  — disables input
  *   className    string   — extra class on wrapper div
+ *   emptyText    string   — text shown when no suggestion matches
  */
 export default function MaterialSearchInput({
   value = '',
@@ -22,6 +23,7 @@ export default function MaterialSearchInput({
   placeholder = 'Tên vật tư',
   disabled = false,
   className = '',
+  emptyText = 'Không tìm thấy vật tư',
 }) {
   const instanceId = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID
@@ -118,7 +120,7 @@ export default function MaterialSearchInput({
                   {item.materialCode && <span className="msi-item-code">{item.materialCode}</span>}
                 </div>
               ))
-            : <div className="msi-empty">Không tìm thấy vật tư</div>
+            : <div className="msi-empty">{emptyText}</div>
           }
         </div>,
         document.body

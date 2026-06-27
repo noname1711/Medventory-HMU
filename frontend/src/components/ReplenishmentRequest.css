@@ -48,20 +48,37 @@
   flex-wrap: wrap;
 }
 
-/* Bảng dự trù có nhiều cột hơn, nên đặt min-width lớn hơn bảng vật tư */
+/* Bảng dự trù dùng sizing chung để tránh ép scroll ngang không cần thiết. */
 .req-table {
-  min-width: 1320px;
+  min-width: 0;
 }
 
 .req-table th,
 .req-table td {
-  white-space: nowrap;
+  white-space: normal;
 }
 
-/* Riêng cột lý do cho phép nội dung dài hơn */
+/* Cột lý do cho phép wrap theo chiều rộng hiện có. */
 .req-table td:nth-child(10),
 .req-table th:nth-child(10) {
-  min-width: 180px;
+  min-width: 0;
+}
+
+/* History tab */
+.req-history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.req-history-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.req-history-table {
+  min-width: 0;
 }
 
 @media (max-width: 900px) {

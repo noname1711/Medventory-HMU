@@ -5,11 +5,30 @@ import "./ForecastApproval.css";
 
 const API_URL = "http://localhost:8080/api";
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function ForecastApproval({ adminInfo }) {
+  const PAGE_SIZE = 10;
   const [forecasts, setForecasts] = useState([]);
   const [activeForecastTab, setActiveForecastTab] = useState("pending");
   const [selectedForecast, setSelectedForecast] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const API_ENDPOINTS = {
     FORECASTS_PENDING: (bghId) => `${API_URL}/supp-forecast/bgh/pending?bghId=${bghId}`,
@@ -39,6 +58,7 @@ export default function ForecastApproval({ adminInfo }) {
 
       const data = await response.json();
       setForecasts(data || []);
+      setCurrentPage(0);
     } catch {
       Swal.fire({
         title: "Lỗi!",
@@ -244,6 +264,13 @@ export default function ForecastApproval({ adminInfo }) {
     return { total, pending, processed };
   }, [forecasts, isPendingStatus]);
 
+  const totalPages = Math.max(1, Math.ceil(forecasts.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1);
+  const pagedForecasts = forecasts.slice(
+    safeCurrentPage * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
+  );
+
   const pageTitle = "Phê duyệt dự trù";
   return (
     <div className="ui-page">
@@ -289,14 +316,20 @@ export default function ForecastApproval({ adminInfo }) {
             <button
               type="button"
               className={`ui-tab ${activeForecastTab === "pending" ? "is-active" : ""}`}
-              onClick={() => setActiveForecastTab("pending")}
+              onClick={() => {
+                setActiveForecastTab("pending");
+                setCurrentPage(0);
+              }}
             >
               Chờ duyệt
             </button>
             <button
               type="button"
               className={`ui-tab ${activeForecastTab === "processed" ? "is-active" : ""}`}
-              onClick={() => setActiveForecastTab("processed")}
+              onClick={() => {
+                setActiveForecastTab("processed");
+                setCurrentPage(0);
+              }}
             >
               Đã xử lý
             </button>
@@ -321,10 +354,9 @@ export default function ForecastApproval({ adminInfo }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {forecasts.length > 0 ? (
-                    forecasts.map((forecast) => {
+                  {pagedForecasts.length > 0 ? (
+                    pagedForecasts.map((forecast) => {
                       const status = getStatusBadge(forecast.status);
-                      const isPending = isPendingStatus(forecast.status);
 
                       return (
                         <tr key={forecast.id}>
@@ -333,7 +365,7 @@ export default function ForecastApproval({ adminInfo }) {
                           <td data-label="Người tạo">{forecast.createdBy?.fullName || "Không xác định"}</td>
                           <td data-label="Ngày tạo">
                             {forecast.createdAt
-                              ? new Date(forecast.createdAt).toLocaleDateString("vi-VN")
+                              ? fmtDate(forecast.createdAt)
                               : "-"}
                           </td>
                           <td data-label="Trạng thái">
@@ -348,24 +380,6 @@ export default function ForecastApproval({ adminInfo }) {
                               >
                                 Xem
                               </button>
-                              {isPending && (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="ui-btn ui-btn-primary ui-btn-sm"
-                                    onClick={() => approveForecast(forecast.id)}
-                                  >
-                                    Duyệt
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="ui-btn ui-btn-danger ui-btn-sm"
-                                    onClick={() => rejectForecast(forecast.id)}
-                                  >
-                                    Từ chối
-                                  </button>
-                                </>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -384,83 +398,103 @@ export default function ForecastApproval({ adminInfo }) {
               </table>
             </div>
           )}
+
+          {!isLoading && forecasts.length > 0 ? (
+            <div className="ui-pagination" aria-label="Phân trang danh sách dự trù">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                disabled={safeCurrentPage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
+                  onClick={() => setCurrentPage(page)}
+                  disabled={page === safeCurrentPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
+                disabled={safeCurrentPage >= totalPages - 1}
+              >
+                Trang sau
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
       {selectedForecast && (
-        <div className="fa-modal-overlay" onMouseDown={closeForecastDetails}>
-          <div className="fa-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="fa-modal-header">
-              <div>
-                <h3 className="fa-modal-title">Chi tiết dự trù #{selectedForecast.id}</h3>
-                <p className="fa-modal-subtitle">Xem thông tin chung và danh sách vật tư của phiếu dự trù.</p>
-              </div>
-              <div className="fa-modal-header-right">
-                <span className={`ui-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
-                  {getStatusBadge(selectedForecast.status).text}
-                </span>
-                <button type="button" className="fa-modal-close" onClick={closeForecastDetails}>
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="fa-modal-content">
-              <div className="fa-info-grid">
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Khoa/Phòng</span>
-                  <strong className="fa-info-value">{selectedForecast.department?.name || "Không xác định"}</strong>
-                </div>
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Năm học</span>
-                  <strong className="fa-info-value">{selectedForecast.academicYear || "-"}</strong>
-                </div>
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Người tạo</span>
-                  <strong className="fa-info-value">{selectedForecast.createdBy?.fullName || "Không xác định"}</strong>
-                </div>
-                <div className="fa-info-card">
-                  <span className="fa-info-label">Ngày tạo</span>
-                  <strong className="fa-info-value">
-                    {selectedForecast.createdAt
-                      ? new Date(selectedForecast.createdAt).toLocaleDateString("vi-VN")
-                      : "-"}
-                  </strong>
-                </div>
-                {selectedForecast.approvalBy && (
-                  <div className="fa-info-card">
-                    <span className="fa-info-label">Người duyệt</span>
-                    <strong className="fa-info-value">{selectedForecast.approvalBy?.fullName || "-"}</strong>
-                  </div>
-                )}
-                {selectedForecast.approvalAt && (
-                  <div className="fa-info-card">
-                    <span className="fa-info-label">Ngày duyệt</span>
-                    <strong className="fa-info-value">
-                      {new Date(selectedForecast.approvalAt).toLocaleDateString("vi-VN")}
-                    </strong>
-                  </div>
-                )}
+        <div className="ui-modal-overlay fa-modal-overlay" onMouseDown={closeForecastDetails}>
+          <div className="ui-modal fa-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ui-modal-body fa-modal-content fa-history-detail">
+              <div className="ui-history-detail-head">
+                Chi tiết Phiếu Dự Trù #{selectedForecast.id}
               </div>
 
-              {selectedForecast.approvalNote && (
-                <div className="ui-alert is-warning fa-note-box">
-                  <strong>Ghi chú xử lý:</strong> {selectedForecast.approvalNote}
-                </div>
-              )}
-
-              <div className="fa-detail-block">
-                <div className="ui-section-head fa-detail-head">
-                  <div>
-                    <h4 className="ui-section-title">Danh sách vật tư</h4>
-                    <p className="ui-section-subtitle">
-                      Tổng số dòng: {selectedForecast.details?.length || 0}
-                    </p>
+              <div className="ui-history-detail-body">
+                <div className="ui-history-info">
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Khoa/Phòng:</div>
+                    <div className="ui-history-info-value">{selectedForecast.department?.name || "Không xác định"}</div>
                   </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Năm học:</div>
+                    <div className="ui-history-info-value">{selectedForecast.academicYear || "-"}</div>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Người tạo:</div>
+                    <div className="ui-history-info-value">{selectedForecast.createdBy?.fullName || "Không xác định"}</div>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Ngày tạo:</div>
+                    <div className="ui-history-info-value">{selectedForecast.createdAt ? fmtDate(selectedForecast.createdAt) : "-"}</div>
+                  </div>
+                  <div className="ui-history-info-row">
+                    <div className="ui-history-info-label">Trạng thái:</div>
+                    <div className="ui-history-info-value">
+                      <span className={`ui-status-badge ${getStatusBadge(selectedForecast.status).className}`}>
+                        {getStatusBadge(selectedForecast.status).text}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedForecast.approvalBy && (
+                    <div className="ui-history-info-row">
+                      <div className="ui-history-info-label">Người duyệt:</div>
+                      <div className="ui-history-info-value">{selectedForecast.approvalBy?.fullName || "-"}</div>
+                    </div>
+                  )}
+                  {selectedForecast.approvalAt && (
+                    <div className="ui-history-info-row">
+                      <div className="ui-history-info-label">Ngày duyệt:</div>
+                      <div className="ui-history-info-value">{fmtDate(selectedForecast.approvalAt)}</div>
+                    </div>
+                  )}
+                  {selectedForecast.approvalNote && (
+                    <div className="ui-history-info-row">
+                      <div className="ui-history-info-label">Ghi chú xử lý:</div>
+                      <div className="ui-history-info-value">{selectedForecast.approvalNote}</div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="ui-table-wrap">
-                  <table className="ui-table fa-detail-table">
+                <h4 className="ui-history-detail-section-title">
+                  Danh sách vật tư ({selectedForecast.details?.length || 0} dòng)
+                </h4>
+
+                <div className="ui-history-table-wrap">
+                  <table className="ui-history-table fa-detail-table">
                     <thead>
                       <tr>
                         <th>Tên vật tư</th>
@@ -494,8 +528,8 @@ export default function ForecastApproval({ adminInfo }) {
               </div>
             </div>
 
-            <div className="fa-modal-footer">
-              {isPendingStatus(selectedForecast.status) && (
+            {isPendingStatus(selectedForecast.status) && (
+              <div className="ui-modal-footer fa-modal-footer">
                 <>
                   <button type="button" className="ui-btn ui-btn-danger" onClick={() => rejectForecast(selectedForecast.id)}>
                     Từ chối
@@ -504,11 +538,8 @@ export default function ForecastApproval({ adminInfo }) {
                     Phê duyệt
                   </button>
                 </>
-              )}
-              <button type="button" className="ui-btn ui-btn-secondary" onClick={closeForecastDetails}>
-                Đóng
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

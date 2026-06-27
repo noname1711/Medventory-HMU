@@ -6,7 +6,33 @@ import "./IssueRequestApproval.css";
 
 const API_URL = "http://localhost:8080/api";
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
+
+function fmtDateTime(s) {
+  if (!s) return "—";
+  const str = String(s).replace("T", " ");
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}`;
+  return fmtDate(s);
+}
+
+function visiblePageNumbers(totalPages, currentPage) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
+  const start = Math.max(0, current - 2);
+  const end = Math.min(total - 1, start + 4);
+  const adjustedStart = Math.max(0, end - 4);
+  const pages = [];
+  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
+  return pages;
+}
+
 export default function IssueRequestApproval() {
+  const PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRequests, setPendingRequests] = useState([]);
   const [processedRequests, setProcessedRequests] = useState([]);
@@ -18,6 +44,7 @@ export default function IssueRequestApproval() {
   const [currentAction, setCurrentAction] = useState("");
   const [initialLoad, setInitialLoad] = useState(true);
   const [categories, setCategories] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -228,7 +255,12 @@ export default function IssueRequestApproval() {
 
   const openApprovalModal = (action, request) => {
     setCurrentAction(action);
-    setSelectedRequest({ header: request });
+    setSelectedRequest((current) => {
+      if (current?.header?.id === request?.id && Array.isArray(current?.details)) {
+        return current;
+      }
+      return { header: request };
+    });
     setShowApprovalModal(true);
     setApprovalNote("");
   };
@@ -315,6 +347,14 @@ export default function IssueRequestApproval() {
     return "is-info";
   };
 
+  const canActOnRequest = (request) => {
+    const badge = String(request?.statusBadge || "").toLowerCase();
+    const name = String(request?.statusName || "").toLowerCase();
+    const status = Number(request?.status);
+
+    return activeTab === "pending" && (badge.includes("pending") || name.includes("chờ") || status === 0);
+  };
+
   useEffect(() => {
     checkAccessAndLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,6 +370,12 @@ export default function IssueRequestApproval() {
 
   const currentRequests = activeTab === "pending" ? pendingRequests : processedRequests;
   const currentTabLoading = isLoading && initialLoad;
+  const totalPages = Math.max(1, Math.ceil(currentRequests.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1);
+  const pagedRequests = currentRequests.slice(
+    safeCurrentPage * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
+  );
 
   const summary = useMemo(
     () => ({
@@ -394,10 +440,22 @@ export default function IssueRequestApproval() {
 
         <div className="ui-section">
           <div className="ui-tabs">
-            <button className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`} onClick={() => setActiveTab("pending")}>
+            <button
+              className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`}
+              onClick={() => {
+                setActiveTab("pending");
+                setCurrentPage(0);
+              }}
+            >
               Chờ phê duyệt ({pendingRequests.length})
             </button>
-            <button className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`} onClick={() => setActiveTab("history")}>
+            <button
+              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              onClick={() => {
+                setActiveTab("history");
+                setCurrentPage(0);
+              }}
+            >
               Lịch sử ({processedRequests.length})
             </button>
           </div>
@@ -426,12 +484,12 @@ export default function IssueRequestApproval() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentRequests.map((request) => (
+                  {pagedRequests.map((request) => (
                     <tr key={request.id}>
                       <td className="ira-cell-id" data-label="Mã phiếu">#{request.id}</td>
                       <td data-label="Người gửi">{request.createdByName}</td>
                       <td data-label="Đơn vị">{request.departmentName}</td>
-                      <td data-label="Thời gian">{new Date(request.requestedAt).toLocaleString("vi-VN")}</td>
+                      <td data-label="Thời gian">{fmtDateTime(request.requestedAt)}</td>
                       <td data-label="Trạng thái">
                         <span className={`ui-status-badge ${getStatusUiClass(request)}`}>{request.statusName}</span>
                         {request.status === 2 && request.approvalNote && (
@@ -443,19 +501,6 @@ export default function IssueRequestApproval() {
                           <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => fetchRequestDetail(request.id)}>
                             Xem
                           </button>
-                          {activeTab === "pending" && (
-                            <>
-                              <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => openApprovalModal("approve", request)}>
-                                Duyệt
-                              </button>
-                              <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => openApprovalModal("reject", request)}>
-                                Từ chối
-                              </button>
-                              <button className="ui-btn ui-btn-warning ui-btn-sm" onClick={() => openApprovalModal("adjust", request)}>
-                                Điều chỉnh
-                              </button>
-                            </>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -464,80 +509,113 @@ export default function IssueRequestApproval() {
               </table>
             </div>
           )}
+
+          {!currentTabLoading && currentRequests.length > 0 ? (
+            <div className="ui-pagination" aria-label="Phân trang phê duyệt phiếu xin lĩnh">
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                disabled={safeCurrentPage <= 0}
+              >
+                Trang trước
+              </button>
+
+              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
+                  onClick={() => setCurrentPage(page)}
+                  disabled={page === safeCurrentPage}
+                >
+                  {page + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="ui-pagination-btn"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
+                disabled={safeCurrentPage >= totalPages - 1}
+              >
+                Trang sau
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
       {selectedRequest && selectedRequest.header && (
-        <div className="ira-modal-overlay" onClick={() => setSelectedRequest(null)}>
-          <div className="ira-modal ira-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ira-modal-header">
+        <div className="ui-modal-overlay ira-modal-overlay" onClick={() => setSelectedRequest(null)}>
+          <div className="ui-modal ira-modal ira-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ui-modal-header ira-modal-header">
               <h2>Chi tiết Phiếu #{selectedRequest.header.id}</h2>
             </div>
 
             {isDetailLoading ? (
               <div className="ira-loading-state ira-modal-loading">Đang tải chi tiết...</div>
             ) : (
-              <div className="ira-modal-body">
+              <div className="ui-modal-body ira-modal-body">
                 <div className="ui-section">
                   <div className="ui-section-head">
                     <div>
                       <h3 className="ui-section-title">Thông tin chung</h3>
                     </div>
                   </div>
-                  <div className="ira-info-grid">
-                    <div className="ira-info-item"><strong>Người gửi:</strong> {selectedRequest.header.createdByName}</div>
-                    <div className="ira-info-item"><strong>Email:</strong> {selectedRequest.header.createdByEmail}</div>
-                    <div className="ira-info-item"><strong>Đơn vị:</strong> {selectedRequest.header.departmentName}</div>
-                    <div className="ira-info-item"><strong>Bộ môn:</strong> {selectedRequest.header.departmentName}</div>
-                    <div className="ira-info-item"><strong>Thời gian:</strong> {new Date(selectedRequest.header.requestedAt).toLocaleString()}</div>
-                    <div className="ira-info-item">
-                      <strong>Trạng thái:</strong> <span className={`ui-status-badge ${getStatusUiClass(selectedRequest.header)}`}>{selectedRequest.header.statusName}</span>
+                  <div className="ui-detail-info-grid">
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Người gửi</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.createdByName}</span>
                     </div>
-                    {selectedRequest.header.approvalByName && <div className="ira-info-item"><strong>Người phê duyệt:</strong> {selectedRequest.header.approvalByName}</div>}
-                    {selectedRequest.header.approvalAt && (
-                      <div className="ira-info-item"><strong>Thời gian phê duyệt:</strong> {new Date(selectedRequest.header.approvalAt).toLocaleString()}</div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Email</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.createdByEmail}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Đơn vị</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.departmentName}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Bộ môn</span>
+                      <span className="ui-detail-info-value">{selectedRequest.header.departmentName}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Thời gian</span>
+                      <span className="ui-detail-info-value">{fmtDateTime(selectedRequest.header.requestedAt)}</span>
+                    </div>
+                    <div className="ui-detail-info-item">
+                      <span className="ui-detail-info-label">Trạng thái</span>
+                      <span className="ui-detail-info-value">
+                        <span className={`ui-status-badge ${getStatusUiClass(selectedRequest.header)}`}>{selectedRequest.header.statusName}</span>
+                      </span>
+                    </div>
+                    {selectedRequest.header.approvalByName && (
+                      <div className="ui-detail-info-item">
+                        <span className="ui-detail-info-label">Người phê duyệt</span>
+                        <span className="ui-detail-info-value">{selectedRequest.header.approvalByName}</span>
+                      </div>
                     )}
-                    {selectedRequest.header.approvalNote && <div className="ira-info-item ira-info-item-full"><strong>Ghi chú phê duyệt:</strong> {selectedRequest.header.approvalNote}</div>}
-                    {selectedRequest.header.note && <div className="ira-info-item ira-info-item-full"><strong>Ghi chú của người gửi:</strong> {selectedRequest.header.note}</div>}
+                    {selectedRequest.header.approvalAt && (
+                      <div className="ui-detail-info-item">
+                        <span className="ui-detail-info-label">Thời gian phê duyệt</span>
+                        <span className="ui-detail-info-value">{fmtDateTime(selectedRequest.header.approvalAt)}</span>
+                      </div>
+                    )}
+                    {selectedRequest.header.approvalNote && (
+                      <div className="ui-detail-info-item is-wide">
+                        <span className="ui-detail-info-label">Ghi chú phê duyệt</span>
+                        <span className="ui-detail-info-value">{selectedRequest.header.approvalNote}</span>
+                      </div>
+                    )}
+                    {selectedRequest.header.note && (
+                      <div className="ui-detail-info-item is-wide">
+                        <span className="ui-detail-info-label">Ghi chú của người gửi</span>
+                        <span className="ui-detail-info-value">{selectedRequest.header.note}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {selectedRequest.summary && (
-                  <div className="ui-section">
-                    <h3 className="ui-section-title">Tổng hợp vật tư</h3>
-                    <div className="ira-summary-grid">
-                      <div className="ira-summary-card">
-                        <div className="ira-summary-value">{selectedRequest.summary.totalMaterials}</div>
-                        <div className="ira-summary-label">Tổng loại</div>
-                      </div>
-                      <div className="ira-summary-card">
-                        <div className="ira-summary-value">{selectedRequest.summary.totalQuantity}</div>
-                        <div className="ira-summary-label">Tổng số lượng</div>
-                      </div>
-                      <div className="ira-summary-card">
-                        <div className="ira-summary-value">{selectedRequest.summary.newMaterials || 0}</div>
-                        <div className="ira-summary-label">Vật tư mới</div>
-                      </div>
-                    </div>
-
-                    {selectedRequest.summary.categoryBreakdown && (
-                      <div className="ira-category-breakdown">
-                        <h4>Phân loại</h4>
-                        <div className="ira-category-grid">
-                          {Object.entries(selectedRequest.summary.categoryBreakdown).map(([category, count]) => {
-                            const categoryInfo = getCategoryInfo(category);
-                            return (
-                              <div key={category} className="ira-category-card">
-                                <span className="ira-category-tag">{categoryInfo.label}</span>
-                                <span className="ira-category-count">{count} loại</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div className="ui-section">
                   <h3 className="ui-section-title">Danh sách vật tư</h3>
@@ -551,7 +629,6 @@ export default function IssueRequestApproval() {
                           <th>Đơn vị</th>
                           <th>Số lượng</th>
                           <th>Loại</th>
-                          <th>Trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -562,20 +639,13 @@ export default function IssueRequestApproval() {
                               <td className="text-center">{index + 1}</td>
                               <td>
                                 {detail.materialName}
-                                {detail.isNewMaterial && <span className="ira-new-badge">Mới</span>}
+                                {detail.isNewMaterial && <span className="ui-status-badge is-pending" style={{ marginLeft: 6, fontSize: '0.72rem' }}>Mới</span>}
                               </td>
                               <td>{detail.spec || "-"}</td>
                               <td>{detail.unitName}</td>
                               <td className="text-center">{detail.qtyRequested}</td>
                               <td className="text-center">
-                                <span className="ira-category-tag" title={categoryInfo.description}>{categoryInfo.label}</span>
-                              </td>
-                              <td className="text-center">
-                                {detail.isNewMaterial ? (
-                                  <span className="ui-status-badge is-pending">Vật tư mới</span>
-                                ) : (
-                                  <span className="ui-status-badge is-approved">Có sẵn</span>
-                                )}
+                                <span className="ui-status-badge is-info" title={categoryInfo.description}>{categoryInfo.label}</span>
                               </td>
                             </tr>
                           );
@@ -585,11 +655,29 @@ export default function IssueRequestApproval() {
                   </div>
                 </div>
 
-                <div className="ira-modal-footer single">
-                  <button className="ui-btn ui-btn-secondary" onClick={() => setSelectedRequest(null)}>
-                    Đóng
-                  </button>
-                </div>
+                {canActOnRequest(selectedRequest.header) && (
+                  <div className="ui-modal-footer ira-modal-footer">
+                    {selectedRequest.summary && (
+                      <div className="ui-btn ui-btn-secondary" role="status">
+                        Tổng số hàng hóa: <strong>{selectedRequest.summary.totalQuantity}</strong>
+                      </div>
+                    )}
+                    <div className="ira-detail-actions">
+                      <button
+                        className="ui-btn ui-btn-primary"
+                        onClick={() => openApprovalModal("approve", selectedRequest.header)}
+                      >
+                        Duyệt
+                      </button>
+                      <button
+                        className="ui-btn ui-btn-danger"
+                        onClick={() => openApprovalModal("reject", selectedRequest.header)}
+                      >
+                        Từ chối
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -597,12 +685,12 @@ export default function IssueRequestApproval() {
       )}
 
       {showApprovalModal && (
-        <div className="ira-modal-overlay" onClick={() => setShowApprovalModal(false)}>
-          <div className="ira-modal ira-approval-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ira-modal-header">
+        <div className="ui-modal-overlay ira-modal-overlay" onClick={() => setShowApprovalModal(false)}>
+          <div className="ui-modal ira-modal ira-approval-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ui-modal-header ira-modal-header">
               <h2>{getModalTitle(currentAction)}</h2>
             </div>
-            <div className="ira-modal-body">
+            <div className="ui-modal-body ira-modal-body">
               <p className="ira-modal-text">
                 Vui lòng nhập {currentAction === "reject" ? "lý do từ chối" : "ghi chú"} {getActionName(currentAction)}:
               </p>
@@ -614,7 +702,7 @@ export default function IssueRequestApproval() {
                 rows="4"
               />
               {currentAction === "reject" && <p className="ira-required-note">Lý do từ chối là bắt buộc</p>}
-              <div className="ira-modal-footer">
+              <div className="ui-modal-footer ira-modal-footer">
                 <button className="ui-btn ui-btn-secondary" onClick={() => setShowApprovalModal(false)}>
                   Hủy
                 </button>

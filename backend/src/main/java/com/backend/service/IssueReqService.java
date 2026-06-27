@@ -44,6 +44,7 @@ public class IssueReqService {
     private final ReservationStatusRepository reservationStatusRepository;
 
     private final RbacService rbacService;
+    private final SystemSettingsService systemSettingsService;
 
     // ==================== DANH SÁCH PHIẾU CHO LÃNH ĐẠO ====================
 
@@ -193,12 +194,6 @@ public class IssueReqService {
                     break;
                 }
 
-                case ApprovalActionDTO.ACTION_REQUEST_ADJUSTMENT: {
-                    // schema không có trạng thái riêng: giữ PENDING, chỉ gửi thông báo
-                    notificationService.notifyAdjustmentRequest(header, request.getNote());
-                    break;
-                }
-
                 default:
                     throw new RuntimeException("Hành động không hợp lệ");
             }
@@ -304,12 +299,15 @@ public class IssueReqService {
             // ===== AUTO APPROVE nếu đủ tồn (đã giữ chỗ) =====
             boolean autoApproved = false;
             String autoFail = null;
+            boolean autoApproveEnabled = systemSettingsService.isIssueReqAutoApproveEnabled();
 
-            try {
-                autoApproved = tryAutoApproveAndReserve(header.getId(), creator);
-            } catch (Exception ex) {
-                autoApproved = false;
-                autoFail = ex.getMessage();
+            if (autoApproveEnabled) {
+                try {
+                    autoApproved = tryAutoApproveAndReserve(header.getId(), creator);
+                } catch (Exception ex) {
+                    autoApproved = false;
+                    autoFail = ex.getMessage();
+                }
             }
 
             // Response
@@ -318,6 +316,7 @@ public class IssueReqService {
 
             IssueReqHeaderDTO headerDTO = convertToDTO(fresh);
             Map<String, Object> summary = createSummary(fresh);
+            summary.put("autoApprovalEnabled", autoApproveEnabled);
 
             if (autoApproved) {
                 notificationService.notifyApprovalResult(fresh, true, AUTO_APPROVAL_NOTE);
@@ -538,19 +537,12 @@ public class IssueReqService {
                 .map(IssueReqDetail::getQtyRequested)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Map<String, Long> categoryCount = header.getDetails().stream()
-                .collect(Collectors.groupingBy(
-                        d -> d.getMaterialCategory() == null ? "?" : d.getMaterialCategory().toString(),
-                        Collectors.counting()
-                ));
-
         long newMaterials = header.getDetails().stream()
                 .filter(d -> d.getMaterial() == null)
                 .count();
 
         summary.put("totalMaterials", totalMaterials);
         summary.put("totalQuantity", totalQty);
-        summary.put("categoryBreakdown", categoryCount);
         summary.put("newMaterials", newMaterials);
         summary.put("existingMaterials", totalMaterials - newMaterials);
 
@@ -687,6 +679,12 @@ public class IssueReqService {
         return v == null ? BigDecimal.ZERO : v;
     }
 
+    private static String fmtQty(BigDecimal v) {
+        BigDecimal value = nvl(v).stripTrailingZeros();
+        if (value.compareTo(BigDecimal.ZERO) == 0) return "0";
+        return value.toPlainString();
+    }
+
     // ==================== RESERVATION (GIỮ CHỖ) ====================
 
     private ReservationStatus requireReservationStatus(String code) {
@@ -806,7 +804,7 @@ public class IssueReqService {
                 BigDecimal availableNet = estimateNetAvailable(materialId, reservedCache);
                 throw new RuntimeException("Không đủ tồn để phê duyệt (đã trừ giữ chỗ): "
                         + material.getCode() + " - " + material.getName()
-                        + " (cần " + needByMaterial.get(materialId) + ", còn " + availableNet + ")");
+                        + " (cần " + fmtQty(needByMaterial.get(materialId)) + ", còn " + fmtQty(availableNet) + ")");
             }
         }
 

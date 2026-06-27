@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 @Service
 public class UserService {
 
+    private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_BGH = "BGH";
     private static final String ROLE_LANH_DAO = "LANH_DAO";
     private static final String ROLE_THU_KHO = "THU_KHO";
@@ -144,6 +145,7 @@ public class UserService {
         dto.setStatusValue(statusCodeToInt(user.getStatus() != null ? user.getStatus().getCode() : null));
 
         dto.setIsApproved(user.isApproved());
+        dto.setIsAdmin(user.isAdmin());
         dto.setIsBanGiamHieu(user.isBanGiamHieu());
         dto.setIsLanhDao(user.isLanhDao());
         dto.setIsThuKho(user.isThuKho());
@@ -209,12 +211,13 @@ public class UserService {
         String u = s.toUpperCase();
 
         // cho phép FE gửi luôn code
-        if (ROLE_BGH.equals(u) || ROLE_LANH_DAO.equals(u) || ROLE_THU_KHO.equals(u) || ROLE_CAN_BO.equals(u)) {
+        if (ROLE_ADMIN.equals(u) || ROLE_BGH.equals(u) || ROLE_LANH_DAO.equals(u) || ROLE_THU_KHO.equals(u) || ROLE_CAN_BO.equals(u)) {
             return u;
         }
 
         // map theo tiếng Việt / cách ghi khác
         String lower = s.toLowerCase();
+        if (lower.equals("admin") || lower.contains("quản trị hệ thống") || lower.contains("quan tri he thong")) return ROLE_ADMIN;
         if (lower.contains("ban giám hiệu") || lower.contains("ban giam hieu") || lower.equals("bgh")) return ROLE_BGH;
         if (lower.contains("lãnh đạo") || lower.contains("lanh dao")) return ROLE_LANH_DAO;
         if (lower.contains("thủ kho") || lower.contains("thu kho")) return ROLE_THU_KHO;
@@ -232,6 +235,7 @@ public class UserService {
     private int roleCodeToRoleCheck(String roleCode) {
         if (roleCode == null) return 3;
         String c = roleCode.trim().toUpperCase();
+        if (ROLE_ADMIN.equals(c)) return 4;
         if (ROLE_BGH.equals(c)) return 0;
         if (ROLE_LANH_DAO.equals(c)) return 1;
         if (ROLE_THU_KHO.equals(c)) return 2;

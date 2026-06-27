@@ -25,7 +25,7 @@
 }
 
 .receipt-table {
-  min-width: 900px;
+  min-width: 0;
 }
 
 .receipt-code-badge {
@@ -41,7 +41,7 @@
 
 .receipt-table td,
 .receipt-table th {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .receipt-row.duplicate-row {
@@ -53,7 +53,7 @@
 }
 
 .receipt-table-input {
-  min-width: 100%;
+  min-width: 0;
 }
 
 .receipt-table-input.is-duplicate {
