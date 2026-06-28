@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_ENDPOINTS, buildHeaders } from '../api/apiConfig';
 import { formatTimeAgo } from '../utils/storage';
@@ -116,7 +117,7 @@ export default function AppHeader({ title }) {
         <View style={styles.right}>
           {/* Bell */}
           <TouchableOpacity style={styles.iconBtn} onPress={handleToggleNoti}>
-            <Text style={styles.bellIcon}>🔔</Text>
+            <Ionicons name="notifications-outline" size={20} color="#fff" />
             {unreadCount > 0 && <View style={styles.badge} />}
           </TouchableOpacity>
 
@@ -234,7 +235,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bellIcon: { fontSize: 18 },
   badge: {
     position: 'absolute',
     top: 4,
