@@ -1,324 +1,610 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
-import { storage } from '../../utils/storage';
-import { colors, radius } from '../../theme/tokens';
+import { API_ENDPOINTS } from '../../api/apiConfig';
+import { apiGet, apiSend } from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
+import MaterialPicker from '../../components/MaterialPicker';
+import DetailModal from '../../components/DetailModal';
+import { colors, radius, spacing, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
-import { Section, Field, Input, Button, Badge, SegmentControl, MonoBadge, Empty, Pagination } from '../../theme/ui';
+import {
+  Section,
+  Field,
+  Input,
+  Button,
+  SegmentControl,
+  MonoBadge,
+  Empty,
+  Pagination,
+} from '../../theme/ui';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
+
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function createRow() {
+  return {
+    key: String(Date.now() + Math.random()),
+    materialId: null,
+    materialName: '',
+    materialCode: '',
+    unitId: '',
+    unitName: '',
+    qtyDoc: '',
+    qtyActual: '',
+    price: '',
+    lotNumber: '',
+    mfgDate: '',
+    expDate: '',
+    pickerVisible: false,
+  };
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const match = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(s);
+}
+
+function fmtMoney(n) {
+  const num = Number(n) || 0;
+  return num.toLocaleString('vi-VN') + ' đ';
+}
 
 export default function ReceiptScreen() {
+  const { user } = useAuth();
+
+  // ── Tab ──
   const [activeTab, setActiveTab] = useState('create');
-  const [currentUser, setCurrentUser] = useState(null);
-  const [materials, setMaterials] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [histLoading, setHistLoading] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [page, setPage] = useState(1);
 
-  const [form, setForm] = useState({
-    receiptDate: new Date().toISOString().split('T')[0],
-    supplierName: '',
-    note: '',
-    details: [createRow()],
+  // ── Create form ──
+  const [header, setHeader] = useState({
+    receivedFrom: '',
+    reason: '',
+    receiptDate: todayISO(),
   });
+  const [rows, setRows] = useState([createRow()]);
+  const [submitting, setSubmitting] = useState(false);
 
-  function createRow() {
-    return { materialId: null, materialName: '', unitId: '', qty: '', unitPrice: '', batchNumber: '', expiryDate: '' };
-  }
+  // ── History ──
+  const [histItems, setHistItems] = useState([]);
+  const [histPage, setHistPage] = useState(1);          // 1-based UI
+  const [histTotalPages, setHistTotalPages] = useState(1);
+  const [histKeyword, setHistKeyword] = useState('');
+  const [histLoading, setHistLoading] = useState(false);
 
-  useEffect(() => {
-    storage.getUser().then((u) => {
-      setCurrentUser(u);
-      Promise.all([fetchMaterials(), fetchUnits()]);
-      if (u?.id) fetchHistory(u.id);
-    });
-  }, []);
+  // ── Detail modal ──
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
-  async function fetchMaterials() {
-    try {
-      const r = await fetch(API_ENDPOINTS.MATERIALS);
-      const d = await r.json();
-      setMaterials(Array.isArray(d) ? d : []);
-    } catch { setMaterials([]); }
-  }
+  // ────────────────────────────────────────────
+  // History fetch (local — feed shape doesn't match useServerHistory)
+  // ────────────────────────────────────────────
+  const debounceRef = useRef(null);
 
-  async function fetchUnits() {
-    try {
-      const r = await fetch(API_ENDPOINTS.UNITS);
-      const d = await r.json();
-      setUnits(Array.isArray(d) ? d : []);
-    } catch { setUnits([]); }
-  }
-
-  async function fetchHistory(userId) {
-    setHistLoading(true);
-    try {
-      const r = await fetch(API_ENDPOINTS.RECEIPTS, { headers: buildHeaders(userId) });
-      const d = await r.json();
-      setHistory(Array.isArray(d) ? d : (d?.content || []));
-    } catch { setHistory([]); }
-    finally { setHistLoading(false); }
-  }
-
-  const updateRow = (i, key, val) => {
-    setForm((f) => {
-      const details = [...f.details];
-      details[i] = { ...details[i], [key]: val };
-      return { ...f, details };
-    });
-  };
-
-  const handleSubmit = async () => {
-    const validRows = form.details.filter((d) => d.qty && Number(d.qty) > 0);
-    if (!validRows.length) {
-      Toast.show({ type: 'error', text1: 'Vui lòng thêm ít nhất 1 vật tư!' });
-      return;
-    }
-    setLoading(true);
-    try {
-      const payload = {
-        receiptDate: form.receiptDate,
-        supplierName: form.supplierName,
-        note: form.note,
-        createdById: currentUser?.id,
-        details: validRows.map((d) => ({
-          materialId: d.materialId || null,
-          materialName: d.materialName,
-          unitId: d.unitId ? Number(d.unitId) : null,
-          qty: Number(d.qty),
-          unitPrice: d.unitPrice ? Number(d.unitPrice) : null,
-          batchNumber: d.batchNumber,
-          expiryDate: d.expiryDate || null,
-        })),
-      };
-      const r = await fetch(API_ENDPOINTS.RECEIPTS, {
-        method: 'POST',
-        headers: buildHeaders(currentUser?.id),
-        body: JSON.stringify(payload),
-      });
-      const d = await r.json();
-      if (r.ok) {
-        Toast.show({ type: 'success', text1: 'Nhập kho thành công!' });
-        setForm({ receiptDate: new Date().toISOString().split('T')[0], supplierName: '', note: '', details: [createRow()] });
-        setActiveTab('history');
-        if (currentUser?.id) fetchHistory(currentUser.id);
+  const loadHistory = useCallback(
+    async (kw = histKeyword, pg = histPage) => {
+      if (!user?.id) return;
+      setHistLoading(true);
+      const page0 = Math.max(0, pg - 1);
+      const url = `${API_ENDPOINTS.RECEIPTS_FEED}?page=${page0}&limit=${PAGE_SIZE}&keyword=${encodeURIComponent(kw || '')}`;
+      const { ok, data } = await apiGet(url, user.id);
+      if (ok && data) {
+        const list = Array.isArray(data.receipts)
+          ? data.receipts
+          : Array.isArray(data.data)
+          ? data.data
+          : [];
+        const total = Math.max(1, data.summary?.totalPages ?? 1);
+        setHistItems(list);
+        setHistTotalPages(total);
       } else {
-        Toast.show({ type: 'error', text1: d.error || 'Nhập kho thất bại!' });
+        setHistItems([]);
+        setHistTotalPages(1);
       }
-    } catch {
-      Toast.show({ type: 'error', text1: 'Lỗi kết nối server!' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      setHistLoading(false);
+    },
+    [user?.id, histKeyword, histPage]
+  );
 
-  // Pagination — reset to page 1 when the history list changes
-  useEffect(() => { setPage(1); }, [history]);
-  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const pagedHistory = history.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  // Reload when tab becomes active or user changes
+  useEffect(() => {
+    if (activeTab !== 'history' || !user?.id) return undefined;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => loadHistory(histKeyword, histPage), 300);
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user?.id, histKeyword, histPage]);
 
-  // Running total of the create form (prototype "Tổng chi phí")
-  const rcTotal = form.details.reduce(
-    (sum, d) => sum + (Number(d.qty) || 0) * (Number(d.unitPrice) || 0),
+  // Reset page when keyword changes
+  useEffect(() => {
+    setHistPage(1);
+  }, [histKeyword]);
+
+  // ────────────────────────────────────────────
+  // Row helpers
+  // ────────────────────────────────────────────
+  function updateRow(key, patch) {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
+  function removeRow(key) {
+    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== key)));
+  }
+
+  function openPicker(key) {
+    updateRow(key, { pickerVisible: true });
+  }
+
+  function closePicker(key) {
+    updateRow(key, { pickerVisible: false });
+  }
+
+  function onPickMaterial(key, dto) {
+    updateRow(key, {
+      materialId: dto.id,
+      materialName: dto.name || '',
+      materialCode: dto.code || '',
+      unitId: dto.unit?.id ?? dto.unitId ?? '',
+      unitName: '',          // MaterialPicker DTO doesn't carry unit name
+      pickerVisible: false,
+    });
+  }
+
+  // Computed total
+  const grandTotal = rows.reduce(
+    (sum, r) => sum + (Number(r.qtyActual) || 0) * (Number(r.price) || 0),
     0
   );
 
+  // ────────────────────────────────────────────
+  // Submit
+  // ────────────────────────────────────────────
+  async function handleSubmit() {
+    if (!user?.id) {
+      Toast.show({ type: 'error', text1: 'Chưa xác định người dùng!' });
+      return;
+    }
+    if (!header.receivedFrom.trim()) {
+      Toast.show({ type: 'error', text1: 'Vui lòng nhập nhà cung cấp!' });
+      return;
+    }
+
+    const validRows = rows.filter((r) => r.materialId && (Number(r.qtyActual) > 0));
+    if (!validRows.length) {
+      Toast.show({ type: 'error', text1: 'Vui lòng thêm ít nhất 1 vật tư với số lượng > 0!' });
+      return;
+    }
+
+    const payload = {
+      receivedFrom: header.receivedFrom.trim(),
+      reason: header.reason.trim() || null,
+      receiptDate: header.receiptDate || null,
+      details: validRows.map((r) => ({
+        materialId: r.materialId,
+        price: Number(r.price) || 0,
+        qtyDoc: r.qtyDoc !== '' ? Number(r.qtyDoc) : null,
+        qtyActual: Number(r.qtyActual),
+        lotNumber: r.lotNumber.trim() || '',
+        mfgDate: r.mfgDate || null,
+        expDate: r.expDate || null,
+      })),
+    };
+
+    setSubmitting(true);
+    const { ok, data } = await apiSend('POST', API_ENDPOINTS.RECEIPT_CREATE, payload, user.id);
+    setSubmitting(false);
+
+    if (ok && data?.success !== false) {
+      Toast.show({ type: 'success', text1: 'Nhập kho thành công!' });
+      // Reset form
+      setHeader({ receivedFrom: '', reason: '', receiptDate: todayISO() });
+      setRows([createRow()]);
+      // Switch to history and reload
+      setHistPage(1);
+      setActiveTab('history');
+    } else {
+      Toast.show({ type: 'error', text1: data?.message || 'Nhập kho thất bại!' });
+    }
+  }
+
+  // ────────────────────────────────────────────
+  // Detail
+  // ────────────────────────────────────────────
+  async function openDetail(id) {
+    if (!user?.id) return;
+    setDetailLoading(true);
+    setDetailData(null);
+    setDetailVisible(true);
+    const { ok, data } = await apiGet(API_ENDPOINTS.RECEIPT_DETAIL(id), user.id);
+    if (ok && data) {
+      setDetailData(data);
+    } else {
+      Toast.show({ type: 'error', text1: 'Không thể tải chi tiết phiếu nhập' });
+      setDetailVisible(false);
+    }
+    setDetailLoading(false);
+  }
+
+  // Build DetailModal props from raw API response
+  const detailHeader = detailData?.receipt ?? detailData?.header ?? detailData?.data?.receipt ?? detailData?.data ?? {};
+  const detailLines = detailData?.details ?? detailData?.items ?? detailData?.lines ?? detailData?.data?.details ?? [];
+
+  const detailInfo = detailHeader?.id != null
+    ? [
+        { label: 'Mã phiếu', value: `#${detailHeader.id}` },
+        { label: 'Ngày nhập', value: fmtDate(detailHeader.receiptDate ?? detailHeader.receipt_date) },
+        { label: 'Nhà cung cấp', value: detailHeader.receivedFrom ?? detailHeader.received_from ?? '—' },
+        { label: 'Lý do', value: detailHeader.reason ?? '—' },
+        { label: 'Tổng tiền', value: fmtMoney(detailHeader.totalAmount ?? detailHeader.total_amount ?? 0) },
+      ]
+    : [];
+
+  const detailColumns = [
+    { key: 'name', label: 'Tên vật tư', flex: 2 },
+    { key: 'lot', label: 'Số lô', flex: 1 },
+    { key: 'qty', label: 'SL nhập', flex: 1 },
+    { key: 'price', label: 'Đơn giá', flex: 1 },
+  ];
+
+  const detailRows = Array.isArray(detailLines)
+    ? detailLines.map((d) => ({
+        name: d?.name ?? d?.materialName ?? '—',
+        lot: d?.lotNumber ?? d?.lot_number ?? '—',
+        qty: String(d?.qtyActual ?? d?.qty_actual ?? 0),
+        price: fmtMoney(d?.price ?? 0),
+      }))
+    : [];
+
+  // ────────────────────────────────────────────
+  // Render
+  // ────────────────────────────────────────────
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
+      <SegmentControl
+        segments={[
+          { key: 'create', label: 'Tạo phiếu' },
+          { key: 'history', label: 'Lịch sử' },
+        ]}
+        active={activeTab}
+        onChange={setActiveTab}
+      />
 
-        <SegmentControl
-          segments={[
-            { key: 'create', label: 'Tạo phiếu' },
-            { key: 'history', label: 'Lịch sử' },
-          ]}
-          active={activeTab}
-          onChange={setActiveTab}
-        />
+      {/* ── CREATE TAB ── */}
+      {activeTab === 'create' && (
+        <>
+          <Section title="Thông tin phiếu nhập">
+            <Field label="Nhà cung cấp / người giao">
+              <Input
+                value={header.receivedFrom}
+                onChangeText={(v) => setHeader((h) => ({ ...h, receivedFrom: v }))}
+                placeholder="Ví dụ: Công ty ABC"
+              />
+            </Field>
+            <Field label="Ngày nhập">
+              <Input
+                value={header.receiptDate}
+                onChangeText={(v) => setHeader((h) => ({ ...h, receiptDate: v }))}
+                placeholder="YYYY-MM-DD"
+              />
+            </Field>
+            <Field label="Lý do nhập">
+              <Input
+                value={header.reason}
+                onChangeText={(v) => setHeader((h) => ({ ...h, reason: v }))}
+                placeholder="Ví dụ: Nhập theo hợp đồng..."
+                multiline
+              />
+            </Field>
+          </Section>
 
-        {activeTab === 'create' ? (
-          <>
-            <Section title="Thông tin phiếu nhập">
-              <Field label="Ngày nhập">
-                <Input
-                  value={form.receiptDate}
-                  onChangeText={(v) => setForm((f) => ({ ...f, receiptDate: v }))}
-                  placeholder="YYYY-MM-DD"
-                />
-              </Field>
-              <Field label="Nhà cung cấp">
-                <Input
-                  value={form.supplierName}
-                  onChangeText={(v) => setForm((f) => ({ ...f, supplierName: v }))}
-                  placeholder="Tên nhà cung cấp"
-                />
-              </Field>
-              <Field label="Ghi chú">
-                <Input
-                  value={form.note}
-                  onChangeText={(v) => setForm((f) => ({ ...f, note: v }))}
-                  placeholder="Ghi chú..."
-                  multiline
-                />
-              </Field>
-            </Section>
-
-            <Section title="Danh sách vật tư nhập kho">
-              {form.details.map((row, i) => (
-                <View key={i} style={styles.rowCard}>
-                  <View style={styles.rowHeader}>
-                    <Text style={styles.rowTitle}>Vật tư #{i + 1}</Text>
-                    {form.details.length > 1 && (
-                      <TouchableOpacity onPress={() => setForm((f) => ({ ...f, details: f.details.filter((_, idx) => idx !== i) }))}>
-                        <Text style={styles.removeText}>✕ Xóa</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <Field label="Tên vật tư">
-                    <Input placeholder="Tên vật tư" value={row.materialName} onChangeText={(v) => updateRow(i, 'materialName', v)} />
-                  </Field>
-                  <View style={styles.twoCol}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Field label="Số lượng">
-                        <Input placeholder="Số lượng" value={row.qty} onChangeText={(v) => updateRow(i, 'qty', v)} keyboardType="numeric" />
-                      </Field>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Field label="Đơn giá">
-                        <Input placeholder="Đơn giá" value={row.unitPrice} onChangeText={(v) => updateRow(i, 'unitPrice', v)} keyboardType="numeric" />
-                      </Field>
-                    </View>
-                  </View>
-                  <Field label="Số lô">
-                    <Input placeholder="Số lô" value={row.batchNumber} onChangeText={(v) => updateRow(i, 'batchNumber', v)} />
-                  </Field>
-                  <Field label="Hạn dùng">
-                    <Input placeholder="Hạn dùng (YYYY-MM-DD)" value={row.expiryDate} onChangeText={(v) => updateRow(i, 'expiryDate', v)} />
-                  </Field>
-                  <Field label="Đơn vị tính">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                      {units.map((u) => {
-                        const on = row.unitId === String(u.id);
-                        return (
-                          <TouchableOpacity key={u.id} style={[styles.chip, on && styles.chipActive]} onPress={() => updateRow(i, 'unitId', String(u.id))}>
-                            <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </Field>
+          <Section title="Danh sách vật tư nhập kho">
+            {rows.map((row, i) => (
+              <View key={row.key} style={styles.rowCard}>
+                {/* Row header */}
+                <View style={styles.rowHeader}>
+                  <Text style={styles.rowTitle}>Vật tư #{i + 1}</Text>
+                  {rows.length > 1 && (
+                    <TouchableOpacity onPress={() => removeRow(row.key)}>
+                      <Text style={styles.removeText}>✕ Xóa</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              ))}
 
-              <TouchableOpacity style={styles.addBtn} onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}>
-                <Text style={styles.addBtnText}>＋ Thêm vật tư</Text>
-              </TouchableOpacity>
-
-              {/* Total cost card (prototype) */}
-              <View style={styles.totalCard}>
-                <Text style={styles.totalLabel}>Tổng chi phí</Text>
-                <Text style={styles.totalValue}>{rcTotal.toLocaleString('vi-VN')} đ</Text>
-              </View>
-
-              <Button title={loading ? '' : 'Lưu phiếu nhập'} onPress={handleSubmit} disabled={loading} style={{ marginTop: 10 }}>
-                {loading ? <ActivityIndicator color={colors.white} /> : null}
-              </Button>
-            </Section>
-          </>
-        ) : (
-          <View>
-            {histLoading && history.length === 0 ? (
-              <ActivityIndicator color={colors.primary} style={{ paddingVertical: 24 }} />
-            ) : history.length === 0 ? (
-              <Empty>Chưa có phiếu nhập nào</Empty>
-            ) : (
-              <>
-                {pagedHistory.map((item) => (
-                  <TouchableOpacity key={String(item.id)} style={styles.histCard} onPress={() => setSelected(item)} activeOpacity={0.85}>
-                    <View style={styles.histTop}>
-                      <MonoBadge>PN #{item.id}</MonoBadge>
-                      <Text style={styles.histDate}>
-                        {item.receiptDate ? new Date(item.receiptDate).toLocaleDateString('vi-VN') : '—'}
-                      </Text>
-                    </View>
-                    <Text style={styles.histSupplier} numberOfLines={1}>{item.supplierName || 'Nhà cung cấp'}</Text>
-                    <Text style={styles.histMeta}>{(item.details || []).length} vật tư</Text>
+                {/* Material picker trigger */}
+                <Field label="Tên vật tư">
+                  <TouchableOpacity
+                    style={[styles.pickerBtn, row.materialId ? styles.pickerBtnFilled : null]}
+                    onPress={() => openPicker(row.key)}
+                  >
+                    <Text
+                      style={row.materialId ? styles.pickerBtnTextFilled : styles.pickerBtnText}
+                      numberOfLines={1}
+                    >
+                      {row.materialName || 'Chọn vật tư...'}
+                    </Text>
+                    {!!row.materialCode && (
+                      <Text style={styles.pickerCode}>{row.materialCode}</Text>
+                    )}
                   </TouchableOpacity>
-                ))}
-                <Pagination
-                  page={pageSafe}
-                  totalPages={totalPages}
-                  onPrev={() => setPage((p) => Math.max(1, p - 1))}
-                  onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-                />
-              </>
-            )}
-          </View>
-        )}
+                </Field>
 
-      <Modal visible={!!selected} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            {selected && (
-              <ScrollView>
-                <Text style={styles.modalTitle}>Phiếu nhập #{selected.id}</Text>
-                {[['Ngày nhập', selected.receiptDate ? new Date(selected.receiptDate).toLocaleDateString('vi-VN') : '—'], ['Nhà cung cấp', selected.supplierName || '—'], ['Ghi chú', selected.note || '—']].map(([k, v]) => (
-                  <View key={k} style={styles.infoRow}><Text style={styles.infoKey}>{k}:</Text><Text style={styles.infoVal}>{v}</Text></View>
-                ))}
-                <Text style={[styles.label, { marginTop: 12 }]}>Danh sách vật tư:</Text>
-                {(selected.details || []).map((d, i) => (
-                  <View key={i} style={styles.detailItem}>
-                    <Text style={styles.detailName}>{d.materialName}</Text>
-                    <Text style={styles.detailMeta}>SL: {d.qty} {d.unitName || ''} | Đơn giá: {d.unitPrice ? d.unitPrice.toLocaleString('vi-VN') : '—'} đ</Text>
-                    {d.batchNumber && <Text style={styles.detailMeta}>Số lô: {d.batchNumber}</Text>}
-                    {d.expiryDate && <Text style={styles.detailMeta}>HSD: {d.expiryDate}</Text>}
+                {/* MaterialPicker modal */}
+                <MaterialPicker
+                  visible={row.pickerVisible}
+                  onClose={() => closePicker(row.key)}
+                  onSelect={(dto) => onPickMaterial(row.key, dto)}
+                />
+
+                {/* Qty Doc + Qty Actual */}
+                <View style={styles.twoCol}>
+                  <View style={styles.colHalf}>
+                    <Field label="SL chứng từ">
+                      <Input
+                        placeholder="0"
+                        value={row.qtyDoc}
+                        onChangeText={(v) => updateRow(row.key, { qtyDoc: v })}
+                        keyboardType="numeric"
+                      />
+                    </Field>
                   </View>
-                ))}
-                <Button title="Đóng" variant="secondary" onPress={() => setSelected(null)} style={{ marginTop: 16 }} />
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+                  <View style={styles.colHalf}>
+                    <Field label="SL thực nhập">
+                      <Input
+                        placeholder="0"
+                        value={row.qtyActual}
+                        onChangeText={(v) => updateRow(row.key, { qtyActual: v })}
+                        keyboardType="numeric"
+                      />
+                    </Field>
+                  </View>
+                </View>
+
+                {/* Price */}
+                <Field label="Đơn giá">
+                  <Input
+                    placeholder="0"
+                    value={row.price}
+                    onChangeText={(v) => updateRow(row.key, { price: v })}
+                    keyboardType="numeric"
+                  />
+                </Field>
+
+                {/* Lot + Dates */}
+                <Field label="Số lô">
+                  <Input
+                    placeholder="Ví dụ: LOT-0125-A"
+                    value={row.lotNumber}
+                    onChangeText={(v) => updateRow(row.key, { lotNumber: v })}
+                  />
+                </Field>
+                <View style={styles.twoCol}>
+                  <View style={styles.colHalf}>
+                    <Field label="Ngày SX">
+                      <Input
+                        placeholder="YYYY-MM-DD"
+                        value={row.mfgDate}
+                        onChangeText={(v) => updateRow(row.key, { mfgDate: v })}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.colHalf}>
+                    <Field label="Hạn dùng">
+                      <Input
+                        placeholder="YYYY-MM-DD"
+                        value={row.expDate}
+                        onChangeText={(v) => updateRow(row.key, { expDate: v })}
+                      />
+                    </Field>
+                  </View>
+                </View>
+
+                {/* Row subtotal */}
+                {(Number(row.qtyActual) > 0 && Number(row.price) > 0) && (
+                  <View style={styles.rowTotal}>
+                    <Text style={styles.rowTotalLabel}>Thành tiền:</Text>
+                    <Text style={styles.rowTotalValue}>
+                      {fmtMoney((Number(row.qtyActual) || 0) * (Number(row.price) || 0))}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+
+            {/* Add row */}
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setRows((prev) => [...prev, createRow()])}
+            >
+              <Text style={styles.addBtnText}>＋ Thêm vật tư</Text>
+            </TouchableOpacity>
+
+            {/* Grand total */}
+            <View style={styles.totalCard}>
+              <Text style={styles.totalLabel}>Tổng chi phí</Text>
+              <Text style={styles.totalValue}>{fmtMoney(grandTotal)}</Text>
+            </View>
+
+            {/* Submit */}
+            <Button
+              title={submitting ? '' : 'Lưu phiếu nhập'}
+              onPress={handleSubmit}
+              disabled={submitting}
+              style={{ marginTop: 10 }}
+            >
+              {submitting ? <ActivityIndicator color={colors.white} /> : null}
+            </Button>
+          </Section>
+        </>
+      )}
+
+      {/* ── HISTORY TAB ── */}
+      {activeTab === 'history' && (
+        <View>
+          {/* Search bar */}
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm theo mã phiếu / NCC / lý do..."
+              placeholderTextColor={colors.textMuted}
+              value={histKeyword}
+              onChangeText={setHistKeyword}
+            />
+            <TouchableOpacity
+              style={styles.reloadBtn}
+              onPress={() => loadHistory(histKeyword, histPage)}
+              disabled={histLoading}
+            >
+              <Text style={styles.reloadBtnText}>Tải lại</Text>
+            </TouchableOpacity>
+          </View>
+
+          {histLoading && histItems.length === 0 ? (
+            <ActivityIndicator color={colors.primary} style={{ paddingVertical: 32 }} />
+          ) : histItems.length === 0 ? (
+            <Empty>Chưa có phiếu nhập nào</Empty>
+          ) : (
+            <>
+              {histItems.map((item) => {
+                const id = item?.id;
+                const date = fmtDate(item?.receiptDate ?? item?.receipt_date);
+                const from = item?.receivedFrom ?? item?.received_from ?? '—';
+                const reason = item?.reason ?? '';
+                const total = item?.totalAmount ?? item?.total_amount ?? 0;
+                return (
+                  <TouchableOpacity
+                    key={String(id)}
+                    style={styles.histCard}
+                    onPress={() => openDetail(id)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.histTop}>
+                      <MonoBadge>PN #{id}</MonoBadge>
+                      <Text style={styles.histDate}>{date}</Text>
+                    </View>
+                    <Text style={styles.histFrom} numberOfLines={1}>{from}</Text>
+                    {!!reason && (
+                      <Text style={styles.histReason} numberOfLines={1}>{reason}</Text>
+                    )}
+                    <Text style={styles.histTotal}>{fmtMoney(total)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <Pagination
+                page={histPage}
+                totalPages={histTotalPages}
+                onPrev={() => setHistPage((p) => Math.max(1, p - 1))}
+                onNext={() => setHistPage((p) => Math.min(histTotalPages, p + 1))}
+              />
+            </>
+          )}
+        </View>
+      )}
+
+      {/* ── DETAIL MODAL ── */}
+      <DetailModal
+        visible={detailVisible}
+        title={
+          detailLoading
+            ? 'Đang tải...'
+            : detailHeader?.id != null
+            ? `Phiếu nhập #${detailHeader.id}`
+            : 'Chi tiết phiếu nhập'
+        }
+        info={detailInfo}
+        columns={detailColumns}
+        rows={detailRows}
+        onClose={() => { setDetailVisible(false); setDetailData(null); }}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
-  label: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.label, marginBottom: 8 },
-  twoCol: { flexDirection: 'row' },
-  chipRow: { gap: 8, paddingVertical: 2 },
-  chip: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginRight: 6 },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.textSoft },
-  chipTextActive: { color: colors.white, fontFamily: fontFamily.semibold },
-  rowCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, marginBottom: 10, backgroundColor: colors.white },
-  rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  content: { paddingBottom: 32, paddingHorizontal: 10 },
+
+  // ── Create rows ──
+  twoCol: { flexDirection: 'row', gap: 8 },
+  colHalf: { flex: 1 },
+
+  rowCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 12,
+    marginBottom: 10,
+    backgroundColor: colors.white,
+  },
+  rowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   rowTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.primary },
   removeText: { fontSize: 13, color: colors.danger },
-  addBtn: { borderWidth: 1, borderColor: '#c7d2e0', borderRadius: 11, borderStyle: 'dashed', backgroundColor: '#f8fafd', paddingVertical: 11, alignItems: 'center' },
+
+  // Picker button (acts like an Input but opens a modal)
+  pickerBtn: {
+    minHeight: 44,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+  },
+  pickerBtnFilled: { borderColor: colors.primary },
+  pickerBtnText: { fontSize: 14, color: colors.textMuted, fontFamily: fontFamily.regular },
+  pickerBtnTextFilled: { fontSize: 14, color: colors.text, fontFamily: fontFamily.medium },
+  pickerCode: { fontSize: 11, color: colors.primary, fontFamily: fontFamily.bold, marginTop: 2 },
+
+  rowTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  rowTotalLabel: { fontSize: 12, color: colors.textSoft, fontFamily: fontFamily.medium },
+  rowTotalValue: { fontSize: 13, color: colors.primary, fontFamily: fontFamily.bold },
+
+  addBtn: {
+    borderWidth: 1,
+    borderColor: '#c7d2e0',
+    borderRadius: 11,
+    borderStyle: 'dashed',
+    backgroundColor: '#f8fafd',
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   addBtnText: { color: colors.primary, fontFamily: fontFamily.bold, fontSize: 13 },
+
   totalCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -329,10 +615,41 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 13,
     paddingHorizontal: 15,
-    marginTop: 12,
+    marginTop: 4,
+    marginBottom: 4,
   },
   totalLabel: { fontSize: 13, color: colors.textSoft, fontFamily: fontFamily.medium },
   totalValue: { fontSize: 16, color: colors.primary, fontFamily: fontFamily.extrabold },
+
+  // ── History ──
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    backgroundColor: colors.white,
+    color: colors.text,
+    fontFamily: fontFamily.regular,
+    fontSize: 13.5,
+  },
+  reloadBtn: {
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    justifyContent: 'center',
+  },
+  reloadBtnText: { color: colors.primary, fontFamily: fontFamily.semibold, fontSize: 13 },
+
   histCard: {
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -341,17 +658,14 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
-  histTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  histTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
   histDate: { fontSize: 11, color: '#94a3b8' },
-  histSupplier: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
-  histMeta: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
-  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  infoKey: { fontSize: 13, color: colors.textSoft, width: 110 },
-  infoVal: { fontSize: 13, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
-  detailItem: { backgroundColor: colors.bg, borderRadius: radius.md, padding: 10, marginBottom: 8 },
-  detailName: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 4 },
-  detailMeta: { fontSize: 12, color: colors.textSoft },
+  histFrom: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
+  histReason: { fontSize: 12, color: colors.textSoft, marginTop: 2 },
+  histTotal: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary, marginTop: 4 },
 });
