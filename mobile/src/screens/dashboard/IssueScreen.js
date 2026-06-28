@@ -79,7 +79,8 @@ export default function IssueScreen() {
       const url = `${API_ENDPOINTS.ISSUES_ELIGIBLE}?eligiblePage=${page0}&pageSize=${PAGE_SIZE}`;
       const { ok, data } = await apiGet(url, user.id);
       if (ok && data) {
-        setEligible(Array.isArray(data.eligible) ? data.eligible : []);
+        const list = Array.isArray(data.eligibleRequests) ? data.eligibleRequests : (Array.isArray(data.eligible) ? data.eligible : []);
+        setEligible(list);
         setSummary(data.summary ?? null);
       } else {
         setEligible([]);
