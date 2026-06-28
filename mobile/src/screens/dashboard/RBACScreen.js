@@ -687,7 +687,7 @@ export default function RBACScreen() {
 // ----------------------------------------------------------------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 32, paddingHorizontal: 12 },
+  content: { paddingBottom: 32, paddingHorizontal: 12, paddingTop: 14 },
 
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 32 },
 

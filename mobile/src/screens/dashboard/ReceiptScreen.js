@@ -257,9 +257,10 @@ export default function ReceiptScreen() {
     : [];
 
   const detailColumns = [
+    { key: 'stt', label: 'STT', flex: 0.5 },
     { key: 'name', label: 'Tên vật tư', flex: 2 },
-    { key: 'lot', label: 'Số lô', flex: 1 },
-    { key: 'qty', label: 'SL nhập', flex: 1 },
+    { key: 'lot', label: 'Số lô', flex: 0.9 },
+    { key: 'qty', label: 'SL', flex: 0.7 },
     { key: 'price', label: 'Đơn giá', flex: 1 },
   ];
 
@@ -543,7 +544,7 @@ export default function ReceiptScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 32, paddingHorizontal: 10 },
+  content: { paddingBottom: 32, paddingHorizontal: 10, paddingTop: 14 },
 
   // ── Create rows ──
   twoCol: { flexDirection: 'row', gap: 8 },

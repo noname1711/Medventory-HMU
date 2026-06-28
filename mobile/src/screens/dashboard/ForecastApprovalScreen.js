@@ -12,6 +12,7 @@ import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS } from '../../api/apiConfig';
 import { apiGet, apiSend } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { normaliseStatus, statusBadge } from '../../utils/status';
 import DetailModal from '../../components/DetailModal';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
@@ -28,9 +29,9 @@ import {
 } from '../../theme/ui';
 
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
-  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
-  REJECTED: { label: 'Từ chối', variant: 'rejected' },
+  PENDING:  { label: 'Chờ duyệt', variant: 'warning' },
+  APPROVED: { label: 'Đã duyệt',  variant: 'success' },
+  REJECTED: { label: 'Từ chối',   variant: 'danger'  },
 };
 
 const PAGE_SIZE = 8;
@@ -46,25 +47,6 @@ function fmtDate(s) {
   return isNaN(d) ? String(s) : d.toLocaleDateString('vi-VN');
 }
 
-// Normalise status from various backend shapes to 'PENDING' | 'APPROVED' | 'REJECTED' | null
-function normaliseStatus(status) {
-  if (!status) return null;
-  if (typeof status === 'object') {
-    if (status.name) return normaliseStatus(status.name);
-    if (status.value !== undefined) {
-      return status.value === 0 ? 'PENDING' : status.value === 1 ? 'APPROVED' : 'REJECTED';
-    }
-    return null;
-  }
-  if (typeof status === 'number') {
-    return status === 0 ? 'PENDING' : status === 1 ? 'APPROVED' : 'REJECTED';
-  }
-  const s = String(status).toUpperCase();
-  if (s.includes('PENDING') || s.includes('CHO') || s.includes('CHỜ')) return 'PENDING';
-  if (s.includes('APPROVED') || s.includes('DUYET') || s.includes('DUYỆT')) return 'APPROVED';
-  if (s.includes('REJECTED') || s.includes('REJECT') || s.includes('TU CHOI') || s.includes('TỪ CHỐI')) return 'REJECTED';
-  return null;
-}
 
 export default function ForecastApprovalScreen() {
   const { user } = useAuth();
@@ -285,11 +267,11 @@ export default function ForecastApprovalScreen() {
   ];
 
   const detailColumns = [
+    { key: 'stt', label: 'STT', flex: 0.5 },
     { key: 'materialName', label: 'Vật tư', flex: 2 },
     { key: 'currentStock', label: 'Tồn kho', flex: 0.9 },
     { key: 'prevYearQty', label: 'Năm trước', flex: 0.9 },
     { key: 'thisYearQty', label: 'Dự trù', flex: 0.8 },
-    { key: 'justification', label: 'Lý do', flex: 1.2 },
   ];
 
   const detailRows = (detailData?.details || []).map((d) => ({
@@ -434,7 +416,7 @@ export default function ForecastApprovalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
+  content: { paddingBottom: 24, paddingHorizontal: 10, paddingTop: 14 },
   centered: { justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
 
   statRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 8 },

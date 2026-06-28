@@ -229,6 +229,7 @@ export default function IssueScreen() {
       : [];
 
   const detailColumns = [
+    { key: 'stt', label: 'STT', flex: 0.5 },
     { key: 'name', label: 'Vật tư', flex: 2 },
     { key: 'unitName', label: 'ĐVT', flex: 1 },
     { key: 'qtyIssued', label: 'SL xuất', flex: 1 },
@@ -252,6 +253,7 @@ export default function IssueScreen() {
     : [];
 
   const previewColumns = [
+    { key: 'stt', label: 'STT', flex: 0.5 },
     { key: 'name', label: 'Vật tư', flex: 2 },
     { key: 'lot', label: 'Lô', flex: 1 },
     { key: 'qty', label: 'SL xuất', flex: 1 },
@@ -429,7 +431,7 @@ export default function IssueScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
+  content: { paddingBottom: 24, paddingHorizontal: 10, paddingTop: 14 },
 
   // Stat row
   statRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },

@@ -12,6 +12,8 @@ import {
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 import { API_ENDPOINTS } from '../../api/apiConfig';
+import { apiGet } from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import { Section, StatCard, Field, Input, Button, Badge, Empty, Pagination } from '../../theme/ui';
@@ -20,6 +22,7 @@ const CATEGORIES = ['A', 'B', 'C', 'D'];
 const PAGE_SIZE = 8;
 
 export default function EquipmentListScreen() {
+  const { user } = useAuth();
   const [stockItems, setStockItems] = useState([]);
   const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState('');
@@ -30,6 +33,7 @@ export default function EquipmentListScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [canManageMaterial, setCanManageMaterial] = useState(false);
   const [form, setForm] = useState({
     materialCode: '',
     materialName: '',
@@ -42,8 +46,11 @@ export default function EquipmentListScreen() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await fetchUnits();
-      await fetchStockItems(keyword, matFilter, page);
+      await Promise.all([
+        fetchUnits(),
+        fetchStockItems(keyword, matFilter, page),
+        fetchPermissions(),
+      ]);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,6 +67,18 @@ export default function EquipmentListScreen() {
 
   // Quay về trang 1 khi đổi từ khóa / bộ lọc
   useEffect(() => { setPage(1); }, [keyword, matFilter]);
+
+  async function fetchPermissions() {
+    if (!user?.id) return;
+    try {
+      const { ok, data } = await apiGet(API_ENDPOINTS.MY_PERMISSIONS, user.id);
+      if (ok && Array.isArray(data?.permissionCodes)) {
+        setCanManageMaterial(data.permissionCodes.includes('MATERIAL.MANAGE'));
+      }
+    } catch {
+      // permission check failed — default to no access (safe)
+    }
+  }
 
   async function fetchUnits() {
     try {
@@ -162,8 +181,8 @@ export default function EquipmentListScreen() {
           <StatCard variant="danger" label="Hết hàng" value={outOfStock} style={styles.statItem} />
         </View>
 
-        {/* Add material form (web "Thêm vật tư mới" section) — collapsible */}
-        <Section title="Thêm vật tư mới" collapsible defaultOpen={false}>
+        {/* Add material form (web "Thêm vật tư mới" section) — only for Thủ kho (MATERIAL.MANAGE) */}
+        {canManageMaterial && <Section title="Thêm vật tư mới" collapsible defaultOpen={false}>
           <Field label="Mã vật tư">
             <Input placeholder="VD: VT001" value={form.materialCode}
               onChangeText={(v) => setForm((f) => ({ ...f, materialCode: v }))} />
@@ -209,7 +228,7 @@ export default function EquipmentListScreen() {
           <Button title={addLoading ? '' : 'Thêm vật tư'} onPress={handleAdd} disabled={addLoading}>
             {addLoading ? <ActivityIndicator color={colors.white} /> : null}
           </Button>
-        </Section>
+        </Section>}
 
         {/* Search with leading icon */}
         <View style={styles.searchBox}>

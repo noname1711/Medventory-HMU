@@ -12,6 +12,7 @@ import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS } from '../../api/apiConfig';
 import { apiGet, apiSend } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { normaliseStatus, statusBadge } from '../../utils/status';
 import DetailModal from '../../components/DetailModal';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
@@ -28,11 +29,6 @@ import {
   Pagination,
 } from '../../theme/ui';
 
-const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
-  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
-  REJECTED: { label: 'Từ chối', variant: 'rejected' },
-};
 
 const PAGE_SIZE = 8;
 
@@ -156,8 +152,14 @@ export default function IssueRequestApprovalScreen() {
     setDetailLoading(true);
     try {
       const res = await apiGet(API_ENDPOINTS.ISSUE_REQ_DETAIL(item.id), user.id);
-      if (res.ok && res.data?.success) {
-        setDetailData(res.data);
+      if (res.ok && res.data) {
+        const d = res.data;
+        // /issue-requests/{id}/detail returns { success, header, details, summary }
+        if (d.header) {
+          setDetailData({ header: d.header, details: d.details || [] });
+        } else {
+          setDetailData(d);
+        }
       }
     } catch {
       // keep the snapshot data
@@ -229,7 +231,8 @@ export default function IssueRequestApprovalScreen() {
 
   // ─── DetailModal props ─────────────────────────────────────────────────────
   const header = detailData?.header || detailData || {};
-  const statusLabel = STATUS_MAP[header.status]?.label || header.statusName || header.status || '—';
+  const normHeaderStatus = normaliseStatus(header.status);
+  const statusLabel = statusBadge(header.status, header.statusName).label;
   const detailInfo = [
     { label: 'Mã phiếu', value: header.id ? `#${header.id}` : '—' },
     { label: 'Người tạo', value: header.createdByName || header.requestedByName || '—' },
@@ -237,29 +240,27 @@ export default function IssueRequestApprovalScreen() {
     { label: 'Ngày tạo', value: fmtDate(header.requestedAt || header.createdAt) },
     { label: 'Trạng thái', value: statusLabel },
     ...(header.note ? [{ label: 'Ghi chú', value: header.note }] : []),
+    ...(header.approvalNote ? [{ label: 'Ghi chú duyệt', value: header.approvalNote }] : []),
   ];
 
   const detailColumns = [
-    { key: 'materialCode', label: 'Mã', flex: 0.8 },
+    { key: 'stt', label: 'STT', flex: 0.5 },
     { key: 'materialName', label: 'Tên vật tư', flex: 2 },
     { key: 'unitName', label: 'ĐVT', flex: 0.7 },
     { key: 'qtyRequested', label: 'SL', flex: 0.6 },
   ];
 
   const detailRows = (detailData?.details || []).map((d) => ({
-    materialCode: d.materialCode || '—',
     materialName: d.materialName || '—',
     unitName: d.unitName || '—',
     qtyRequested: String(d.qtyRequested ?? '—'),
   }));
 
-  const isPendingHeader = header.status === 'PENDING' ||
-    (typeof header.status === 'number' && header.status === 0) ||
-    String(header.statusBadge || '').toLowerCase().includes('pending');
+  const isPendingHeader = normHeaderStatus === 'PENDING';
 
   // ─── Card renderer ────────────────────────────────────────────────────────
   const renderCard = (item) => {
-    const status = STATUS_MAP[item.status] || { label: item.statusName || item.status, variant: 'neutral' };
+    const status = statusBadge(item.status, item.statusName);
     const count = (item.details || []).length;
     return (
       <Pressable key={String(item.id)} style={styles.card} onPress={() => handleRowPress(item)}>
@@ -389,7 +390,7 @@ export default function IssueRequestApprovalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
+  content: { paddingBottom: 24, paddingHorizontal: 10, paddingTop: 14 },
   centered: { justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
 
   // Stat row

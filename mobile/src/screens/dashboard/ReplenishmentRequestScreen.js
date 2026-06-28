@@ -13,6 +13,7 @@ import { API_ENDPOINTS } from '../../api/apiConfig';
 import { apiGet, apiSend } from '../../api/apiClient';
 import { useServerHistory } from '../../hooks/useServerHistory';
 import { useAuth } from '../../context/AuthContext';
+import { statusBadge } from '../../utils/status';
 import MaterialPicker from '../../components/MaterialPicker';
 import DetailModal from '../../components/DetailModal';
 import { colors, radius, fontSize } from '../../theme/tokens';
@@ -31,11 +32,6 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const STATUS_MAP = {
-  PENDING:  { label: 'Chờ duyệt',  variant: 'pending'  },
-  APPROVED: { label: 'Đã duyệt',   variant: 'approved' },
-  REJECTED: { label: 'Từ chối',    variant: 'rejected' },
-};
 
 const CURRENT_ACADEMIC_YEAR = '2025-2026';
 
@@ -276,15 +272,13 @@ export default function ReplenishmentRequestScreen() {
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
-  const statusOf = (code) => STATUS_MAP[String(code || '').toUpperCase()] || { label: code || '—', variant: 'info' };
-
   const detailInfo = detailData ? [
     { label: 'Mã phiếu',   value: `#${detailData.id}`                                                         },
     { label: 'Năm học',    value: detailData.academicYear || '—'                                                },
     { label: 'Bộ môn',     value: detailData.department?.name || '—'                                           },
     { label: 'Người tạo',  value: detailData.createdBy?.fullName || '—'                                        },
     { label: 'Ngày tạo',   value: detailData.createdAt ? new Date(detailData.createdAt).toLocaleDateString('vi-VN') : '—' },
-    { label: 'Trạng thái', value: statusOf(detailData.status).label                                            },
+    { label: 'Trạng thái', value: statusBadge(detailData.status, detailData.statusName).label                  },
     ...(detailData.approvalNote ? [{ label: 'Ghi chú duyệt', value: detailData.approvalNote }] : []),
   ] : [];
 
@@ -458,7 +452,7 @@ export default function ReplenishmentRequestScreen() {
             ) : (
               <>
                 {histItems.map((item) => {
-                  const s = statusOf(item.status);
+                  const s = statusBadge(item.status, item.statusName);
                   return (
                     <TouchableOpacity
                       key={String(item.id)}
@@ -566,7 +560,7 @@ function DeptPickerModal({ departments, onSelect, onClose }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content:   { paddingBottom: 32, paddingHorizontal: 10 },
+  content:   { paddingBottom: 32, paddingHorizontal: 10, paddingTop: 14 },
 
   // ── Dept button ──
   deptBtn: {

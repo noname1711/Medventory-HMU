@@ -13,6 +13,7 @@ import Toast from 'react-native-toast-message';
 import { API_ENDPOINTS } from '../../api/apiConfig';
 import { apiGet, apiSend } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { statusBadge } from '../../utils/status';
 import { useServerHistory } from '../../hooks/useServerHistory';
 import MaterialPicker from '../../components/MaterialPicker';
 import DetailModal from '../../components/DetailModal';
@@ -30,11 +31,6 @@ import {
   Pagination,
 } from '../../theme/ui';
 
-const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
-  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
-  REJECTED: { label: 'Từ chối', variant: 'rejected' },
-};
 
 const PAGE_SIZE = 8;
 
@@ -185,7 +181,13 @@ export default function CreateIssueRequestScreen() {
     const { ok, data } = await apiGet(API_ENDPOINTS.ISSUE_REQ_DETAIL(item.id), user?.id);
     setDetailLoading(false);
     if (ok && data) {
-      setSelectedRequest(data);
+      // /issue-requests/{id}/detail returns { success, header, details, summary }
+      // Flatten into a single object so buildDetailModal can read fields directly.
+      if (data.header) {
+        setSelectedRequest({ ...data.header, details: data.details || [] });
+      } else {
+        setSelectedRequest(data);
+      }
     } else {
       // Fallback: show what we already have from the list
       setSelectedRequest(item);
@@ -195,26 +197,27 @@ export default function CreateIssueRequestScreen() {
   // ─── DetailModal props builder ────────────────────────────────────────────
   const buildDetailModal = () => {
     if (!selectedRequest) return null;
-    const status = STATUS_MAP[selectedRequest.status] || { label: selectedRequest.status, variant: 'info' };
+    const status = statusBadge(selectedRequest.status, selectedRequest.statusName);
     const info = [
-      { label: 'Mã phiếu', value: String(selectedRequest.id || '—') },
+      { label: 'Mã phiếu', value: selectedRequest.id ? String(selectedRequest.id) : '—' },
       {
         label: 'Ngày gửi',
         value: selectedRequest.requestedAt
           ? new Date(selectedRequest.requestedAt).toLocaleDateString('vi-VN')
           : '—',
       },
-      { label: 'Phòng/Khoa', value: selectedRequest.subDepartmentName || '—' },
+      { label: 'Phòng/Khoa', value: selectedRequest.subDepartmentName || selectedRequest.departmentName || '—' },
       { label: 'Ghi chú', value: selectedRequest.note || '—' },
       { label: 'Trạng thái', value: status.label },
     ];
-    if (selectedRequest.rejectReason) {
-      info.push({ label: 'Lý do từ chối', value: selectedRequest.rejectReason });
+    if (selectedRequest.approvalNote) {
+      info.push({ label: 'Ghi chú duyệt', value: selectedRequest.approvalNote });
     }
     const columns = [
+      { key: 'stt', label: 'STT', flex: 0.5 },
       { key: 'materialName', label: 'Tên vật tư', flex: 2 },
-      { key: 'qtyRequested', label: 'SL xin', flex: 1 },
-      { key: 'unitName', label: 'Đơn vị', flex: 1 },
+      { key: 'qtyRequested', label: 'SL', flex: 0.8 },
+      { key: 'unitName', label: 'ĐVT', flex: 0.8 },
     ];
     const rows = (selectedRequest.details || []).map((d) => ({
       materialName: d.materialName || d.material?.name || '—',
@@ -363,7 +366,7 @@ export default function CreateIssueRequestScreen() {
           ) : (
             <>
               {historyItems.map((item) => {
-                const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
+                const status = statusBadge(item.status, item.statusName);
                 const count = (item.details || []).length;
                 return (
                   <TouchableOpacity
@@ -434,7 +437,7 @@ export default function CreateIssueRequestScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
+  content: { paddingBottom: 24, paddingHorizontal: 10, paddingTop: 14 },
 
   // Chip row (sub-department selector)
   chipRow: { gap: 8, paddingVertical: 2 },

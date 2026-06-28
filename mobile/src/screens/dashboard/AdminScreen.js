@@ -342,7 +342,7 @@ export default function AdminScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
+  content: { paddingBottom: 24, paddingHorizontal: 10, paddingTop: 14 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   segment: { marginBottom: 12 },
   statRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },

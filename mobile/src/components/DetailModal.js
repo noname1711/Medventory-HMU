@@ -69,7 +69,7 @@ export default function DetailModal({ visible, title, info = [], columns = [], r
                     <View key={idx} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                       {columns.map((col) => (
                         <Text key={col.key} style={[styles.tdCell, { flex: col.flex ?? 1 }]}>
-                          {row[col.key] ?? '—'}
+                          {col.key === 'stt' ? String(idx + 1) : (row[col.key] ?? '—')}
                         </Text>
                       ))}
                     </View>
