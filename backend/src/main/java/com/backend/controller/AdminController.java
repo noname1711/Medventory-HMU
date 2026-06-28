@@ -61,6 +61,24 @@ public class AdminController {
         }
     }
 
+    /** Danh sách người dùng đã lọc + phân trang ở backend (cho màn Quản trị). */
+    @GetMapping("/users")
+    public ResponseEntity<?> getUsersPage(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestHeader(value = "X-User-Id", required = false) Long actorId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "all") String status,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword,
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "10") int size
+    ) {
+        try {
+            requireUsersManage(auth, actorId);
+            return ResponseEntity.ok(userService.getUsersPage(status, keyword, page, size));
+        } catch (SecurityException se) {
+            return forbidden(se);
+        }
+    }
+
     @PostMapping("/users/{userId}/approve")
     public ResponseEntity<Map<String, String>> approveUser(
             @PathVariable Long userId,

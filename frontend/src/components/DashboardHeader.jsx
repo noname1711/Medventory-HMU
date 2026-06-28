@@ -187,6 +187,17 @@ export default function DashboardHeader({ userInfo }) {
     setShowNoti(false);
   };
 
+  // Màu chấm trạng thái theo eventType (0 chờ duyệt, 1 duyệt, 2 từ chối, 3 lên lịch)
+  const getNotiDotColor = (it) => {
+    if (it?.isRead) return "#94a3b8";
+    switch (it?.eventType) {
+      case 1: return "#16a34a"; // đã duyệt — xanh lá
+      case 2: return "#dc2626"; // từ chối — đỏ
+      case 3: return "#2563eb"; // đã lên lịch — xanh dương
+      default: return "#f59e0b"; // chờ duyệt — vàng
+    }
+  };
+
   // --- DISPLAY HELPERS ---
   const roleDisplayMapping = {
     lanhdao: "Lãnh đạo",
@@ -244,7 +255,8 @@ export default function DashboardHeader({ userInfo }) {
   return (
     <>
       <header className="dh-header">
-        <div className="dh-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="dh-stripe" />
+        <div className="dh-inner">
           {/* Logo Section */}
           <div className="dh-left">
             <div className="dh-logo">
@@ -260,8 +272,21 @@ export default function DashboardHeader({ userInfo }) {
             {/* User Dropdown */}
             {/* Notification Bell */}
                         <div className="dh-noti" ref={notiRef}>
-                          <button className="dh-noti-btn" onClick={handleToggleNoti} type="button">
-                            <span className="dh-noti-icon">🔔</span>
+                          <button className="dh-noti-btn" onClick={handleToggleNoti} type="button" aria-label="Thông báo">
+                            <svg
+                              className="dh-noti-icon"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z" />
+                              <path d="M10.4 21a2 2 0 003.2 0" />
+                            </svg>
                             {unreadCount > 0 && (
                               <span className="dh-noti-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
                             )}
@@ -273,12 +298,12 @@ export default function DashboardHeader({ userInfo }) {
                                 <div className="dh-noti-title">Thông báo</div>
                                 {unreadCount > 0 && (
                                   <button className="dh-noti-mark-all" onClick={markAllRead}>
-                                    Đánh dấu đã đọc hết
+                                    Đánh dấu đã đọc
                                   </button>
                                 )}
                               </div>
 
-                              <div className="dh-noti-content">
+                              <div className="dh-noti-content scry">
                                 {notiLoading ? (
                                   <div className="dh-noti-empty">Đang tải...</div>
                                 ) : notiItems.length === 0 ? (
@@ -291,12 +316,15 @@ export default function DashboardHeader({ userInfo }) {
                                         className={`dh-noti-item ${it.isRead ? "read" : "unread"}`}
                                         onClick={() => handleNotiClick(it)}
                                       >
-                                        <div className="dh-noti-item-top">
-                                            <span className="dh-noti-item-title">{it.title}</span>
-                                            {!it.isRead && <span className="dh-noti-dot"></span>}
+                                        <span
+                                          className="dh-noti-dot"
+                                          style={{ background: getNotiDotColor(it) }}
+                                        ></span>
+                                        <div className="dh-noti-item-main">
+                                          <div className="dh-noti-item-title">{it.title}</div>
+                                          <div className="dh-noti-item-body">{it.content}</div>
+                                          <div className="dh-noti-item-time">{formatTimeAgo(it.createdAt)}</div>
                                         </div>
-                                        <div className="dh-noti-item-body">{it.content}</div>
-                                        <div className="dh-noti-item-time">{formatTimeAgo(it.createdAt)}</div>
                                       </div>
                                     ))}
                                   </div>

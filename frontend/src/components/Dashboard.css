@@ -1,52 +1,66 @@
-/* =============== DASHBOARD FULL VIEW HEIGHT =============== */
+/* =============== DASHBOARD LAYOUT ===============
+   The whole page is ONE scroll container. Header + nav are sticky INSIDE it,
+   so the header row, the nav row, and the content column all share the exact
+   same available width (viewport minus the single scrollbar) and align perfectly.
+*/
 .dashboard-page {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-  background: #f8fafc;
-  font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  color: #111827;
-  overflow-x: hidden;
-}
-
-/* Header luôn trên cùng */
-.dh-header {
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-/* Nội dung chính chiếm phần còn lại */
-.dashboard-page > .container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0;
-  margin: 0;
-}
-
-/* Tabs luôn hiển thị ở trên cùng của nội dung */
-.dt-nav {
-  flex-shrink: 0;
-  justify-content: center;
-  padding: 1rem 1rem;
-  background: #ffffff;
-  border-bottom: 1px solid #dbeafe;
-}
-
-/* Nội dung tab có thể cuộn */
-.mt-4 {
-  flex: 1;
-  min-width: 0;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1.5rem;
+  background: #eef1f6;
+  font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: #1e293b;
   scrollbar-width: thin;
-  scrollbar-color: #93c5fd transparent;
+  scrollbar-color: #c7d2e0 transparent;
+}
+
+.dashboard-page::-webkit-scrollbar {
+  width: 10px;
+}
+.dashboard-page::-webkit-scrollbar-thumb {
+  background: #c7d2e0;
+  border-radius: 5px;
+}
+
+/* Header sticks to the very top; nav sticks right below it (4px stripe + 70px row) */
+.dashboard-page > .dh-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.dashboard-page > .dt-nav {
+  position: sticky;
+  top: 74px;
+  z-index: 39;
+}
+
+.dashboard-main {
+  background: #eef1f6;
+}
+
+/* Centered inner content column — same 1280 box as the header/nav inners */
+.dashboard-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 26px 28px 80px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .dashboard-content {
+    padding: 16px 16px 60px;
+  }
+}
+
+/* On phones the header is shorter; drop the fixed 74px sticky offset to avoid a gap */
+@media (max-width: 640px) {
+  .dashboard-page > .dh-header,
+  .dashboard-page > .dt-nav {
+    position: static;
+  }
+  .dashboard-content {
+    padding: 14px 14px 56px;
+  }
 }
 
 /* =============== CARD & GRID =============== */
@@ -183,31 +197,5 @@
   color: #6b7280;
 }
 
-/* =============== SCROLL SMOOTH =============== */
-.mt-4::-webkit-scrollbar {
-  width: 8px;
-}
-.mt-4::-webkit-scrollbar-thumb {
-  background: #93c5fd;
-  border-radius: 4px;
-}
-.mt-4::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
-}
 
 
-@keyframes fadeSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Toàn trang dashboard mờ dần xuất hiện */
-.dashboard-page {
-  animation: fadeSlideUp 0.25s ease forwards;
-}

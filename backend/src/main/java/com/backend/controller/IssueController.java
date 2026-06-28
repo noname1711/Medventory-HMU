@@ -20,9 +20,10 @@ public class IssueController {
             @RequestParam(value = "afterId", required = false) Long afterId,
             @RequestParam(value = "page", required = false) Integer page,
             @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestHeader("X-User-Id") Long userId) {
         try {
-            return ResponseEntity.ok(issueService.feedIssues(afterId, limit, userId, page));
+            return ResponseEntity.ok(issueService.feedIssues(afterId, limit, userId, page, keyword));
         } catch (Exception e) {
             return ResponseEntity.ok(IssueFeedResponseDTO.error("Không thể lấy feed: " + e.getMessage()));
         }
@@ -94,10 +95,17 @@ public class IssueController {
             @RequestParam(value = "departmentId", required = false) Long departmentId,
             @RequestParam(value = "subDepartmentId", required = false) Long subDepartmentId,
             @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "deptKeyword", required = false) String deptKeyword,
+            @RequestParam(value = "subDeptKeyword", required = false) String subDeptKeyword,
+            @RequestParam(value = "eligiblePage", required = false, defaultValue = "0") Integer eligiblePage,
+            @RequestParam(value = "ineligiblePage", required = false, defaultValue = "0") Integer ineligiblePage,
+            @RequestParam(value = "pageSize", required = false, defaultValue = "10") Integer pageSize,
             @RequestHeader("X-User-Id") Long thuKhoId) {
         try {
             return ResponseEntity.ok(
-                    issueService.getEligibleApprovedRequestsWithReasons(thuKhoId, departmentId, subDepartmentId, limit)
+                    issueService.getEligibleApprovedRequestsWithReasons(
+                            thuKhoId, departmentId, subDepartmentId, limit, deptKeyword, subDeptKeyword,
+                            eligiblePage, ineligiblePage, pageSize)
             );
         } catch (Exception e) {
             return ResponseEntity.ok(EligibleIssueReqResponseDTO.error("Không thể lấy eligible: " + e.getMessage()));

@@ -5,45 +5,114 @@
 ========================================================= */
 
 
-.rbac-panel-body {
+/* Segment inside the main card */
+.rbac-segment {
+  margin-bottom: 18px;
+}
+
+/* Selector + action buttons row (prototype) */
+.rbac-select-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.rbac-select-field {
+  flex: 1;
+  min-width: 280px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 6px;
 }
 
-.rbac-info-row {
+.rbac-select-field .ui-label {
+  margin: 0;
+}
+
+.rbac-select-actions {
   display: flex;
-  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 0;
-  padding: 12px 14px;
-  font-size: 0.875rem;
-  color: #1e293b;
 }
 
-.rbac-info-label {
+/* Meta info bar (prototype gray strip with · separators) */
+.rbac-meta-bar {
+  background: #f7f9fc;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  padding: 11px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
   color: #64748b;
-  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
 }
 
-.rbac-info-sep {
+.rbac-meta-bar b {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.rbac-meta-bar b.is-count {
+  color: #1e40af;
+}
+
+.rbac-meta-dot {
   color: #cbd5e1;
   user-select: none;
 }
 
-.rbac-info-dirty {
+.rbac-meta-dirty {
   color: #d97706;
   font-weight: 700;
 }
 
-.rbac-inner-section {
-  padding: 18px;
+/* Default / extra legend (user tab) */
+.rbac-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.rbac-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rbac-legend-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.rbac-legend-dot.is-default {
+  background: #94a3b8;
+}
+
+.rbac-legend-dot.is-extra {
+  background: #1e40af;
 }
 
 .rbac-settings-section {
-  padding: 18px;
-  margin-bottom: 16px;
+  padding: 18px 22px;
+  margin-bottom: 0;
+}
+
+/* The .ui-page-stack flex gap already spaces the cards — kill the extra
+   adjacent-sibling margin so the gap below the auto-approve card isn't doubled. */
+.rbac-settings-section + .rbac-main-card {
+  margin-top: 0;
 }
 
 .rbac-setting-row {
@@ -140,33 +209,36 @@
   color: #ffffff;
 }
 
-.rbac-grid-actions {
-  margin-top: 16px;
-  margin-bottom: 14px;
-}
-
 .rbac-perm-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
+/* ----- Role tab: checkbox card ----- */
 .rbac-perm-card {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 12px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  padding: 14px 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .rbac-perm-card:hover {
   border-color: #cbd5e1;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  transform: translateY(-1px);
 }
 
 .rbac-perm-card.is-checked {
-  border-color: rgba(37, 99, 235, 0.24);
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-color: rgba(37, 99, 235, 0.32);
+  background: #f8fbff;
+}
+
+.rbac-perm-card.is-disabled {
+  cursor: default;
 }
 
 .rbac-perm-card.is-special {
@@ -174,58 +246,148 @@
   background: #fffbeb;
 }
 
-.rbac-perm-card-top {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.rbac-perm-card-top input[type="checkbox"] {
-  margin-top: 2px;
+.rbac-perm-card input[type="checkbox"] {
+  margin-top: 1px;
   width: 18px;
   height: 18px;
   accent-color: #2563eb;
+  flex: none;
+  cursor: pointer;
 }
 
-.rbac-perm-card.is-special input[type="checkbox"] {
+.rbac-perm-card.is-disabled input[type="checkbox"] {
   cursor: not-allowed;
-  opacity: 0.5;
 }
 
-.rbac-perm-card-title-wrap {
+.rbac-perm-card-body {
   min-width: 0;
   flex: 1;
 }
 
 .rbac-perm-card-name {
-  color: #111827;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-.rbac-inline-badge {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #f59e0b;
-  color: #7c2d12;
-  font-size: 0.74rem;
-  font-weight: 800;
-  vertical-align: middle;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #1e293b;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .rbac-perm-card-desc {
-  color: #6b7280;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin-top: 2px;
 }
 
-.rbac-footnote {
+/* ----- User tab: toggle card ----- */
+.rbac-user-card {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: #fff;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.rbac-user-card.is-on {
+  border-color: rgba(37, 99, 235, 0.32);
+  background: #f8fbff;
+}
+
+.rbac-user-card-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.rbac-user-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rbac-user-card-name {
+  color: #1e293b;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.rbac-user-card-desc {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+/* Small pill tags */
+.rbac-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rbac-tag.is-default {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.rbac-tag.is-extra {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.rbac-tag.is-special-tag {
+  background: #f59e0b;
+  color: #7c2d12;
+}
+
+/* Toggle switch (user tab) */
+.rbac-toggle {
+  position: relative;
+  width: 40px;
+  height: 23px;
+  flex: none;
+  margin-top: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.rbac-toggle.is-on {
+  background: #2563eb;
+}
+
+.rbac-toggle.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rbac-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.rbac-toggle.is-on .rbac-toggle-knob {
+  transform: translateX(17px);
 }
 
 @media (max-width: 900px) {
@@ -238,7 +400,11 @@
     grid-template-columns: 1fr;
   }
 
-  .rbac-tools-row {
+  .rbac-select-row {
     align-items: stretch;
+  }
+
+  .rbac-select-actions {
+    justify-content: flex-end;
   }
 }

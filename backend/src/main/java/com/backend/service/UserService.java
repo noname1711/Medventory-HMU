@@ -103,6 +103,59 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Danh sách người dùng cho màn Quản trị — đã lọc (trạng thái + keyword)
+     * và phân trang ở backend. Loại trừ Admin và Ban Giám Hiệu.
+     *
+     * @param status "all" | "pending" | "approved"
+     */
+    public com.backend.dto.UserPageDTO getUsersPage(String status, String keyword, int page, int size) {
+        List<UserDTO> all = userRepository.findAll()
+                .stream()
+                .map(this::convertToDTO)
+                .filter(u -> !Boolean.TRUE.equals(u.getIsAdmin())
+                        && !Boolean.TRUE.equals(u.getIsBanGiamHieu()))
+                .collect(Collectors.toList());
+
+        long totalUsers = all.size();
+        long pendingUsers = all.stream().filter(u -> Integer.valueOf(0).equals(u.getStatusValue())).count();
+        long approvedUsers = all.stream().filter(u -> Integer.valueOf(1).equals(u.getStatusValue())).count();
+
+        String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+        String st = status == null ? "all" : status.trim().toLowerCase();
+
+        List<UserDTO> filtered = all.stream()
+                .filter(u -> {
+                    if ("pending".equals(st)) return Integer.valueOf(0).equals(u.getStatusValue());
+                    if ("approved".equals(st)) return Integer.valueOf(1).equals(u.getStatusValue());
+                    return true;
+                })
+                .filter(u -> {
+                    if (kw.isEmpty()) return true;
+                    String name = u.getFullName() == null ? "" : u.getFullName().toLowerCase();
+                    String email = u.getEmail() == null ? "" : u.getEmail().toLowerCase();
+                    return name.contains(kw) || email.contains(kw);
+                })
+                .collect(Collectors.toList());
+
+        int safeSize = size <= 0 ? 10 : size;
+        int totalPages = (int) Math.max(1, Math.ceil((double) filtered.size() / safeSize));
+        int safePage = Math.max(0, Math.min(page, totalPages - 1));
+        int from = Math.min(safePage * safeSize, filtered.size());
+        int to = Math.min(from + safeSize, filtered.size());
+
+        return new com.backend.dto.UserPageDTO(
+                new java.util.ArrayList<>(filtered.subList(from, to)),
+                safePage,
+                safeSize,
+                filtered.size(),
+                totalPages,
+                totalUsers,
+                pendingUsers,
+                approvedUsers
+        );
+    }
+
     // controller cũ gọi updateUserStatus(userId, "approved"/"pending")
     public boolean updateUserStatus(Long userId, String status) {
         return userRepository.findById(userId)

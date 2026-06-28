@@ -3,7 +3,7 @@
   position: relative;
   width: 100vw;
   min-height: 100dvh;
-  background: #f0f4ff;
+  background: #eef1f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,10 +28,11 @@
 .auth-wrapper {
   background: #ffffff;
   padding: 40px;
-  border-radius: 10px;
-  width: 380px;
+  border-radius: 20px;
+  width: 420px;
+  max-width: 100%;
   text-align: center;
-  box-shadow: 0 4px 24px rgba(30, 64, 175, 0.1);
+  box-shadow: 0 24px 60px -20px rgba(30, 64, 175, 0.28);
   border: 1px solid #e2e8f0;
   animation: slideUp 0.4s ease;
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./ReplenishmentRequest.css";
 import MaterialSearchInput from "./MaterialSearchInput";
@@ -10,17 +11,6 @@ function fmtDate(s) {
   if (!s) return "—";
   const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
-}
-
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
 }
 
 function statusLabel(code) {
@@ -89,8 +79,6 @@ export default function ReplenishmentRequest() {
   const [currentUser, setCurrentUser] = useState(null);
 
   const [items, setItems] = useState([createEmptyRow()]);
-  const [materials, setMaterials] = useState([]);
-  const [stockByMaterialId, setStockByMaterialId] = useState({});
   const [previousByMaterialId, setPreviousByMaterialId] = useState({});
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
@@ -101,6 +89,8 @@ export default function ReplenishmentRequest() {
   const [historyErr, setHistoryErr] = useState("");
   const [historySearch, setHistorySearch] = useState("");
   const [historyPage, setHistoryPage] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyTotalCount, setHistoryTotalCount] = useState(0);
   const HISTORY_PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -108,12 +98,14 @@ export default function ReplenishmentRequest() {
     setCurrentUser(user);
   }, []);
 
+  // Lọc (keyword) + phân trang ở backend; debounce theo từ khóa.
   useEffect(() => {
-    if (activeTab !== "history") return;
-    if (!currentUser?.id) return;
-    loadHistory();
+    if (activeTab !== "history") return undefined;
+    if (!currentUser?.id) return undefined;
+    const t = setTimeout(() => loadHistory(historySearch, historyPage), 300);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, currentUser?.id]);
+  }, [activeTab, currentUser?.id, historySearch, historyPage]);
 
   function changeItem(index, e) {
     const { name, value } = e.target;
@@ -124,10 +116,25 @@ export default function ReplenishmentRequest() {
     });
   }
 
-  function handleSelectMaterial(index, material) {
-    const stockInfo = stockByMaterialId[material.materialId] || {};
+  // Tra cứu tồn kho hiện có của 1 vật tư ở backend (không tải toàn bộ kho về FE).
+  async function fetchCurrentStock(material) {
+    const kw = material.materialCode || material.materialName || "";
+    if (!kw) return null;
+    try {
+      const res = await fetch(`${API_URL}/inventory/materials?keyword=${encodeURIComponent(kw)}&size=50`);
+      const data = await res.json();
+      const list = Array.isArray(data?.items) ? data.items : [];
+      const row = list.find((x) => x.materialId === material.materialId);
+      return row ? numberOrEmpty(row.closingStock) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleSelectMaterial(index, material) {
     const previousInfo = previousByMaterialId[material.materialId] || {};
-    const currentStock = numberOrEmpty(stockInfo.closingStock ?? previousInfo.currentStock);
+    const liveStock = await fetchCurrentStock(material);
+    const currentStock = liveStock != null ? liveStock : numberOrEmpty(previousInfo.currentStock);
     const previousQty = numberOrEmpty(previousInfo.prevYearQty);
 
     setItems((prev) => {
@@ -199,16 +206,23 @@ export default function ReplenishmentRequest() {
     }
   }
 
-  async function loadHistory() {
+  async function loadHistory(kw = historySearch, page = historyPage) {
     if (!currentUser?.id) return;
     setHistoryLoading(true);
     setHistoryErr("");
     try {
-      const res = await fetch(`${API_URL}/supp-forecast/my?userId=${currentUser.id}`);
+      const qs = new URLSearchParams({
+        userId: String(currentUser.id),
+        keyword: kw || "",
+        page: String(page),
+        size: String(HISTORY_PAGE_SIZE),
+      });
+      const res = await fetch(`${API_URL}/supp-forecast/my?${qs.toString()}`);
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) throw new Error(data?.message || `HTTP ${res.status}`);
       setHistoryItems(Array.isArray(data.items) ? data.items : []);
-      setHistoryPage(0);
+      setHistoryTotalPages(Math.max(1, data.totalPages || 1));
+      setHistoryTotalCount(data.totalCount || 0);
     } catch (err) {
       setHistoryErr(err.message || "Không thể tải lịch sử phiếu dự trù");
     } finally {
@@ -333,19 +347,25 @@ export default function ReplenishmentRequest() {
 
       setPreviousByMaterialId(buildPreviousByMaterialId(data));
 
-      const mapped = data.map((item) => ({
-        rowId: crypto.randomUUID(),
-        materialId: item.materialId,
-        materialName: item.materialName,
-        specification: item.specification,
-        unitId: item.unitId,
-        qtyAvailable: Number(item.currentStock || 0),
-        qtyLastYear: Number(item.prevYearQty || 0),
-        qtyRequested: Number(item.thisYearQty || 0),
-        materialCode: item.materialCode,
-        manufacturer: item.manufacturer,
-        reason: "Tải từ dự trù năm trước",
-      }));
+      const mapped = data.map((item) => {
+        const currentStock = Number(item.currentStock || 0);
+        const prevYearQty = Number(item.prevYearQty || 0);
+        // Dự trù = Năm trước − Hiện có (không âm)
+        const proposed = Math.max(0, prevYearQty - currentStock);
+        return {
+          rowId: crypto.randomUUID(),
+          materialId: item.materialId,
+          materialName: item.materialName,
+          specification: item.specification,
+          unitId: item.unitId,
+          qtyAvailable: currentStock,
+          qtyLastYear: prevYearQty,
+          qtyRequested: proposed,
+          materialCode: item.materialCode,
+          manufacturer: item.manufacturer,
+          reason: "Tải từ dự trù năm trước",
+        };
+      });
 
       setItems(mapped);
       Swal.fire({ icon: "success", title: "Đã tải dự trù năm trước", timer: 1200, showConfirmButton: false });
@@ -364,28 +384,26 @@ export default function ReplenishmentRequest() {
     }
   }
 
-  async function fetchMaterials() {
+  // Tìm vật tư ở backend (server-side) cho ô gợi ý — không tải toàn bộ danh mục.
+  async function searchMaterials(kw) {
     try {
-      const res = await fetch(`${API_URL}/materials`);
+      const res = await fetch(
+        `${API_URL}/materials/search?keyword=${encodeURIComponent(kw || "")}&limit=20`
+      );
+      if (!res.ok) return [];
       const data = await res.json();
-      setMaterials(Array.isArray(data) ? data : []);
+      return (Array.isArray(data) ? data : []).map((m) => ({
+        id: m.id,
+        materialId: m.id,
+        materialName: m.name,
+        materialCode: m.code || "",
+        specification: m.spec || "",
+        unitId: m.unit?.id ?? m.unitId ?? "",
+        manufacturer: m.manufacturer || "",
+        category: m.category || "",
+      }));
     } catch {
-      setMaterials([]);
-    }
-  }
-
-  async function fetchMaterialStock() {
-    try {
-      const res = await fetch(`${API_URL}/inventory/materials`);
-      const data = await res.json();
-      const map = {};
-      (Array.isArray(data) ? data : []).forEach((item) => {
-        if (!item?.materialId) return;
-        map[item.materialId] = item;
-      });
-      setStockByMaterialId(map);
-    } catch {
-      setStockByMaterialId({});
+      return [];
     }
   }
 
@@ -403,8 +421,6 @@ export default function ReplenishmentRequest() {
   }
 
   useEffect(() => {
-    fetchMaterials();
-    fetchMaterialStock();
     fetchDepartments();
   }, []);
 
@@ -412,16 +428,6 @@ export default function ReplenishmentRequest() {
     fetchPreviousLookup(selectedDept);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDept]);
-
-  const materialSearchItems = useMemo(
-    () => materials.map((m) => ({
-      id: m.materialId,
-      materialName: m.materialName,
-      materialCode: m.materialCode || '',
-      unitName: UNIT_MAP[m.unitId] || '',
-    })),
-    [materials, UNIT_MAP]
-  );
 
   const departmentSearchItems = useMemo(
     () => departments.map((dept) => ({
@@ -445,46 +451,32 @@ export default function ReplenishmentRequest() {
     setDepartmentInput(deptItem.materialName || "");
   };
 
-  const filteredHistory = useMemo(() => {
-    const search = (historySearch || "").trim().toLowerCase();
-    if (!search) return historyItems;
-    return historyItems.filter((item) =>
-      String(item.id ?? "").includes(search) ||
-      String(item.academicYear ?? "").toLowerCase().includes(search) ||
-      String(item.departmentName ?? "").toLowerCase().includes(search) ||
-      String(item.status ?? "").toLowerCase().includes(search) ||
-      String(item.createdAt ?? "").includes(search)
-    );
-  }, [historyItems, historySearch]);
-
-  const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / HISTORY_PAGE_SIZE));
+  // Dữ liệu đã được lọc + phân trang ở backend.
   const safeHistoryPage = Math.min(historyPage, historyTotalPages - 1);
-  const pagedHistory = filteredHistory.slice(
-    safeHistoryPage * HISTORY_PAGE_SIZE,
-    safeHistoryPage * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
-  );
+  const pagedHistory = historyItems;
 
   return (
     <div className="ui-page req-page">
-      <div className="ui-page-frame">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">Tạo phiếu dự trù bổ sung vật tư</h1>
+      <div className="ui-page-stack">
+        <div className="ui-screen-bar">
+          <div className="ui-screen-head">
+            <div className="ui-eyebrow">Dự trù</div>
+            <h1 className="ui-screen-title">Tạo phiếu dự trù bổ sung</h1>
           </div>
-          <div className="ui-tabs" style={{ marginBottom: 0 }}>
+          <div className="ui-segment">
             <button
               type="button"
-              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "create" ? "is-active" : ""}`}
               onClick={() => setActiveTab("create")}
             >
               Tạo phiếu
             </button>
             <button
               type="button"
-              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "history" ? "is-active" : ""}`}
               onClick={() => setActiveTab("history")}
             >
-              Lịch sử phiếu dự trù
+              Lịch sử
             </button>
           </div>
         </div>
@@ -494,7 +486,7 @@ export default function ReplenishmentRequest() {
             <form className="req-form" onSubmit={submit}>
               <div className="req-topbar">
                 <div className="ui-field req-department-field">
-                  <label className="ui-label">Chọn bộ môn lập dự trù</label>
+                  <label className="ui-label">Bộ môn lập dự trù</label>
                   <MaterialSearchInput
                     value={departmentInput}
                     onChange={handleDepartmentInputChange}
@@ -508,10 +500,10 @@ export default function ReplenishmentRequest() {
                 <div className="req-top-actions">
                   <button
                     type="button"
-                    className="ui-btn ui-btn-secondary"
+                    className="ui-btn-ghost"
                     onClick={loadPreviousForecast}
                   >
-                    Tải dự trù năm trước
+                    ↻ Tải dự trù năm trước
                   </button>
                 </div>
               </div>
@@ -524,13 +516,11 @@ export default function ReplenishmentRequest() {
                       <th>Tên vật tư</th>
                       <th>Quy cách</th>
                       <th>ĐVT</th>
-                      <th>SL hiện có</th>
+                      <th>Hiện có</th>
                       <th>Năm trước</th>
                       <th>Dự trù</th>
-                      <th>Mã code</th>
-                      <th>Hãng SX</th>
                       <th>Lý do</th>
-                      <th className="text-center">Thao tác</th>
+                      <th></th>
                     </tr>
                   </thead>
 
@@ -550,13 +540,8 @@ export default function ReplenishmentRequest() {
                                   return u;
                                 })
                               }
-                              onSelect={(selectedItem) => {
-                                const original = materials.find(
-                                  (m) => m.materialId === selectedItem.id
-                                );
-                                if (original) handleSelectMaterial(index, original);
-                              }}
-                              items={materialSearchItems}
+                              onSelect={(selectedItem) => handleSelectMaterial(index, selectedItem)}
+                              onSearch={searchMaterials}
                               placeholder="Chọn vật tư"
                             />
                           </td>
@@ -569,7 +554,7 @@ export default function ReplenishmentRequest() {
                             <input className="ui-input" name="unitId" value={UNIT_MAP[item.unitId] || ""} readOnly />
                           </td>
 
-                          <td data-label="SL hiện có">
+                          <td data-label="Hiện có">
                             <input className="ui-input" type="number" name="qtyAvailable" value={item.qtyAvailable || ""} readOnly />
                           </td>
 
@@ -587,14 +572,6 @@ export default function ReplenishmentRequest() {
                             />
                           </td>
 
-                          <td data-label="Mã code">
-                            <input className="ui-input" name="materialCode" value={item.materialCode || ""} readOnly />
-                          </td>
-
-                          <td data-label="Hãng SX">
-                            <input className="ui-input" name="manufacturer" value={item.manufacturer || ""} readOnly />
-                          </td>
-
                           <td data-label="Lý do">
                             <input
                               className="ui-input"
@@ -607,18 +584,19 @@ export default function ReplenishmentRequest() {
                           <td className="text-center">
                             <button
                               type="button"
-                              className="ui-btn ui-btn-danger ui-btn-sm"
+                              className="ui-remove-btn"
                               onClick={() => deleteRow(item.rowId)}
                               disabled={items.length === 1}
+                              title="Xóa dòng"
                             >
-                              Xóa
+                              ✕
                             </button>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="11" className="ui-empty">Không có dữ liệu</td>
+                        <td colSpan="9" className="ui-empty">Không có dữ liệu</td>
                       </tr>
                     )}
                   </tbody>
@@ -626,11 +604,11 @@ export default function ReplenishmentRequest() {
               </div>
 
               <div className="req-actions">
-                <button type="button" className="ui-btn ui-btn-secondary" onClick={addRow}>
-                  + Thêm dòng
+                <button type="button" className="ui-add-dashed" onClick={addRow}>
+                  ＋ Thêm dòng
                 </button>
                 <button type="submit" className="ui-btn ui-btn-primary">
-                  Gửi phiếu
+                  Gửi phiếu dự trù
                 </button>
               </div>
             </form>
@@ -657,7 +635,7 @@ export default function ReplenishmentRequest() {
               </div>
               <button
                 type="button"
-                className="ui-btn ui-btn-secondary"
+                className="ui-btn ui-btn-light"
                 onClick={loadHistory}
                 disabled={historyLoading}
               >
@@ -683,7 +661,7 @@ export default function ReplenishmentRequest() {
                   {pagedHistory.length > 0 ? (
                     pagedHistory.map((item) => (
                       <tr key={item.id}>
-                        <td data-label="Mã phiếu">#{item.id}</td>
+                        <td data-label="Mã phiếu"><span className="ui-mono">#{item.id}</span></td>
                         <td data-label="Ngày tạo">{fmtDate(item.createdAt)}</td>
                         <td data-label="Năm học">{item.academicYear}</td>
                         <td data-label="Bộ môn">{item.departmentName || "—"}</td>
@@ -695,7 +673,7 @@ export default function ReplenishmentRequest() {
                         <td className="text-center">
                           <button
                             type="button"
-                            className="ui-btn ui-btn-secondary ui-btn-sm"
+                            className="ui-btn-ghost"
                             onClick={() => openForecastDetail(item.id)}
                           >
                             Xem
@@ -714,37 +692,13 @@ export default function ReplenishmentRequest() {
               </table>
             </div>
 
-            <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu dự trù">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setHistoryPage((page) => Math.max(0, page - 1))}
-                disabled={historyLoading || safeHistoryPage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(historyTotalPages, safeHistoryPage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === safeHistoryPage ? "is-active" : ""}`}
-                  onClick={() => setHistoryPage(page)}
-                  disabled={historyLoading || page === safeHistoryPage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setHistoryPage((page) => Math.min(historyTotalPages - 1, page + 1))}
-                disabled={historyLoading || safeHistoryPage >= historyTotalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
+            <Pagination
+              page={safeHistoryPage}
+              totalPages={historyTotalPages}
+              onChange={setHistoryPage}
+              disabled={historyLoading}
+              ariaLabel="Phân trang lịch sử phiếu dự trù"
+            />
           </div>
         )}
       </div>

@@ -12,12 +12,57 @@
   margin-bottom: 20px;
 }
 
-/* Ô nút submit trong form thêm vật tư */
-.eq-submit-field {
-  justify-content: flex-end;
+/* Add-material form (prototype: title + 5 fields + button) */
+.eq-add-title {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f1c3f;
 }
 
-/* Khi toolbar bị xuống dòng, giữ input không quá ngắn */
-.eq-toolbar .ui-toolbar-actions {
-  min-width: min(100%, 320px);
+.eq-add-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.4fr 1.1fr 0.9fr 1.1fr 0.9fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.eq-add-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .eq-add-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .eq-add-btn {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .eq-add-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Toolbar: search box + filter pills — space before the table */
+.eq-toolbar {
+  margin-bottom: 18px;
+}
+
+.eq-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .eq-toolbar-actions {
+    width: 100%;
+  }
+  .eq-toolbar-actions .ui-search-box {
+    width: 100%;
+  }
 }

@@ -1,26 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./Admin.css";
 
 const API_URL = "http://localhost:8080/api";
 
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
-}
-
 export default function Admin() {
-  const PAGE_SIZE = 10;
-  const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [pagedUsers, setPagedUsers] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState({ totalUsers: 0, pendingUsers: 0, approvedUsers: 0 });
   const [editingUser, setEditingUser] = useState(null);
   const [newRole, setNewRole] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
@@ -39,9 +29,12 @@ export default function Admin() {
     { value: "Cán bộ", label: "Cán bộ khác" },
   ];
 
+  const PAGE_SIZE_CONST = 10;
   const API_ENDPOINTS = {
     RBAC_PERMISSIONS: `${API_URL}/admin/rbac/permissions`,
     USERS_ALL: `${API_URL}/admin/users/all`,
+    USERS_PAGE: (status, page) =>
+      `${API_URL}/admin/users?status=${encodeURIComponent(status)}&page=${page}&size=${PAGE_SIZE_CONST}`,
     USER_APPROVE: (id) => `${API_URL}/admin/users/${id}/approve`,
     USER_DELETE: (id) => `${API_URL}/admin/users/${id}`,
     USER_ROLE: (id) => `${API_URL}/admin/users/${id}/role`,
@@ -107,12 +100,11 @@ export default function Admin() {
 
         setIsAuthenticated(true);
         setAdminInfo(userData);
-        await fetchUsers();
+        // Danh sách sẽ được tải bởi effect khi isAuthenticated = true.
       } catch {
         if (userData?.isAdmin) {
           setIsAuthenticated(true);
           setAdminInfo(userData);
-          await fetchUsers();
         } else {
           setIsAuthenticated(false);
           navigate("/");
@@ -126,9 +118,10 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  const fetchUsers = async () => {
+  // Tải danh sách người dùng — lọc theo trạng thái + phân trang ở backend.
+  const fetchUsers = async (status = activeTab, page = currentPage) => {
     try {
-      const response = await fetch(API_ENDPOINTS.USERS_ALL, {
+      const response = await fetch(API_ENDPOINTS.USERS_PAGE(status, page), {
         headers: { ...authHeaders() },
       });
 
@@ -136,9 +129,13 @@ export default function Admin() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json();
-      const filteredData = (Array.isArray(data) ? data : []).filter((user) => !user.isAdmin && !user.isBanGiamHieu);
-      setUsers(filteredData);
-      filterUsersByStatus(filteredData, activeTab);
+      setPagedUsers(Array.isArray(data?.items) ? data.items : []);
+      setTotalPages(Math.max(1, data?.totalPages || 1));
+      setSummary({
+        totalUsers: data?.totalUsers || 0,
+        pendingUsers: data?.pendingUsers || 0,
+        approvedUsers: data?.approvedUsers || 0,
+      });
     } catch (error) {
       if (String(error?.message) === "FORBIDDEN") {
         Swal.fire({
@@ -161,28 +158,16 @@ export default function Admin() {
     }
   };
 
-  const filterUsersByStatus = (userList, status) => {
-    if (status === "pending") {
-      setFilteredUsers((userList || []).filter((user) => user.statusValue === 0));
-    } else {
-      setFilteredUsers((userList || []).filter((user) => user.statusValue === 1));
-    }
-    setCurrentPage(0);
-  };
-
+  // Tải lại khi đổi tab trạng thái hoặc trang (sau khi đã xác thực).
   useEffect(() => {
-    filterUsersByStatus(users, activeTab);
-  }, [users, activeTab]);
+    if (isAuthenticated) fetchUsers(activeTab, currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentPage, isAuthenticated]);
 
-  const approvedCount = useMemo(() => users.filter((u) => u.statusValue === 1).length, [users]);
-  const pendingCount = useMemo(() => users.filter((u) => u.statusValue === 0).length, [users]);
-  const totalCount = users.length;
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const approvedCount = summary.approvedUsers;
+  const pendingCount = summary.pendingUsers;
+  const totalCount = summary.totalUsers;
   const safeCurrentPage = Math.min(currentPage, totalPages - 1);
-  const pagedUsers = filteredUsers.slice(
-    safeCurrentPage * PAGE_SIZE,
-    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
-  );
 
 
   const approveUser = async (id, roleBeforeApprove = null) => {
@@ -209,18 +194,12 @@ export default function Admin() {
       if (response.status === 403) throw new Error("FORBIDDEN");
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const user = users.find((u) => u.id === id);
-      const nextUsers = users.map((u) => (
-        u.id === id
-          ? { ...u, role: roleBeforeApprove || u.role, statusValue: 1, status: "Đã duyệt" }
-          : u
-      ));
-      setUsers(nextUsers);
-      filterUsersByStatus(nextUsers, activeTab);
+      const user = pagedUsers.find((u) => u.id === id);
       if (editingUser?.id === id) {
         setEditingUser(null);
         setNewRole("");
       }
+      await fetchUsers(activeTab, currentPage);
 
       Swal.fire({
         title: "✅ Đã duyệt!",
@@ -239,7 +218,7 @@ export default function Admin() {
   };
 
   const deleteUser = async (id) => {
-    const user = users.find((u) => u.id === id);
+    const user = pagedUsers.find((u) => u.id === id);
     if (!user) return;
 
     const isPending = user.statusValue === 0;
@@ -272,13 +251,11 @@ export default function Admin() {
       if (response.status === 403) throw new Error("FORBIDDEN");
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const nextUsers = users.filter((u) => u.id !== id);
-      setUsers(nextUsers);
-      filterUsersByStatus(nextUsers, activeTab);
       if (editingUser?.id === id) {
         setEditingUser(null);
         setNewRole("");
       }
+      await fetchUsers(activeTab, currentPage);
 
       Swal.fire({
         title: isPending ? "❌ Đã từ chối & xóa!" : "✅ Đã xóa!",
@@ -313,9 +290,7 @@ export default function Admin() {
         throw new Error(errorText || "Không thể thay đổi quyền");
       }
 
-      const nextUsers = users.map((u) => (u.id === id ? { ...u, role: roleLabel } : u));
-      setUsers(nextUsers);
-      filterUsersByStatus(nextUsers, activeTab);
+      await fetchUsers(activeTab, currentPage);
 
       setEditingUser(null);
       setNewRole("");
@@ -378,31 +353,24 @@ export default function Admin() {
 
   return (
     <div className="ui-page admin-page-shell">
-      <div className="ui-page-frame">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">Quản lý người dùng</h1>
-          </div>
-          <div className="admin-page-meta">
-            <div className="admin-page-user">{adminInfo?.fullName || "Quản trị viên"}</div>
-          </div>
+      <div className="ui-page-stack">
+        <div className="ui-screen-head">
+          <div className="ui-eyebrow">Quản trị</div>
+          <h1 className="ui-screen-title">Quản lý người dùng</h1>
         </div>
 
         <div className="ui-stat-grid">
           <div className="ui-stat-card is-primary">
-            <p className="ui-stat-label">Tổng tài khoản</p>
             <p className="ui-stat-value">{totalCount}</p>
-            <p className="ui-stat-note">Toàn bộ người dùng đang quản lý</p>
+            <p className="ui-stat-label">Tổng tài khoản</p>
           </div>
           <div className="ui-stat-card is-warning">
-            <p className="ui-stat-label">Chờ duyệt</p>
             <p className="ui-stat-value">{pendingCount}</p>
-            <p className="ui-stat-note">Cần kiểm tra và phê duyệt</p>
+            <p className="ui-stat-label">Chờ duyệt</p>
           </div>
-          <div className="ui-stat-card">
-            <p className="ui-stat-label">Đã duyệt</p>
+          <div className="ui-stat-card is-success">
             <p className="ui-stat-value">{approvedCount}</p>
-            <p className="ui-stat-note">Đã có quyền truy cập hệ thống</p>
+            <p className="ui-stat-label">Đã duyệt</p>
           </div>
         </div>
 
@@ -411,12 +379,12 @@ export default function Admin() {
               <div>
                 <h2 className="ui-section-title">Danh sách tài khoản</h2>
               </div>
-              <div className="ui-status-badge is-info">{filteredUsers.length} tài khoản</div>
+              <div className="ui-status-badge is-info">{activeTab === "pending" ? pendingCount : approvedCount} tài khoản</div>
             </div>
 
-            <div className="ui-tabs">
+            <div className="ui-segment">
               <button
-                className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`}
+                className={`ui-segment-btn ${activeTab === "pending" ? "is-active" : ""}`}
                 onClick={() => {
                   setActiveTab("pending");
                   setCurrentPage(0);
@@ -426,7 +394,7 @@ export default function Admin() {
                 Chờ duyệt ({pendingCount})
               </button>
               <button
-                className={`ui-tab ${activeTab === "approved" ? "is-active" : ""}`}
+                className={`ui-segment-btn ${activeTab === "approved" ? "is-active" : ""}`}
                 onClick={() => {
                   setActiveTab("approved");
                   setCurrentPage(0);
@@ -467,7 +435,7 @@ export default function Admin() {
                         <td>
                           <div className="admin-row-actions">
                             <button
-                              className="ui-btn ui-btn-secondary ui-btn-sm"
+                              className="ui-btn-ghost"
                               onClick={() => openRoleChangeModal(u)}
                               title="Thay đổi quyền"
                               type="button"
@@ -490,39 +458,12 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
-            {filteredUsers.length > 0 ? (
-              <div className="ui-pagination" aria-label="Phân trang danh sách tài khoản">
-                <button
-                  type="button"
-                  className="ui-pagination-btn"
-                  onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                  disabled={safeCurrentPage <= 0}
-                >
-                  Trang trước
-                </button>
-
-                {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
-                    onClick={() => setCurrentPage(page)}
-                    disabled={page === safeCurrentPage}
-                  >
-                    {page + 1}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  className="ui-pagination-btn"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
-                  disabled={safeCurrentPage >= totalPages - 1}
-                >
-                  Trang sau
-                </button>
-              </div>
-            ) : null}
+            <Pagination
+              page={safeCurrentPage}
+              totalPages={totalPages}
+              onChange={setCurrentPage}
+              ariaLabel="Phân trang danh sách tài khoản"
+            />
         </section>
       </div>
 

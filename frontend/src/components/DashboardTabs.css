@@ -1,88 +1,65 @@
-/* =============== DASHBOARD TABS =============== */
+/* =============== DASHBOARD TABS — prototype pill sub-nav =============== */
 .dt-nav {
-  display: flex;
-  gap: 12px;
-  margin: 20px auto;
-  padding: 0 24px;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  animation: fadeSlideDown 0.6s ease forwards;
+  background: #fafbfd;
+  border-bottom: 1px solid #eef2f7;
 }
 
-/* Tab item */
+.dt-nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 28px;
+  height: 54px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dt-nav-inner::-webkit-scrollbar {
+  display: none;
+}
+
 .dt-tab {
   position: relative;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-weight: 600;
-  background: transparent;
-  color: #4b5563;
+  padding: 8px 16px;
+  border-radius: 9px;
   border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s ease;
-  overflow: hidden;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  line-height: 1;
 }
 
-/* Hover effect */
 .dt-tab:hover {
+  background: rgba(30, 64, 175, 0.07);
   color: #1e40af;
-  transform: translateY(-2px);
 }
 
-/* Active tab */
 .dt-tab.active {
-  background: var(--ui-primary);
-  color: white;
-  box-shadow: 0 6px 18px rgba(30, 64, 175, 0.2);
-  transform: translateY(-2px);
+  background: #1e40af;
+  color: #fff;
+  box-shadow: 0 4px 10px -3px rgba(30, 64, 175, 0.5);
 }
 
-/* Ripple effect khi click */
-.dt-tab::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.dt-tab:active::after {
-  width: 220%;
-  height: 220%;
-  opacity: 1;
-  transition: 0s;
-}
-
-/* Animation khi toàn bộ nav xuất hiện */
-@keyframes fadeSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Trạng thái đang đồng bộ quyền */
 .dt-perm-loading {
   font-size: 0.8rem;
   color: #9ca3af;
   padding: 6px 10px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.6);
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 
 .dt-perm-loading::before {
@@ -99,28 +76,4 @@
 
 @keyframes dtPermSpin {
   to { transform: rotate(360deg); }
-}
-
-/* Hiệu ứng highlight trượt dưới chân tab */
-.dt-tab::before {
-  content: "";
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  width: 0%;
-  height: 3px;
-  background: #2563eb;
-  border-radius: 2px;
-  transform: translateX(-50%);
-  transition: width 0.25s ease;
-  opacity: 0.8;
-}
-
-.dt-tab:hover::before {
-  width: 60%;
-}
-
-.dt-tab.active::before {
-  width: 80%;
-  background: white;
 }

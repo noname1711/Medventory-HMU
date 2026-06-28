@@ -372,6 +372,11 @@ public class IssueService {
 
     @Transactional(readOnly = true)
     public IssueFeedResponseDTO feedIssues(Long afterId, Integer limit, Long userId, Integer page) {
+        return feedIssues(afterId, limit, userId, page, null);
+    }
+
+    @Transactional(readOnly = true)
+    public IssueFeedResponseDTO feedIssues(Long afterId, Integer limit, Long userId, Integer page, String keyword) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
@@ -385,11 +390,15 @@ public class IssueService {
             }
 
             int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);
+            String kw = keyword == null ? "" : keyword.trim().toLowerCase();
 
             if (page != null) {
                 int pageNumber = Math.max(0, page);
-                Page<IssueHeader> pageResult = issueHeaderRepository
-                        .findAll(PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
+                Page<IssueHeader> pageResult = kw.isEmpty()
+                        ? issueHeaderRepository.findAll(
+                                PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")))
+                        : issueHeaderRepository.searchByKeyword(kw,
+                                PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
 
                 List<IssueFeedItemDTO> items = pageResult.getContent().stream().map(this::toIssueFeedItemDTO).toList();
 
@@ -721,6 +730,8 @@ public class IssueService {
         dto.setIssueDate(header.getIssueDate());
         dto.setReceiverName(header.getReceiverName());
         dto.setTotalAmount(header.getTotalAmount());
+        // Số loại vật tư = số dòng chi tiết của phiếu xuất
+        dto.setMaterialTypeCount(issueDetailRepository.findByHeaderId(header.getId()).size());
 
         if (header.getCreatedBy() != null) {
             dto.setCreatedById(header.getCreatedBy().getId());
@@ -1246,10 +1257,33 @@ public class IssueService {
                                                                               Long departmentId,
                                                                               Long subDepartmentId,
                                                                               Integer limit) {
+        return getEligibleApprovedRequestsWithReasons(thuKhoId, departmentId, subDepartmentId, limit, null, null, 0, 0, 10);
+    }
+
+    public EligibleIssueReqResponseDTO getEligibleApprovedRequestsWithReasons(Long thuKhoId,
+                                                                              Long departmentId,
+                                                                              Long subDepartmentId,
+                                                                              Integer limit,
+                                                                              String deptKeyword,
+                                                                              String subDeptKeyword) {
+        return getEligibleApprovedRequestsWithReasons(thuKhoId, departmentId, subDepartmentId, limit, deptKeyword, subDeptKeyword, 0, 0, 10);
+    }
+
+    public EligibleIssueReqResponseDTO getEligibleApprovedRequestsWithReasons(Long thuKhoId,
+                                                                              Long departmentId,
+                                                                              Long subDepartmentId,
+                                                                              Integer limit,
+                                                                              String deptKeyword,
+                                                                              String subDeptKeyword,
+                                                                              Integer eligiblePage,
+                                                                              Integer ineligiblePage,
+                                                                              Integer pageSize) {
         try {
             validateThuKho(thuKhoId);
 
-            int size = (limit == null || limit <= 0) ? 50 : Math.min(limit, 200);
+            // Cap tính toán: phải duyệt toàn bộ phiếu approved theo thứ tự ưu tiên
+            // để mô phỏng giữ chỗ tồn kho cho đúng (không phải là pageSize hiển thị).
+            int size = (limit == null || limit <= 0) ? 1000 : Math.min(limit, 2000);
 
             List<IssueReqHeader> approved;
             if (departmentId != null && subDepartmentId != null) {
@@ -1265,6 +1299,21 @@ public class IssueService {
             } else {
                 approved = issueReqHeaderRepository
                         .findByStatus_CodeOrderByRequestedAtAsc(DOC_APPROVED, PageRequest.of(0, size));
+            }
+
+            // Lọc theo tên khoa / bộ môn ở backend (khớp UX ô tìm kiếm tự do).
+            String dk = deptKeyword == null ? "" : deptKeyword.trim().toLowerCase();
+            String sk = subDeptKeyword == null ? "" : subDeptKeyword.trim().toLowerCase();
+            if (!dk.isEmpty() || !sk.isEmpty()) {
+                approved = approved.stream().filter(req -> {
+                    String dn = (req.getDepartment() != null && req.getDepartment().getName() != null)
+                            ? req.getDepartment().getName().toLowerCase() : "";
+                    String sn = (req.getSubDepartment() != null && req.getSubDepartment().getName() != null)
+                            ? req.getSubDepartment().getName().toLowerCase() : "";
+                    if (!dk.isEmpty() && !dn.contains(dk)) return false;
+                    if (!sk.isEmpty() && !sn.contains(sk)) return false;
+                    return true;
+                }).collect(Collectors.toList());
             }
 
             Map<Long, List<LotState>> lotCache = new HashMap<>();
@@ -1321,6 +1370,21 @@ public class IssueService {
                 eligible.add(reqDTO);
             }
 
+            // Phân trang ở backend: chỉ trả về 1 trang của mỗi danh sách.
+            int ps = (pageSize == null || pageSize <= 0) ? 10 : pageSize;
+            int eTotalPages = (int) Math.max(1, Math.ceil((double) eligible.size() / ps));
+            int iTotalPages = (int) Math.max(1, Math.ceil((double) ineligible.size() / ps));
+            int ePage = Math.max(0, Math.min(eligiblePage == null ? 0 : eligiblePage, eTotalPages - 1));
+            int iPage = Math.max(0, Math.min(ineligiblePage == null ? 0 : ineligiblePage, iTotalPages - 1));
+
+            int eFrom = Math.min(ePage * ps, eligible.size());
+            int eTo = Math.min(eFrom + ps, eligible.size());
+            int iFrom = Math.min(iPage * ps, ineligible.size());
+            int iTo = Math.min(iFrom + ps, ineligible.size());
+
+            List<IssueReqHeaderDTO> pagedEligible = new ArrayList<>(eligible.subList(eFrom, eTo));
+            List<IneligibleIssueReqDTO> pagedIneligible = new ArrayList<>(ineligible.subList(iFrom, iTo));
+
             Map<String, Object> summary = new HashMap<>();
             summary.put("checked", checked);
             summary.put("eligible", eligible.size());
@@ -1328,13 +1392,19 @@ public class IssueService {
             summary.put("rejectedAlreadyIssued", rejectedAlreadyIssued);
             summary.put("rejectedHasUnmappedMaterial", rejectedUnmapped);
             summary.put("rejectedNotEnoughStock", rejectedNotEnough);
+            // Thông tin phân trang
+            summary.put("pageSize", ps);
+            summary.put("eligiblePage", ePage);
+            summary.put("ineligiblePage", iPage);
+            summary.put("eligibleTotalPages", eTotalPages);
+            summary.put("ineligibleTotalPages", iTotalPages);
             summary.put("note", "eligible/ineligible đã trừ qty đang giữ chỗ (IssueReservation ACTIVE); phiếu có reservation sẽ được cộng lại phần của chính nó");
 
             String msg = eligible.isEmpty()
                     ? "Không có phiếu nào đủ điều kiện để xuất"
                     : "Lấy danh sách + lý do bị loại thành công";
 
-            return EligibleIssueReqResponseDTO.success(msg, eligible, ineligible, summary);
+            return EligibleIssueReqResponseDTO.success(msg, pagedEligible, pagedIneligible, summary);
 
         } catch (Exception e) {
             return EligibleIssueReqResponseDTO.error("Không thể lấy eligible: " + e.getMessage());

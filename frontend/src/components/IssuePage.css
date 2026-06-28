@@ -8,6 +8,17 @@
   width: 100%;
 }
 
+/* Simplified eligible list (prototype "Phiếu đủ điều kiện xuất") */
+.issue-card-title {
+  margin-bottom: 14px;
+}
+.issue-eligible-table tbody td {
+  padding: 14px 16px;
+}
+.issue-eligible-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .issue-stack {
   display: flex;
   flex-direction: column;

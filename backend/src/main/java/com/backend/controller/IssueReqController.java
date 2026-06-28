@@ -122,9 +122,12 @@ public class IssueReqController {
 
     @GetMapping("/canbo/my-requests")
     public ResponseEntity<IssueReqListResponseDTO> getCanBoRequests(
-            @RequestHeader("X-User-Id") Long canBoId) {
+            @RequestHeader("X-User-Id") Long canBoId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer size) {
         try {
-            IssueReqListResponseDTO response = issueReqService.getRequestsForCanBo(canBoId);
+            IssueReqListResponseDTO response = issueReqService.getRequestsForCanBo(canBoId, keyword, page, size);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.warn("Failed to load issue requests for canBo {}", canBoId, e);

@@ -1,18 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./EquipmentList.css";
-
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
-}
 
 export default function InventoryPage() {
   const PAGE_SIZE = 10;
@@ -20,8 +10,13 @@ export default function InventoryPage() {
   /* ================= STATE ================= */
   const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState("");
+  const [matFilter, setMatFilter] = useState("all");
   const [stockItems, setStockItems] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState({ totalItems: 0, lowStock: 0, outOfStock: 0 });
+  // "Thêm vật tư mới" chỉ hiển thị cho người có quyền quản lý vật tư (Thủ kho)
+  const [canManage, setCanManage] = useState(false);
 
   const [form, setForm] = useState({
     materialCode: "",
@@ -32,11 +27,46 @@ export default function InventoryPage() {
     category: "C",
   });
 
+  /* "Cập nhật" timestamp — set when inventory data loads */
+  const updatedAt = useMemo(() => {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `hôm nay, ${hh}:${mm}`;
+    // recompute only when the stock list changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockItems.length]);
+
   /* ================= LOAD DATA ================= */
   useEffect(() => {
     fetchUnits();
-    fetchStockItems();
+    checkManagePermission();
   }, []);
+
+  // Lọc + phân trang ở backend. Debounce keyword để tránh gọi API mỗi phím gõ.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchStockItems(keyword, matFilter, currentPage);
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, matFilter, currentPage]);
+
+  async function checkManagePermission() {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+      if (!currentUser?.id) return;
+      const res = await fetch("http://localhost:8080/api/auth/my-permissions", {
+        headers: { "X-User-Id": String(currentUser.id) },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const codes = Array.isArray(data?.permissionCodes) ? data.permissionCodes : [];
+      setCanManage(codes.includes("MATERIAL.MANAGE"));
+    } catch {
+      setCanManage(false);
+    }
+  }
 
   async function fetchUnits() {
     try {
@@ -48,38 +78,38 @@ export default function InventoryPage() {
     }
   }
 
-  async function fetchStockItems() {
+  async function fetchStockItems(kw = keyword, status = matFilter, page = currentPage) {
     try {
-      const res = await fetch("http://localhost:8080/api/inventory/materials");
+      const qs = new URLSearchParams({
+        keyword: kw || "",
+        status: status || "all",
+        page: String(page),
+        size: String(PAGE_SIZE),
+      });
+      const res = await fetch(`http://localhost:8080/api/inventory/materials?${qs.toString()}`);
       const data = await res.json();
-      setStockItems(Array.isArray(data) ? data : []);
+      setStockItems(Array.isArray(data?.items) ? data.items : []);
+      setTotalPages(Math.max(1, data?.totalPages || 1));
+      setSummary({
+        totalItems: data?.totalItems || 0,
+        lowStock: data?.lowStock || 0,
+        outOfStock: data?.outOfStock || 0,
+      });
     } catch {
       setStockItems([]);
+      setTotalPages(1);
+      setSummary({ totalItems: 0, lowStock: 0, outOfStock: 0 });
     }
   }
 
   /* ================= COMPUTED DATA ================= */
-  const filteredStockItems = stockItems.filter((item) => {
-    const code = String(item.materialCode || "").toLowerCase();
-    const name = String(item.materialName || "").toLowerCase();
-    const search = keyword.toLowerCase();
-    return code.includes(search) || name.includes(search);
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredStockItems.length / PAGE_SIZE));
+  // Dữ liệu đã được lọc + phân trang ở backend.
   const safeCurrentPage = Math.min(currentPage, totalPages - 1);
-  const pagedStockItems = filteredStockItems.slice(
-    safeCurrentPage * PAGE_SIZE,
-    safeCurrentPage * PAGE_SIZE + PAGE_SIZE
-  );
+  const pagedStockItems = stockItems;
 
-  const totalItems = stockItems.length;
-  const lowStockItems = stockItems.filter(
-    (item) => Number(item.closingStock) > 0 && Number(item.closingStock) < 10
-  ).length;
-  const outOfStockItems = stockItems.filter(
-    (item) => Number(item.closingStock) <= 0
-  ).length;
+  const totalItems = summary.totalItems;
+  const lowStockItems = summary.lowStock;
+  const outOfStockItems = summary.outOfStock;
 
   /* ================= ACTIONS ================= */
   async function handleSubmit() {
@@ -123,44 +153,39 @@ export default function InventoryPage() {
 
   return (
     <div className="ui-page eq-page">
-      <div className="ui-page-frame">
-        <div className="ui-page-stack">
-          <div className="ui-card-header eq-page-header">
-            <div>
-              <h3 className="ui-card-title">Quản lý vật tư kho</h3>
-            </div>
+      <div className="ui-page-stack">
+        <div className="ui-screen-bar">
+          <div className="ui-screen-head">
+            <div className="ui-eyebrow">Kho vật tư</div>
+            <h1 className="ui-screen-title">Danh sách vật tư tồn kho</h1>
           </div>
+          <div className="ui-head-pill">Cập nhật: <b>{updatedAt}</b></div>
+        </div>
 
-          {/* Dải KPI nằm ngang theo kiểu dashboard nhưng vẫn nằm trong cùng một khung trắng */}
-          <div className="ui-stat-grid eq-stat-grid">
+        {/* Dải KPI nằm ngang */}
+        <div className="ui-stat-grid eq-stat-grid">
             <div className="ui-stat-card is-primary">
-              <p className="ui-stat-label">Tổng mặt hàng</p>
               <p className="ui-stat-value">{totalItems}</p>
-              <p className="ui-stat-note">Số lượng mã vật tư đang có trong kho</p>
+              <p className="ui-stat-label">Tổng mặt hàng</p>
             </div>
 
             <div className="ui-stat-card is-warning">
-              <p className="ui-stat-label">Sắp hết hàng</p>
               <p className="ui-stat-value">{lowStockItems}</p>
-              <p className="ui-stat-note">Các mã có tồn kho lớn hơn 0 và nhỏ hơn 10</p>
+              <p className="ui-stat-label">Sắp hết hàng</p>
             </div>
 
             <div className="ui-stat-card is-danger">
-              <p className="ui-stat-label">Hết hàng</p>
               <p className="ui-stat-value">{outOfStockItems}</p>
-              <p className="ui-stat-note">Các mã vật tư hiện không còn tồn kho</p>
+              <p className="ui-stat-label">Hết hàng</p>
             </div>
           </div>
 
-          {/* Form thêm vật tư */}
+          {/* Form thêm vật tư — chỉ hiển thị cho Thủ kho (quyền MATERIAL.MANAGE) */}
+          {canManage && (
           <section className="ui-section">
-            <div className="ui-card-header">
-              <div>
-                <h3 className="ui-card-title">Thêm vật tư mới</h3>
-              </div>
-            </div>
+            <h3 className="eq-add-title">Thêm vật tư mới</h3>
 
-            <div className="ui-form-grid cols-7">
+            <div className="eq-add-grid">
               <div className="ui-field">
                 <label className="ui-label">Mã vật tư</label>
                 <input
@@ -182,7 +207,7 @@ export default function InventoryPage() {
               </div>
 
               <div className="ui-field">
-                <label className="ui-label">Quy cách đóng gói</label>
+                <label className="ui-label">Quy cách</label>
                 <input
                   className="ui-input"
                   placeholder="VD: Hộp 50 chiếc"
@@ -192,7 +217,7 @@ export default function InventoryPage() {
               </div>
 
               <div className="ui-field">
-                <label className="ui-label">Đơn vị tính</label>
+                <label className="ui-label">Đơn vị</label>
                 <select
                   className="ui-select"
                   value={form.unitId}
@@ -224,30 +249,49 @@ export default function InventoryPage() {
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
                 >
-                  <option value="A">A – Quan trọng</option>
-                  <option value="B">B – Thiết yếu</option>
-                  <option value="C">C – Thông dụng</option>
-                  <option value="D">D – Ít quan trọng</option>
+                  <option value="A">A · Thiết yếu</option>
+                  <option value="B">B · Quan trọng</option>
+                  <option value="C">C · Thông dụng</option>
+                  <option value="D">D · Ít quan trọng</option>
                 </select>
               </div>
 
-              <div className="ui-field eq-submit-field">
-                <label className="ui-label">Thao tác</label>
-                <button type="button" className="ui-btn ui-btn-primary" onClick={handleSubmit}>
-                  Thêm vật tư
-                </button>
-              </div>
+              <button type="button" className="ui-btn ui-btn-primary eq-add-btn" onClick={handleSubmit}>
+                ＋ Thêm
+              </button>
             </div>
           </section>
+          )}
 
           {/* Bảng danh sách */}
           <section className="ui-section">
             <div className="ui-toolbar eq-toolbar">
-              <div>
-                <h3 className="ui-card-title">Danh sách vật tư tồn kho</h3>
+              <div className="ui-filter-pills">
+                {[
+                  { key: "all", label: "Tất cả" },
+                  { key: "low", label: "Sắp hết" },
+                  { key: "out", label: "Hết hàng" },
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    className={`ui-filter-pill ${matFilter === f.key ? "is-active" : ""}`}
+                    onClick={() => {
+                      setMatFilter(f.key);
+                      setCurrentPage(0);
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="ui-toolbar-actions">
+              <div className="ui-search-box">
+                <svg className="ui-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
                 <input
                   className="ui-input ui-search"
                   placeholder="Tìm theo mã hoặc tên vật tư..."
@@ -266,7 +310,8 @@ export default function InventoryPage() {
                   <tr>
                     <th>Mã vật tư</th>
                     <th>Tên vật tư</th>
-                    <th>Đơn vị tính</th>
+                    <th>Đơn vị</th>
+                    <th>Phân loại</th>
                     <th className="text-right">Tồn kho</th>
                   </tr>
                 </thead>
@@ -275,9 +320,18 @@ export default function InventoryPage() {
                   {pagedStockItems.length > 0 ? (
                     pagedStockItems.map((item) => (
                       <tr key={item.materialId}>
-                        <td data-label="Mã vật tư">{item.materialCode}</td>
+                        <td data-label="Mã vật tư">
+                          <span className="ui-mono">{item.materialCode}</span>
+                        </td>
                         <td data-label="Tên vật tư">{item.materialName}</td>
-                        <td data-label="Đơn vị tính">{item.unitName}</td>
+                        <td data-label="Đơn vị">{item.unitName}</td>
+                        <td data-label="Phân loại">
+                          {item.category ? (
+                            <span className={`ui-cat-badge is-${String(item.category).toLowerCase()}`}>
+                              Loại {item.category}
+                            </span>
+                          ) : '—'}
+                        </td>
                         <td data-label="Tồn kho" className="text-right">
                           <span className={getStockClass(item.closingStock)}>
                             {item.closingStock}
@@ -287,10 +341,10 @@ export default function InventoryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="ui-empty">
+                      <td colSpan="5" className="ui-empty">
                         {keyword
                           ? `Không tìm thấy vật tư phù hợp với "${keyword}"`
-                          : "Chưa có vật tư nào trong kho. Sử dụng form phía trên để thêm vật tư đầu tiên."}
+                          : "Chưa có vật tư nào trong kho."}
                       </td>
                     </tr>
                   )}
@@ -298,39 +352,13 @@ export default function InventoryPage() {
               </table>
             </div>
 
-            <div className="ui-pagination" aria-label="Phân trang danh sách vật tư">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                disabled={safeCurrentPage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
-                  onClick={() => setCurrentPage(page)}
-                  disabled={page === safeCurrentPage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
-                disabled={safeCurrentPage >= totalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
+            <Pagination
+              page={safeCurrentPage}
+              totalPages={totalPages}
+              onChange={setCurrentPage}
+              ariaLabel="Phân trang danh sách vật tư"
+            />
           </section>
-        </div>
       </div>
     </div>
   );

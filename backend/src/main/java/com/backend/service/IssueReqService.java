@@ -350,6 +350,14 @@ public class IssueReqService {
     }
 
     public IssueReqListResponseDTO getRequestsForCanBo(Long canBoId) {
+        return getRequestsForCanBo(canBoId, null, null, null);
+    }
+
+    /**
+     * Danh sách phiếu xin lĩnh của cán bộ — lọc theo keyword (mã phiếu / mục đích)
+     * và phân trang ở backend. Summary (tổng/chờ/duyệt/từ chối) tính trên toàn bộ.
+     */
+    public IssueReqListResponseDTO getRequestsForCanBo(Long canBoId, String keyword, Integer page, Integer size) {
         try {
             User canBo = userRepository.findById(canBoId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
@@ -359,23 +367,42 @@ public class IssueReqService {
             List<IssueReqHeader> requests =
                     headerRepository.findByCreatedByIdOrderByRequestedAtDesc(canBoId);
 
-            List<IssueReqHeaderDTO> requestDTOs = requests.stream()
-                    .map(this::convertToDTO)
-                    .collect(Collectors.toList());
-
             long totalCount = requests.size();
             long pendingCount = requests.stream().filter(r -> isDocStatus(r, DOC_PENDING)).count();
             long approvedCount = requests.stream().filter(r -> isDocStatus(r, DOC_APPROVED)).count();
             long rejectedCount = requests.stream().filter(r -> isDocStatus(r, DOC_REJECTED)).count();
 
-            return IssueReqListResponseDTO.success(
-                    requestDTOs.isEmpty() ? "Chưa có phiếu xin lĩnh nào" : "Lấy danh sách phiếu thành công",
-                    requestDTOs,
+            List<IssueReqHeaderDTO> all = requests.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+
+            // Lọc theo keyword (mã phiếu hoặc mục đích sử dụng)
+            String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+            List<IssueReqHeaderDTO> filtered = kw.isEmpty() ? all : all.stream()
+                    .filter(d -> String.valueOf(d.getId()).contains(kw)
+                            || (d.getNote() != null && d.getNote().toLowerCase().contains(kw)))
+                    .collect(Collectors.toList());
+
+            // Phân trang
+            int safeSize = (size == null || size <= 0) ? 10 : size;
+            int totalPages = (int) Math.max(1, Math.ceil((double) filtered.size() / safeSize));
+            int safePage = Math.max(0, Math.min(page == null ? 0 : page, totalPages - 1));
+            int from = Math.min(safePage * safeSize, filtered.size());
+            int to = Math.min(from + safeSize, filtered.size());
+            List<IssueReqHeaderDTO> pageItems = new ArrayList<>(filtered.subList(from, to));
+
+            IssueReqListResponseDTO resp = IssueReqListResponseDTO.success(
+                    pageItems.isEmpty() ? "Không có phiếu phù hợp" : "Lấy danh sách phiếu thành công",
+                    pageItems,
                     totalCount,
                     (int) pendingCount,
                     (int) approvedCount,
                     (int) rejectedCount
             );
+            resp.setPage(safePage);
+            resp.setTotalPages(totalPages);
+            resp.setFilteredCount((long) filtered.size());
+            return resp;
 
         } catch (Exception e) {
             return IssueReqListResponseDTO.success(

@@ -14,4 +14,5 @@ public class MaterialStockDTO {
     private String materialName;
     private String unitName;
     private BigDecimal closingStock;
+    private String category; // "A"/"B"/"C"/"D"
 }

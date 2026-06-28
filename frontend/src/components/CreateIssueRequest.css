@@ -9,14 +9,40 @@
 }
 
 
-/* Form / sections */
-.create-issue-request .issue-form,
-.create-issue-request .history-section {
-  background: white;
-  border-radius: 12px;
-  padding: 0;
-  box-shadow: none;
-  border: none;
+/* The section card IS the card — no double-wrapping */
+.create-issue-request .issue-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.create-issue-request .issue-form .ui-section {
+  padding-bottom: 20px;
+}
+
+/* Footer strip — "Thêm hàng" on the left, actions on the right, all one row */
+.cir-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 18px;
+  margin-top: 18px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.cir-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* History toolbar: single full-width search field (matches Nhập kho) */
+.cir-history-toolbar {
+  margin-bottom: 14px;
+}
+
+.cir-history-search {
+  width: 100%;
 }
 
 
@@ -101,60 +127,6 @@
   font-size: 0.95rem;
   font-weight: 800;
   color: #374151;
-}
-
-/* Help collapsible */
-.cir-help {
-  margin-top: 10px;
-}
-
-.cir-help-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 4px 0;
-  color: #64748b;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.cir-help-toggle:hover {
-  color: #1e40af;
-}
-
-.cir-help-chevron {
-  font-size: 0.7rem;
-}
-
-.cir-help-list {
-  margin: 8px 0 0;
-  padding: 12px 14px 12px 28px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  list-style: disc;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.cir-help-list li {
-  color: #475569;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.cir-help-list strong {
-  color: #1e40af;
-}
-
-/* Add-row footer below table */
-.cir-table-footer {
-  margin: 8px 0 4px;
 }
 
 
