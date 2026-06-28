@@ -86,17 +86,18 @@ export default function IssueRequestApprovalScreen() {
 
       if (pendingRes.ok && pendingRes.data?.success) {
         setPendingRequests(pendingRes.data.requests || []);
-        setStats({
-          pendingCount: pendingRes.data.pendingCount ?? 0,
-          approvedCount: processedRes.data?.approvedCount ?? 0,
-          rejectedCount: processedRes.data?.rejectedCount ?? 0,
-        });
+        setStats((prev) => ({ ...prev, pendingCount: pendingRes.data.pendingCount ?? 0 }));
       } else {
         setPendingRequests([]);
       }
 
       if (processedRes.ok && processedRes.data?.success) {
         setProcessedRequests(processedRes.data.requests || []);
+        setStats((prev) => ({
+          ...prev,
+          approvedCount: processedRes.data.approvedCount ?? 0,
+          rejectedCount: processedRes.data.rejectedCount ?? 0,
+        }));
       } else {
         setProcessedRequests([]);
       }
@@ -332,64 +333,56 @@ export default function IssueRequestApprovalScreen() {
         columns={detailColumns}
         rows={detailRows}
         onClose={closeDetail}
-      />
-
-      {/* Approve/Reject action panel — shown below modal as a bottom sheet when detail is open and status is PENDING */}
-      {detailVisible && isPendingHeader && (
-        <View style={styles.actionSheet}>
-          {detailLoading ? (
+        footer={isPendingHeader ? (
+          detailLoading ? (
             <ActivityIndicator color={colors.primary} />
-          ) : (
+          ) : showRejectInput ? (
             <>
-              {showRejectInput ? (
-                <>
-                  <Field label="Lý do từ chối">
-                    <Input
-                      placeholder="Nhập lý do từ chối..."
-                      value={rejectNote}
-                      onChangeText={setRejectNote}
-                      multiline
-                    />
-                  </Field>
-                  <View style={styles.actionRow}>
-                    <Button
-                      title="Xác nhận từ chối"
-                      variant="danger"
-                      onPress={handleReject}
-                      disabled={actionLoading}
-                      style={styles.actionBtn}
-                    />
-                    <Button
-                      title="Hủy"
-                      variant="secondary"
-                      onPress={() => { setShowRejectInput(false); setRejectNote(''); }}
-                      disabled={actionLoading}
-                      style={styles.actionBtn}
-                    />
-                  </View>
-                </>
-              ) : (
-                <View style={styles.actionRow}>
-                  <Button
-                    title="✓ Phê duyệt"
-                    variant="primary"
-                    onPress={handleApprove}
-                    disabled={actionLoading}
-                    style={styles.actionBtn}
-                  />
-                  <Button
-                    title="✕ Từ chối"
-                    variant="danger"
-                    onPress={() => setShowRejectInput(true)}
-                    disabled={actionLoading}
-                    style={styles.actionBtn}
-                  />
-                </View>
-              )}
+              <Field label="Lý do từ chối">
+                <Input
+                  placeholder="Nhập lý do từ chối..."
+                  value={rejectNote}
+                  onChangeText={setRejectNote}
+                  multiline
+                />
+              </Field>
+              <View style={styles.actionRow}>
+                <Button
+                  title="Xác nhận từ chối"
+                  variant="danger"
+                  onPress={handleReject}
+                  disabled={actionLoading}
+                  style={styles.actionBtn}
+                />
+                <Button
+                  title="Hủy"
+                  variant="secondary"
+                  onPress={() => { setShowRejectInput(false); setRejectNote(''); }}
+                  disabled={actionLoading}
+                  style={styles.actionBtn}
+                />
+              </View>
             </>
-          )}
-        </View>
-      )}
+          ) : (
+            <View style={styles.actionRow}>
+              <Button
+                title="✓ Phê duyệt"
+                variant="primary"
+                onPress={handleApprove}
+                disabled={actionLoading}
+                style={styles.actionBtn}
+              />
+              <Button
+                title="✕ Từ chối"
+                variant="danger"
+                onPress={() => setShowRejectInput(true)}
+                disabled={actionLoading}
+                style={styles.actionBtn}
+              />
+            </View>
+          )
+        ) : undefined}
+      />
     </ScrollView>
   );
 }
@@ -416,14 +409,6 @@ const styles = StyleSheet.create({
   cardDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
   cardMeta: { fontSize: 12, color: '#94a3b8', marginTop: 3 },
 
-  // Action sheet (below DetailModal overlay)
-  actionSheet: {
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    padding: 16,
-    gap: 10,
-  },
   actionRow: { flexDirection: 'row', gap: 12 },
   actionBtn: { flex: 1 },
 });

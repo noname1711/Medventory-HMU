@@ -21,8 +21,9 @@ import { Empty } from '../theme/ui';
  *   columns   {Array<{key,label}>}   — table column definitions
  *   rows      {Array<object>}        — table row data (each row keyed by column.key)
  *   onClose   {function}
+ *   footer    {ReactNode}            — optional node pinned at the bottom of the sheet (e.g. action buttons)
  */
-export default function DetailModal({ visible, title, info = [], columns = [], rows = [], onClose }) {
+export default function DetailModal({ visible, title, info = [], columns = [], rows = [], onClose, footer }) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -77,6 +78,13 @@ export default function DetailModal({ visible, title, info = [], columns = [], r
               </View>
             )}
           </ScrollView>
+
+          {/* ── Optional footer (e.g. action buttons) pinned inside the sheet ── */}
+          {footer != null && (
+            <View style={styles.footer}>
+              {footer}
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -131,6 +139,14 @@ const styles = StyleSheet.create({
   body: {
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
+  },
+
+  // ── Footer ──
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
 
   // ── Info block ──
