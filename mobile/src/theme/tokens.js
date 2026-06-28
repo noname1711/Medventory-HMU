@@ -21,11 +21,11 @@ export const colors = {
   border: '#e2e8f0',
   borderSoft: '#f3f4f6',
   borderStrong: '#d1d5db',
-  bg: '#f8fafc',
+  bg: '#eef1f6',
   white: '#ffffff',
 
   // Auth page background (web .auth-page)
-  authBg: '#f0f4ff',
+  authBg: '#eef1f6',
 
   // Focus ring
   focus: '#3b82f6',

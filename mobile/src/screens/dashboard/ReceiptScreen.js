@@ -14,7 +14,7 @@ import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
 import { colors, radius } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
-import { PageFrame, PageHead, Section, Field, Input, Button, Badge, Tabs, Empty, Pagination } from '../../theme/ui';
+import { Section, Field, Input, Button, Badge, SegmentControl, MonoBadge, Empty, Pagination } from '../../theme/ui';
 
 const PAGE_SIZE = 8;
 
@@ -133,19 +133,23 @@ export default function ReceiptScreen() {
   const pageSafe = Math.min(page, totalPages);
   const pagedHistory = history.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
+  // Running total of the create form (prototype "Tổng chi phí")
+  const rcTotal = form.details.reduce(
+    (sum, d) => sum + (Number(d.qty) || 0) * (Number(d.unitPrice) || 0),
+    0
+  );
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
-      <PageFrame>
-        <PageHead title="Nhập kho" />
 
-        <Tabs
-          tabs={[
-            { key: 'create', label: 'Tạo phiếu nhập' },
-            { key: 'history', label: 'Lịch sử nhập' },
+        <SegmentControl
+          segments={[
+            { key: 'create', label: 'Tạo phiếu' },
+            { key: 'history', label: 'Lịch sử' },
           ]}
           active={activeTab}
           onChange={setActiveTab}
@@ -226,16 +230,22 @@ export default function ReceiptScreen() {
               ))}
 
               <TouchableOpacity style={styles.addBtn} onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}>
-                <Text style={styles.addBtnText}>+ Thêm vật tư</Text>
+                <Text style={styles.addBtnText}>＋ Thêm vật tư</Text>
               </TouchableOpacity>
 
-              <Button title={loading ? '' : 'Xác nhận nhập kho'} onPress={handleSubmit} disabled={loading}>
+              {/* Total cost card (prototype) */}
+              <View style={styles.totalCard}>
+                <Text style={styles.totalLabel}>Tổng chi phí</Text>
+                <Text style={styles.totalValue}>{rcTotal.toLocaleString('vi-VN')} đ</Text>
+              </View>
+
+              <Button title={loading ? '' : 'Lưu phiếu nhập'} onPress={handleSubmit} disabled={loading} style={{ marginTop: 10 }}>
                 {loading ? <ActivityIndicator color={colors.white} /> : null}
               </Button>
             </Section>
           </>
         ) : (
-          <Section title="Lịch sử nhập">
+          <View>
             {histLoading && history.length === 0 ? (
               <ActivityIndicator color={colors.primary} style={{ paddingVertical: 24 }} />
             ) : history.length === 0 ? (
@@ -243,15 +253,15 @@ export default function ReceiptScreen() {
             ) : (
               <>
                 {pagedHistory.map((item) => (
-                  <TouchableOpacity key={String(item.id)} style={styles.histRow} onPress={() => setSelected(item)}>
-                    <View style={styles.histInfo}>
-                      <Text style={styles.histId}>Phiếu nhập #{item.id}</Text>
-                      {!!item.supplierName && <Text style={styles.histSupplier} numberOfLines={1}>NCC: {item.supplierName}</Text>}
-                      <Text style={styles.histMeta}>{(item.details || []).length} vật tư</Text>
+                  <TouchableOpacity key={String(item.id)} style={styles.histCard} onPress={() => setSelected(item)} activeOpacity={0.85}>
+                    <View style={styles.histTop}>
+                      <MonoBadge>PN #{item.id}</MonoBadge>
+                      <Text style={styles.histDate}>
+                        {item.receiptDate ? new Date(item.receiptDate).toLocaleDateString('vi-VN') : '—'}
+                      </Text>
                     </View>
-                    <Badge variant="info">
-                      {item.receiptDate ? new Date(item.receiptDate).toLocaleDateString('vi-VN') : '—'}
-                    </Badge>
+                    <Text style={styles.histSupplier} numberOfLines={1}>{item.supplierName || 'Nhà cung cấp'}</Text>
+                    <Text style={styles.histMeta}>{(item.details || []).length} vật tư</Text>
                   </TouchableOpacity>
                 ))}
                 <Pagination
@@ -262,9 +272,8 @@ export default function ReceiptScreen() {
                 />
               </>
             )}
-          </Section>
+          </View>
         )}
-      </PageFrame>
 
       <Modal visible={!!selected} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
@@ -296,7 +305,7 @@ export default function ReceiptScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
+  content: { paddingBottom: 24, paddingHorizontal: 10 },
   label: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.label, marginBottom: 8 },
   twoCol: { flexDirection: 'row' },
   chipRow: { gap: 8, paddingVertical: 2 },
@@ -308,20 +317,34 @@ const styles = StyleSheet.create({
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   rowTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.primary },
   removeText: { fontSize: 13, color: colors.danger },
-  addBtn: { borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.md, borderStyle: 'dashed', paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
-  addBtnText: { color: colors.primary, fontFamily: fontFamily.bold, fontSize: 14 },
-  histRow: {
+  addBtn: { borderWidth: 1, borderColor: '#c7d2e0', borderRadius: 11, borderStyle: 'dashed', backgroundColor: '#f8fafd', paddingVertical: 11, alignItems: 'center' },
+  addBtnText: { color: colors.primary, fontFamily: fontFamily.bold, fontSize: 13 },
+  totalCard: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    marginTop: 12,
   },
-  histInfo: { flex: 1 },
-  histId: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 2 },
-  histSupplier: { fontSize: 13, color: colors.label, marginBottom: 2 },
-  histMeta: { fontSize: 12, color: colors.textMuted },
+  totalLabel: { fontSize: 13, color: colors.textSoft, fontFamily: fontFamily.medium },
+  totalValue: { fontSize: 16, color: colors.primary, fontFamily: fontFamily.extrabold },
+  histCard: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  histTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  histDate: { fontSize: 11, color: '#94a3b8' },
+  histSupplier: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
+  histMeta: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
   modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },

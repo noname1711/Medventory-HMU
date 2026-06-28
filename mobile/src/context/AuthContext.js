@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
     return user.fullName;
   };
 
-  const isAdmin = user?.isBanGiamHieu === true;
+  const isAdmin = user?.isAdmin === true;
 
   return (
     <AuthContext.Provider

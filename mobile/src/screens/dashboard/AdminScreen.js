@@ -17,11 +17,7 @@ import { storage } from '../../utils/storage';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
-  PageFrame,
-  PageHead,
-  Section,
   StatCard,
-  Field,
   Input,
   Label,
   Button,
@@ -163,24 +159,25 @@ export default function AdminScreen() {
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <PageFrame>
-        <PageHead title="Quản lý người dùng" subtitle={`${filtered.length} người dùng`} />
 
-        {/* KPI stat cards (web .ui-stat-grid) */}
-        <StatCard variant="primary" label="Tổng tài khoản" value={totalCount} note="Toàn bộ người dùng đang quản lý" />
-        <StatCard variant="success" label="Đang hoạt động" value={activeCount} note="Tài khoản đang được kích hoạt" />
-        <StatCard variant="danger" label="Đã khóa" value={inactiveCount} note="Tài khoản đang bị vô hiệu hóa" />
+        {/* KPI stat row */}
+        <View style={styles.statRow}>
+          <StatCard variant="primary" label="Tổng tài khoản" value={totalCount} style={styles.statItem} />
+          <StatCard variant="success" label="Hoạt động" value={activeCount} style={styles.statItem} />
+          <StatCard variant="danger" label="Đã khóa" value={inactiveCount} style={styles.statItem} />
+        </View>
 
-        {/* User list (web "Danh sách tài khoản" section) */}
-        <Section title="Danh sách tài khoản">
-          <Field label="Tìm kiếm">
-            <Input
-              placeholder="Tìm theo tên, email, khoa..."
-              value={search}
-              onChangeText={setSearch}
-            />
-          </Field>
+        {/* Search */}
+        <View style={styles.searchWrap}>
+          <Input
+            placeholder="Tìm theo tên, email, khoa..."
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
 
+        {/* User list — cards */}
+        <View>
           {filtered.length === 0 ? (
             <Empty>
               {search
@@ -234,8 +231,7 @@ export default function AdminScreen() {
               />
             </>
           )}
-        </Section>
-      </PageFrame>
+        </View>
 
       {/* Edit Modal */}
       <Modal visible={editModal} transparent animationType="slide">
@@ -273,19 +269,23 @@ export default function AdminScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
+  content: { paddingBottom: 24, paddingHorizontal: 10 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  statRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  statItem: { flex: 1 },
+  searchWrap: { marginBottom: 12 },
   // User row card
   card: {
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: 12,
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
     marginBottom: 10,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  avatarText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#eff4ff', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  avatarText: { color: colors.primary, fontSize: 16, fontFamily: fontFamily.extrabold },
   cardInfo: { flex: 1 },
   userName: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.text },
   userEmail: { fontSize: fontSize.sm, color: colors.textSoft },

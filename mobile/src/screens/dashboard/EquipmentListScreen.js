@@ -5,14 +5,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { Ionicons } from '@expo/vector-icons';
 import { API_ENDPOINTS } from '../../api/apiConfig';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
-import { PageFrame, PageHead, Section, StatCard, Field, Input, Button, Badge, Empty, Pagination } from '../../theme/ui';
+import { Section, StatCard, Field, Input, Button, Badge, Empty, Pagination } from '../../theme/ui';
 
 const CATEGORIES = ['A', 'B', 'C', 'D'];
 const PAGE_SIZE = 8;
@@ -21,7 +23,10 @@ export default function EquipmentListScreen() {
   const [stockItems, setStockItems] = useState([]);
   const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState('');
-  const [page, setPage] = useState(1);
+  const [matFilter, setMatFilter] = useState('all');
+  const [page, setPage] = useState(1); // 1-based ở UI; backend dùng 0-based
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState({ totalItems: 0, lowStock: 0, outOfStock: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
@@ -35,14 +40,26 @@ export default function EquipmentListScreen() {
   });
 
   useEffect(() => {
-    loadAll();
+    (async () => {
+      setLoading(true);
+      await fetchUnits();
+      await fetchStockItems(keyword, matFilter, page);
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadAll() {
-    setLoading(true);
-    await Promise.all([fetchUnits(), fetchStockItems()]);
-    setLoading(false);
-  }
+  // Lọc + phân trang ở backend; debounce theo từ khóa.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchStockItems(keyword, matFilter, page);
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, matFilter, page]);
+
+  // Quay về trang 1 khi đổi từ khóa / bộ lọc
+  useEffect(() => { setPage(1); }, [keyword, matFilter]);
 
   async function fetchUnits() {
     try {
@@ -54,38 +71,42 @@ export default function EquipmentListScreen() {
     }
   }
 
-  async function fetchStockItems() {
+  async function fetchStockItems(kw = keyword, status = matFilter, pageNum = page) {
     try {
-      const res = await fetch(API_ENDPOINTS.INVENTORY_MATERIALS);
+      const qs = new URLSearchParams({
+        keyword: kw || '',
+        status: status || 'all',
+        page: String(Math.max(0, pageNum - 1)),
+        size: String(PAGE_SIZE),
+      });
+      const res = await fetch(`${API_ENDPOINTS.INVENTORY_MATERIALS}?${qs.toString()}`);
       const data = await res.json();
-      setStockItems(Array.isArray(data) ? data : []);
+      setStockItems(Array.isArray(data?.items) ? data.items : []);
+      setTotalPages(Math.max(1, data?.totalPages || 1));
+      setSummary({
+        totalItems: data?.totalItems || 0,
+        lowStock: data?.lowStock || 0,
+        outOfStock: data?.outOfStock || 0,
+      });
     } catch {
       setStockItems([]);
+      setTotalPages(1);
+      setSummary({ totalItems: 0, lowStock: 0, outOfStock: 0 });
     }
   }
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStockItems();
+    await fetchStockItems(keyword, matFilter, page);
     setRefreshing(false);
   };
 
-  const filtered = stockItems.filter((item) => {
-    const code = String(item.materialCode || '').toLowerCase();
-    const name = String(item.materialName || '').toLowerCase();
-    const kw = keyword.toLowerCase();
-    return code.includes(kw) || name.includes(kw);
-  });
-
-  // Pagination — reset to page 1 whenever the search changes
-  useEffect(() => { setPage(1); }, [keyword]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Dữ liệu đã lọc + phân trang ở backend.
+  const paged = stockItems;
   const pageSafe = Math.min(page, totalPages);
-  const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
-
-  const totalItems = stockItems.length;
-  const lowStock = stockItems.filter((i) => Number(i.closingStock) > 0 && Number(i.closingStock) < 10).length;
-  const outOfStock = stockItems.filter((i) => Number(i.closingStock) <= 0).length;
+  const totalItems = summary.totalItems;
+  const lowStock = summary.lowStock;
+  const outOfStock = summary.outOfStock;
 
   const handleAdd = async () => {
     if (!form.materialCode || !form.materialName || !form.unitId) {
@@ -133,13 +154,13 @@ export default function EquipmentListScreen() {
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <PageFrame>
-        <PageHead title="Quản lý vật tư kho" />
 
-        {/* KPI stat cards (web .ui-stat-grid) */}
-        <StatCard variant="primary" label="Tổng mặt hàng" value={totalItems} note="Số lượng mã vật tư đang có trong kho" />
-        <StatCard variant="warning" label="Sắp hết hàng" value={lowStock} note="Các mã có tồn kho lớn hơn 0 và nhỏ hơn 10" />
-        <StatCard variant="danger" label="Hết hàng" value={outOfStock} note="Các mã vật tư hiện không còn tồn kho" />
+        {/* KPI stat row */}
+        <View style={styles.statRow}>
+          <StatCard variant="primary" label="Tổng mặt hàng" value={totalItems} style={styles.statItem} />
+          <StatCard variant="warning" label="Sắp hết hàng" value={lowStock} style={styles.statItem} />
+          <StatCard variant="danger" label="Hết hàng" value={outOfStock} style={styles.statItem} />
+        </View>
 
         {/* Add material form (web "Thêm vật tư mới" section) — collapsible */}
         <Section title="Thêm vật tư mới" collapsible defaultOpen={false}>
@@ -190,15 +211,38 @@ export default function EquipmentListScreen() {
           </Button>
         </Section>
 
-        {/* Inventory list (web "Danh sách vật tư tồn kho" section) */}
-        <Section title="Danh sách vật tư tồn kho">
-          <Input
-            placeholder="Tìm theo mã hoặc tên vật tư..."
+        {/* Search with leading icon */}
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={18} color="#9aa6b8" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm vật tư..."
+            placeholderTextColor={colors.textMuted}
             value={keyword}
             onChangeText={setKeyword}
-            style={{ marginBottom: 14 }}
           />
-          {filtered.length === 0 ? (
+        </View>
+
+        {/* Filter pills */}
+        <View style={styles.filterRow}>
+          {[
+            { key: 'all', label: 'Tất cả' },
+            { key: 'low', label: 'Sắp hết' },
+            { key: 'out', label: 'Hết hàng' },
+          ].map((f) => {
+            const on = matFilter === f.key;
+            return (
+              <TouchableOpacity key={f.key} onPress={() => setMatFilter(f.key)}
+                style={[styles.filterPill, on && styles.filterPillActive]}>
+                <Text style={[styles.filterText, on && styles.filterTextActive]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Inventory list — material cards */}
+        <View>
+          {stockItems.length === 0 ? (
             <Empty>
               {keyword
                 ? `Không tìm thấy vật tư phù hợp với "${keyword}"`
@@ -207,13 +251,14 @@ export default function EquipmentListScreen() {
           ) : (
             <>
               {paged.map((item) => (
-                <View key={String(item.materialId || item.id)} style={styles.row}>
-                  <View style={styles.rowInfo}>
-                    <Text style={styles.code}>[{item.materialCode}]</Text>
+                <View key={String(item.materialId || item.id)} style={styles.card}>
+                  <View style={styles.cardInfo}>
                     <Text style={styles.name} numberOfLines={2}>{item.materialName}</Text>
-                    <Text style={styles.meta}>
-                      {item.unitName || '—'}{item.category ? ` · Loại ${item.category}` : ''}
-                    </Text>
+                    <View style={styles.cardMeta}>
+                      <Text style={styles.code}>{item.materialCode}</Text>
+                      {!!item.unitName && <Text style={styles.meta}>{item.unitName}</Text>}
+                      {!!item.category && <Text style={styles.meta}>Loại {item.category}</Text>}
+                    </View>
                   </View>
                   <View style={styles.rowStock}>
                     <Badge variant={stockVariant(item.closingStock)}>
@@ -230,15 +275,46 @@ export default function EquipmentListScreen() {
               />
             </>
           )}
-        </Section>
-      </PageFrame>
+        </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
+  content: { paddingBottom: 24, paddingHorizontal: 10, paddingTop: 10 },
+  statRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  statItem: { flex: 1 },
+  searchBox: {
+    position: 'relative',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  searchIcon: { position: 'absolute', left: 12, zIndex: 1 },
+  searchInput: {
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingLeft: 36,
+    paddingRight: 14,
+    backgroundColor: colors.white,
+    color: colors.text,
+    fontSize: 13.5,
+    fontFamily: fontFamily.regular,
+  },
+  filterRow: { flexDirection: 'row', gap: 7, marginBottom: 14 },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  filterPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterText: { fontSize: 12.5, fontFamily: fontFamily.bold, color: colors.textSoft },
+  filterTextActive: { color: colors.white },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   chipRow: { gap: 8, paddingVertical: 2 },
   chipRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -252,17 +328,22 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
   chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
-  row: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    justifyContent: 'space-between',
     gap: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 13,
+    padding: 13,
+    marginBottom: 9,
   },
-  rowInfo: { flex: 1 },
-  code: { fontSize: fontSize.sm, color: colors.primary, fontFamily: fontFamily.bold, marginBottom: 2 },
-  name: { fontSize: fontSize.base, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 2 },
-  meta: { fontSize: fontSize.sm, color: colors.textMuted },
-  rowStock: { alignItems: 'flex-end' },
+  cardInfo: { flex: 1, minWidth: 0 },
+  cardMeta: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 },
+  code: { fontSize: 11, color: colors.primary, fontFamily: fontFamily.bold, backgroundColor: '#eff4ff', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 },
+  name: { fontSize: 13.5, fontFamily: fontFamily.semibold, color: colors.text },
+  meta: { fontSize: 11.5, color: '#94a3b8', fontFamily: fontFamily.regular },
+  rowStock: { alignItems: 'flex-end', flexShrink: 0 },
 });

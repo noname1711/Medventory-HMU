@@ -6,7 +6,7 @@
 // fields, buttons, badges, tabs).
 // =========================================================
 import React from 'react';
-import { Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { colors, radius, shadow, fontSize } from './tokens';
 import { fontFamily } from './typography';
 
@@ -75,18 +75,18 @@ export function Pagination({ page, totalPages, onPrev, onNext }) {
 
 // ---- Stat card (web .ui-stat-card.is-*) ----
 const STAT_VARIANTS = {
-  primary: { border: 'rgba(30,64,175,0.18)', tint: '#eff6ff', accent: colors.primary },
-  success: { border: 'rgba(22,163,74,0.18)', tint: '#f0fdf4', accent: colors.success },
-  warning: { border: 'rgba(217,119,6,0.18)', tint: '#fffbeb', accent: colors.warning },
-  danger: { border: 'rgba(220,38,38,0.18)', tint: '#fef2f2', accent: colors.danger },
-  neutral: { border: colors.border, tint: '#f8fbff', accent: colors.text },
+  primary: { border: '#e7ebf2', accent: '#0f1c3f' },
+  success: { border: '#e7ebf2', accent: '#15803d' },
+  warning: { border: '#fde9c8', accent: '#b45309' },
+  danger: { border: '#fbd5d5', accent: '#b91c1c' },
+  neutral: { border: '#e7ebf2', accent: colors.text },
 };
 export function StatCard({ label, value, note, variant = 'neutral', style }) {
   const v = STAT_VARIANTS[variant] || STAT_VARIANTS.neutral;
   return (
-    <View style={[s.statCard, { borderColor: v.border, backgroundColor: v.tint }, style]}>
-      <Text style={s.statLabel}>{label}</Text>
+    <View style={[s.statCard, { borderColor: v.border }, style]}>
       <Text style={[s.statValue, { color: v.accent }]}>{value}</Text>
+      <Text style={s.statLabel}>{label}</Text>
       {!!note && <Text style={[s.statNote, { color: v.accent }]}>{note}</Text>}
     </View>
   );
@@ -164,27 +164,64 @@ export function Badge({ children, variant = 'info', style }) {
   );
 }
 
-// ---- Tabs (web .ui-tabs / .ui-tab.is-active) ----
+// ---- Tabs (web .ui-tabs / .ui-tab.is-active) — horizontal scroll ----
 export function Tabs({ tabs, active, onChange }) {
   return (
-    <View style={s.tabs}>
-      {tabs.map((t) => {
-        const key = typeof t === 'string' ? t : t.key;
-        const label = typeof t === 'string' ? t : t.label;
+    <View style={s.tabsWrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.tabs}
+        keyboardShouldPersistTaps="handled"
+      >
+        {tabs.map((t) => {
+          const key = typeof t === 'string' ? t : t.key;
+          const label = typeof t === 'string' ? t : t.label;
+          const on = key === active;
+          return (
+            <TouchableOpacity
+              key={key}
+              onPress={() => onChange(key)}
+              activeOpacity={0.8}
+              style={[s.tab, on && s.tabActive]}
+            >
+              <Text style={[s.tabText, on && s.tabTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---- Segment control (prototype in-screen pill sub-nav) ----
+// Filled-pill segments (Tạo phiếu / Lịch sử, Chờ duyệt / Đã xử lý …),
+// distinct from the underline `Tabs`. Content-width, left-aligned.
+export function SegmentControl({ segments, active, onChange, style }) {
+  return (
+    <View style={[s.segmentRow, style]}>
+      {segments.map((seg) => {
+        const key = typeof seg === 'string' ? seg : seg.key;
+        const label = typeof seg === 'string' ? seg : seg.label;
         const on = key === active;
         return (
           <TouchableOpacity
             key={key}
             onPress={() => onChange(key)}
-            activeOpacity={0.8}
-            style={[s.tab, on && s.tabActive]}
+            activeOpacity={0.85}
+            style={[s.segment, on && s.segmentActive]}
           >
-            <Text style={[s.tabText, on && s.tabTextActive]}>{label}</Text>
+            <Text style={[s.segmentText, on && s.segmentTextActive]}>{label}</Text>
           </TouchableOpacity>
         );
       })}
     </View>
   );
+}
+
+// ---- Monospace code badge (prototype .mono code chips) ----
+export function MonoBadge({ children, style }) {
+  return <Text style={[s.monoBadge, style]}>{children}</Text>;
 }
 
 // ---- Alert (web .ui-alert.is-*) ----
@@ -232,17 +269,17 @@ const s = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
   sectionHeadCollapsed: { marginBottom: 0 },
   chevron: { fontSize: 16, color: colors.textSoft, paddingLeft: 4 },
-  // Stat — compact
+  // Stat card — clean white card matching prototype
   statCard: {
     borderWidth: 1,
-    borderRadius: radius.md,
-    paddingVertical: 10,
+    borderRadius: 13,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    marginBottom: 8,
+    backgroundColor: colors.white,
   },
-  statLabel: { color: colors.textSoft, fontSize: fontSize.sm, fontFamily: fontFamily.bold },
-  statValue: { marginTop: 4, fontSize: 22, fontFamily: fontFamily.black, lineHeight: 26 },
-  statNote: { marginTop: 4, fontSize: fontSize.xs, fontFamily: fontFamily.medium },
+  statLabel: { color: colors.textSoft, fontSize: 10.5, fontFamily: fontFamily.medium, marginTop: 2 },
+  statValue: { fontSize: 22, fontFamily: fontFamily.extrabold, lineHeight: 24 },
+  statNote: { marginTop: 2, fontSize: fontSize.xs, fontFamily: fontFamily.medium },
   // Field
   field: { marginBottom: 10 },
   label: { color: colors.label, fontSize: fontSize.base, fontFamily: fontFamily.bold, marginBottom: 6 },
@@ -270,20 +307,48 @@ const s = StyleSheet.create({
   badge: { alignSelf: 'flex-start', minWidth: 68, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs, alignItems: 'center' },
   badgeText: { fontSize: fontSize.sm, fontFamily: fontFamily.bold },
   // Tabs
-  tabs: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  tabsWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: 12,
+    backgroundColor: colors.white,
+  },
+  tabs: { flexDirection: 'row', paddingHorizontal: 10, gap: 4 },
   tab: {
-    minHeight: 38,
     paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: radius.md,
+    paddingVertical: 10,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    justifyContent: 'center',
+  },
+  tabActive: { borderBottomColor: colors.primary },
+  tabText: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
+  tabTextActive: { color: colors.primary },
+  // Segment control (prototype pills)
+  segmentRow: { flexDirection: 'row', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
+  segment: {
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.white,
-    justifyContent: 'center',
   },
-  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
-  tabTextActive: { color: colors.white },
+  segmentActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  segmentText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.textSoft },
+  segmentTextActive: { color: colors.white },
+  // Monospace code badge
+  monoBadge: {
+    fontSize: 11,
+    color: colors.primary,
+    fontFamily: fontFamily.bold,
+    backgroundColor: '#eff4ff',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+  },
   // Alert
   alert: { padding: 14, borderRadius: radius.md, borderLeftWidth: 4, marginBottom: 12 },
   alertText: { fontFamily: fontFamily.bold, fontSize: fontSize.base },
@@ -315,5 +380,6 @@ const s = StyleSheet.create({
 });
 
 export default {
-  PageFrame, PageHead, Section, StatCard, Field, Input, Label, Button, Badge, Tabs, Alert, Empty,
+  PageFrame, PageHead, Section, StatCard, Field, Input, Label, Button, Badge, Tabs,
+  SegmentControl, MonoBadge, Alert, Empty,
 };

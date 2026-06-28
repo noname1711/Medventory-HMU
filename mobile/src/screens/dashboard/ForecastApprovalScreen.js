@@ -15,15 +15,12 @@ import { storage } from '../../utils/storage';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
-  PageFrame,
-  PageHead,
-  Section,
-  StatCard,
   Field,
   Input,
   Button,
   Badge,
-  Tabs,
+  SegmentControl,
+  MonoBadge,
   Empty,
   Pagination,
 } from '../../theme/ui';
@@ -150,16 +147,14 @@ export default function ForecastApprovalScreen() {
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <PageFrame>
-        <PageHead title="Phê duyệt dự trù" />
 
-        <Section title="Danh sách dự trù">
-          <Tabs
-            tabs={Object.keys(STATUS_MAP).map((key) => ({ key, label: TAB_LABELS[key] }))}
-            active={filterStatus}
-            onChange={setFilterStatus}
-          />
+        <SegmentControl
+          segments={Object.keys(STATUS_MAP).map((key) => ({ key, label: TAB_LABELS[key] }))}
+          active={filterStatus}
+          onChange={setFilterStatus}
+        />
 
+        <View>
           {loading ? (
             <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
           ) : forecasts.length === 0 ? (
@@ -168,18 +163,20 @@ export default function ForecastApprovalScreen() {
             <>
               {paged.map((item) => {
                 const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
+                const count = (item.details || []).length;
                 return (
-                  <Pressable key={String(item.id)} style={styles.row} onPress={() => setSelected(item)}>
-                    <View style={styles.rowTop}>
-                      <Text style={styles.rowId}>Dự trù #{item.id}</Text>
+                  <Pressable key={String(item.id)} style={styles.card} onPress={() => setSelected(item)}>
+                    <View style={styles.cardTop}>
+                      <MonoBadge>DT #{item.id}</MonoBadge>
                       <Badge variant={status.variant}>{status.label}</Badge>
                     </View>
-                    <Text style={styles.rowBy}>
-                      Người lập: {item.requestedByName || item.requestedBy?.fullName || '—'}
+                    <Text style={styles.cardDept} numberOfLines={1}>
+                      {item.departmentName || item.subDepartmentName || 'Phiếu dự trù'}
                     </Text>
-                    <Text style={styles.rowMeta}>
-                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
-                      {'  ·  '}{(item.details || []).length} vật tư
+                    <Text style={styles.cardMeta} numberOfLines={1}>
+                      {item.requestedByName || item.requestedBy?.fullName || '—'}
+                      {item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString('vi-VN')}` : ''}
+                      {count ? ` · ${count} vật tư` : ''}
                     </Text>
                   </Pressable>
                 );
@@ -192,8 +189,7 @@ export default function ForecastApprovalScreen() {
               />
             </>
           )}
-        </Section>
-      </PageFrame>
+        </View>
 
       {/* Chi tiết dự trù */}
       <Modal visible={!!selected} transparent animationType="slide">
@@ -280,17 +276,19 @@ export default function ForecastApprovalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
+  content: { paddingBottom: 24, paddingHorizontal: 10 },
   centered: { justifyContent: 'center', alignItems: 'center', paddingVertical: 32 },
-  row: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  card: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
   },
-  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  rowId: { fontSize: fontSize.md, fontFamily: fontFamily.bold, color: colors.primary },
-  rowBy: { fontSize: fontSize.base, color: colors.label, marginBottom: 2 },
-  rowMeta: { fontSize: fontSize.sm, color: colors.textMuted },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  cardDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
+  cardMeta: { fontSize: 12, color: '#94a3b8', marginTop: 3 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
   modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { useAuth } from '../../context/AuthContext';
@@ -20,22 +21,22 @@ import RBACScreen from './RBACScreen';
 
 const Tab = createBottomTabNavigator();
 
-// Icon mapping for tabs
+// Monochrome line-icon mapping for tabs (prototype icon set, via Ionicons)
 const TAB_ICONS = {
-  'Vật tư': '📦',
-  'Tạo phiếu xin': '📋',
-  'Phê duyệt lĩnh': '✅',
-  'Phiếu dự trù': '📊',
-  'Nhập kho': '⬇️',
-  'Xuất kho': '⬆️',
-  'Duyệt dự trù': '🔍',
-  'Người dùng': '👥',
-  'Phân quyền': '🔐',
+  'Vật tư': 'cube-outline',
+  'Tạo phiếu xin': 'document-text-outline',
+  'Phê duyệt lĩnh': 'checkmark-circle-outline',
+  'Phiếu dự trù': 'bar-chart-outline',
+  'Nhập kho': 'arrow-down-circle-outline',
+  'Xuất kho': 'arrow-up-circle-outline',
+  'Duyệt dự trù': 'checkmark-done-circle-outline',
+  'Người dùng': 'people-outline',
+  'Phân quyền': 'shield-checkmark-outline',
 };
 
 function tabIcon(name) {
-  return ({ focused }) => (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{TAB_ICONS[name] || '📋'}</Text>
+  return ({ focused, color }) => (
+    <Ionicons name={TAB_ICONS[name] || 'document-outline'} size={22} color={color} />
   );
 }
 

@@ -15,15 +15,13 @@ import { storage } from '../../utils/storage';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
-  PageFrame,
-  PageHead,
   Section,
-  StatCard,
   Field,
   Input,
   Button,
   Badge,
-  Tabs,
+  SegmentControl,
+  MonoBadge,
   Empty,
   Pagination,
 } from '../../theme/ui';
@@ -145,25 +143,23 @@ export default function IssueRequestApprovalScreen() {
   const pageSafe = Math.min(page, totalPages);
   const paged = requests.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  const renderRow = (item) => {
+  const renderCard = (item) => {
     const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
+    const count = (item.details || []).length;
     return (
-      <Pressable key={String(item.id)} style={styles.row} onPress={() => setSelected(item)}>
-        <View style={styles.rowInfo}>
-          <View style={styles.rowTop}>
-            <Text style={styles.rowId}>Phiếu #{item.id}</Text>
-            <Badge variant={status.variant}>{status.label}</Badge>
-          </View>
-          <Text style={styles.rowDept} numberOfLines={1}>
-            {item.subDepartmentName || item.subDepartment?.name || '—'}
-          </Text>
-          <Text style={styles.rowMeta}>
-            Người tạo: {item.requestedByName || item.requestedBy?.fullName || '—'}
-          </Text>
-          <Text style={styles.rowMeta}>
-            {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
-          </Text>
+      <Pressable key={String(item.id)} style={styles.card} onPress={() => setSelected(item)}>
+        <View style={styles.cardTop}>
+          <MonoBadge>#{item.id}</MonoBadge>
+          <Badge variant={status.variant}>{status.label}</Badge>
         </View>
+        <Text style={styles.cardDept} numberOfLines={1}>
+          {item.subDepartmentName || item.subDepartment?.name || '—'}
+        </Text>
+        <Text style={styles.cardMeta} numberOfLines={1}>
+          {item.requestedByName || item.requestedBy?.fullName || '—'}
+          {count ? ` · ${count} vật tư` : ''}
+          {item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString('vi-VN')}` : ''}
+        </Text>
       </Pressable>
     );
   };
@@ -175,23 +171,16 @@ export default function IssueRequestApprovalScreen() {
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <PageFrame>
-        <PageHead title="Phê duyệt Phiếu xin lĩnh" />
 
-        {/* KPI stat cards (web .ui-stat-grid) */}
-        <StatCard variant="primary" label="Tổng phiếu" value={total} note="Theo bộ lọc hiện tại" />
-        <StatCard variant="warning" label="Chờ phê duyệt" value={pendingCount} note="Cần xử lý ngay" />
-        <StatCard variant="neutral" label="Đã xử lý" value={processedCount} note="Đã duyệt hoặc từ chối" />
-
-        {/* Status filter tabs (web .ui-tabs) */}
-        <Tabs
-          tabs={Object.entries(STATUS_MAP).map(([key, val]) => ({ key, label: val.label }))}
+        {/* Status filter — segment pills */}
+        <SegmentControl
+          segments={Object.entries(STATUS_MAP).map(([key, val]) => ({ key, label: val.label }))}
           active={filterStatus}
           onChange={setFilterStatus}
         />
 
-        {/* Requests list (web table section) */}
-        <Section title="Danh sách phiếu">
+        {/* Requests list — cards */}
+        <View>
           {loading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color={colors.primary} />
@@ -200,7 +189,7 @@ export default function IssueRequestApprovalScreen() {
             <Empty>Không có phiếu nào</Empty>
           ) : (
             <>
-              {paged.map(renderRow)}
+              {paged.map(renderCard)}
               <Pagination
                 page={pageSafe}
                 totalPages={totalPages}
@@ -209,8 +198,7 @@ export default function IssueRequestApprovalScreen() {
               />
             </>
           )}
-        </Section>
-      </PageFrame>
+        </View>
 
       {/* Detail + Action Modal */}
       <Modal visible={!!selected} transparent animationType="slide">
@@ -308,22 +296,20 @@ export default function IssueRequestApprovalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
+  content: { paddingBottom: 24, paddingHorizontal: 10 },
   centered: { justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
-  // List rows (web table rows)
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 12,
+  // Request cards (prototype)
+  card: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
   },
-  rowInfo: { flex: 1 },
-  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  rowId: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
-  rowDept: { fontSize: fontSize.base, color: colors.label, marginBottom: 2 },
-  rowMeta: { fontSize: fontSize.sm, color: colors.textMuted },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  cardDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
+  cardMeta: { fontSize: 12, color: '#94a3b8', marginTop: 3 },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },

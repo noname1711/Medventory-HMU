@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -91,29 +92,38 @@ export default function AppHeader({ title }) {
   const displayName = getDisplayName();
   const displayRole = getDisplayRole(user?.role);
 
+  const initials = (user?.fullName || 'U')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2);
+
   return (
     <>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        {/* Logo + title */}
         <View style={styles.brand}>
-          <Text style={styles.brandTitle}>{title || 'Medventory HMU'}</Text>
-          <Text style={styles.brandSub}>Bệnh viện Đại học Y Hà Nội</Text>
+          <View style={styles.logoCircle}>
+            <Image source={require('../../assets/logo.jpg')} style={styles.logoImg} />
+          </View>
+          <View>
+            <Text style={styles.brandTitle}>{title || 'Medventory HMU'}</Text>
+            <Text style={styles.brandSub}>{displayRole || 'Bệnh viện Đại học Y Hà Nội'}</Text>
+          </View>
         </View>
 
         <View style={styles.right}>
           {/* Bell */}
           <TouchableOpacity style={styles.iconBtn} onPress={handleToggleNoti}>
             <Text style={styles.bellIcon}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-              </View>
-            )}
+            {unreadCount > 0 && <View style={styles.badge} />}
           </TouchableOpacity>
 
           {/* Avatar */}
           <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(user?.fullName || 'U')[0].toUpperCase()}</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -192,59 +202,58 @@ export default function AppHeader({ title }) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: colors.white,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 4,
-    borderBottomColor: colors.primary,
+    backgroundColor: '#1e40af',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+    paddingTop: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    ...shadow.soft,
+    alignItems: 'center',
   },
-  brand: {},
-  brandTitle: { fontSize: fontSize.lg, fontFamily: fontFamily.extrabold, color: colors.text },
-  brandSub: { fontSize: fontSize.sm, fontFamily: fontFamily.semibold, color: colors.primary, marginTop: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
+  logoCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    overflow: 'hidden',
+  },
+  logoImg: { width: 36, height: 36, resizeMode: 'cover' },
+  brandTitle: { fontSize: fontSize.base, fontFamily: fontFamily.extrabold, color: '#fff', lineHeight: 19 },
+  brandSub: { fontSize: fontSize.xs, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: {
     position: 'relative',
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bellIcon: { fontSize: 20 },
+  bellIcon: { fontSize: 18 },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: colors.danger,
-    borderRadius: radius.pill,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: colors.white,
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    backgroundColor: '#ef4444',
+    borderRadius: 4,
   },
-  badgeText: { color: colors.white, fontSize: 10, fontFamily: fontFamily.extrabold },
   avatarBtn: {},
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.25)',
   },
-  avatarText: { color: colors.primary, fontSize: fontSize.base, fontFamily: fontFamily.black },
+  avatarText: { color: '#1e40af', fontSize: fontSize.sm, fontFamily: fontFamily.black },
   // Notification
   notiOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   notiPanel: {

@@ -16,14 +16,14 @@ import { storage } from '../../utils/storage';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
-  PageFrame,
-  PageHead,
   Section,
   Field,
   Input,
   Button,
   Badge,
   Empty,
+  SegmentControl,
+  MonoBadge,
   Pagination,
 } from '../../theme/ui';
 
@@ -144,20 +144,15 @@ export default function IssueScreen() {
         ) : undefined
       }
     >
-      <PageFrame>
-        <PageHead title="Xuất kho" />
 
-        {/* Tab switch (web tabs): Tạo phiếu xuất / Lịch sử xuất */}
-        <View style={styles.tabs}>
-          {[['create', 'Tạo phiếu xuất'], ['history', 'Lịch sử xuất']].map(([key, label]) => {
-            const on = activeTab === key;
-            return (
-              <TouchableOpacity key={key} style={[styles.tab, on && styles.tabActive]} onPress={() => setActiveTab(key)}>
-                <Text style={[styles.tabText, on && styles.tabTextActive]}>{label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <SegmentControl
+          segments={[
+            { key: 'create', label: 'Tạo phiếu xuất' },
+            { key: 'history', label: 'Lịch sử' },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
 
         {activeTab === 'create' ? (
           <>
@@ -225,12 +220,13 @@ export default function IssueScreen() {
                 </View>
               ))}
 
-              <Button
-                title="+ Thêm vật tư"
-                variant="secondary"
+              <TouchableOpacity
                 onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}
-                style={styles.addBtn}
-              />
+                style={styles.addRowBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.addRowText}>＋ Thêm vật tư</Text>
+              </TouchableOpacity>
 
               <Button title={loading ? '' : 'Xác nhận xuất kho'} onPress={handleSubmit} disabled={loading} style={{ marginTop: 10 }}>
                 {loading ? <ActivityIndicator color={colors.white} /> : null}
@@ -238,21 +234,21 @@ export default function IssueScreen() {
             </Section>
           </>
         ) : (
-          <Section title="Lịch sử xuất kho">
+          <View>
             {history.length === 0 ? (
               <Empty>Chưa có phiếu xuất nào</Empty>
             ) : (
               <>
                 {pagedHistory.map((item) => (
-                  <TouchableOpacity key={String(item.id)} style={styles.row} onPress={() => setSelected(item)}>
-                    <View style={styles.rowInfo}>
-                      <Text style={styles.cardId}>Phiếu xuất #{item.id}</Text>
-                      <Text style={styles.cardDept} numberOfLines={1}>{item.subDepartmentName || '—'}</Text>
-                      <Text style={styles.cardMeta}>
-                        {item.issueDate ? new Date(item.issueDate).toLocaleDateString('vi-VN') : '—'} · {(item.details || []).length} vật tư
+                  <TouchableOpacity key={String(item.id)} style={styles.histCard} onPress={() => setSelected(item)} activeOpacity={0.85}>
+                    <View style={styles.histTop}>
+                      <MonoBadge>PX #{item.id}</MonoBadge>
+                      <Text style={styles.histDate}>
+                        {item.issueDate ? new Date(item.issueDate).toLocaleDateString('vi-VN') : '—'}
                       </Text>
                     </View>
-                    <Badge variant="info">{(item.details || []).length} VT</Badge>
+                    <Text style={styles.histDept} numberOfLines={1}>{item.subDepartmentName || '—'}</Text>
+                    <Text style={styles.histMeta}>{(item.details || []).length} vật tư</Text>
                   </TouchableOpacity>
                 ))}
                 <Pagination
@@ -263,9 +259,8 @@ export default function IssueScreen() {
                 />
               </>
             )}
-          </Section>
+          </View>
         )}
-      </PageFrame>
 
       <Modal visible={!!selected} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
@@ -295,22 +290,7 @@ export default function IssueScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
-  // Tabs
-  tabs: { flexDirection: 'row', gap: 8, marginBottom: 4, flexWrap: 'wrap' },
-  tab: {
-    minHeight: 38,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-  },
-  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
-  tabTextActive: { color: colors.white },
+  content: { paddingBottom: 24, paddingHorizontal: 10 },
   // Chips
   chipRow: { gap: 8, paddingVertical: 2 },
   chip: { borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
@@ -322,13 +302,29 @@ const styles = StyleSheet.create({
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   rowTitle: { fontSize: fontSize.md, fontFamily: fontFamily.bold, color: colors.primary },
   removeText: { fontSize: fontSize.base, color: colors.statRed, fontFamily: fontFamily.semibold },
-  addBtn: { marginTop: 2 },
-  // History row
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 12 },
-  rowInfo: { flex: 1 },
-  cardId: { fontSize: fontSize.md, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 2 },
-  cardDept: { fontSize: fontSize.base, color: colors.label, marginBottom: 2 },
-  cardMeta: { fontSize: fontSize.sm, color: colors.textMuted },
+  addRowBtn: {
+    paddingVertical: 11,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#c7d2e0',
+    backgroundColor: '#f8fafd',
+    alignItems: 'center',
+  },
+  addRowText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary },
+  // History cards
+  histCard: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  histTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  histDate: { fontSize: 11, color: '#94a3b8' },
+  histDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
+  histMeta: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },

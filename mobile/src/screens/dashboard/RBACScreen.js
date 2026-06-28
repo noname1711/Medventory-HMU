@@ -15,7 +15,7 @@ import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
 import { storage } from '../../utils/storage';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
-import { PageFrame, PageHead, Section, Badge, Empty } from '../../theme/ui';
+import { Badge, MonoBadge, Empty } from '../../theme/ui';
 
 export default function RBACScreen() {
   const [roles, setRoles] = useState([]);
@@ -98,36 +98,33 @@ export default function RBACScreen() {
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
-      <PageFrame>
-        <PageHead title="Phân quyền vai trò" />
 
-        <Section title="Danh sách vai trò">
-          {roles.length === 0 ? (
-            <Empty>Không có vai trò nào</Empty>
-          ) : (
-            roles.map((item) => (
-              <TouchableOpacity
-                key={String(item.id)}
-                style={styles.roleCard}
-                onPress={() => openRole(item)}
-              >
-                <View style={styles.roleLeft}>
-                  <View style={[styles.roleIcon, { backgroundColor: getRoleColor(item.code) + '20' }]}>
-                    <Text style={[styles.roleIconText, { color: getRoleColor(item.code) }]}>
-                      {(item.displayName || item.name || item.code || '?')[0].toUpperCase()}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.roleName}>{item.displayName || item.name || item.code}</Text>
-                    <Text style={styles.roleCode}>{item.code}</Text>
-                  </View>
+        <Text style={styles.heading}>Phân quyền vai trò</Text>
+        {roles.length === 0 ? (
+          <Empty>Không có vai trò nào</Empty>
+        ) : (
+          roles.map((item) => (
+            <TouchableOpacity
+              key={String(item.id)}
+              style={styles.roleCard}
+              onPress={() => openRole(item)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.roleLeft}>
+                <View style={[styles.roleIcon, { backgroundColor: getRoleColor(item.code) + '20' }]}>
+                  <Text style={[styles.roleIconText, { color: getRoleColor(item.code) }]}>
+                    {(item.displayName || item.name || item.code || '?')[0].toUpperCase()}
+                  </Text>
                 </View>
-                <Badge variant="info">{(item.permissions || []).length} quyền</Badge>
-              </TouchableOpacity>
-            ))
-          )}
-        </Section>
-      </PageFrame>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.roleName} numberOfLines={1}>{item.displayName || item.name || item.code}</Text>
+                  <MonoBadge>{item.code}</MonoBadge>
+                </View>
+              </View>
+              <Badge variant="info">{(item.permissions || []).length} quyền</Badge>
+            </TouchableOpacity>
+          ))
+        )}
 
       {/* Permission editor modal */}
       <Modal visible={!!selected} transparent animationType="slide">
@@ -180,22 +177,25 @@ function getRoleColor(code) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24 },
+  content: { paddingBottom: 24, paddingHorizontal: 10 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  heading: { fontSize: 16, fontFamily: fontFamily.extrabold, color: '#0f1c3f', marginBottom: 12 },
   roleCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
     gap: 12,
   },
-  roleLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  roleLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 0 },
   roleIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   roleIconText: { fontSize: 18, fontFamily: fontFamily.bold },
-  roleName: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.text },
-  roleCode: { fontSize: fontSize.sm, color: colors.textMuted },
+  roleName: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.text, marginBottom: 4 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
   modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },

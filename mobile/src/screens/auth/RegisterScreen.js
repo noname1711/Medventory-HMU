@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -104,13 +105,30 @@ export default function RegisterScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Back button */}
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Quay lại</Text>
-        </TouchableOpacity>
-
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Đăng ký tài khoản</Text>
+          {/* Header — same as Login */}
+          <View style={styles.header}>
+            <View style={styles.logoCircle}>
+              <Image
+                source={require('../../../assets/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.title}>HMU Medical</Text>
+            <Text style={styles.subtitle}>Hệ thống quản lý vật tư y tế</Text>
+            <Text style={styles.subtext}>Bệnh viện Đại học Y Hà Nội</Text>
+          </View>
+
+          {/* Tabs */}
+          <View style={styles.tabs}>
+            <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.tabText}>Đăng nhập</Text>
+            </TouchableOpacity>
+            <View style={[styles.tab, styles.tabActive]}>
+              <Text style={[styles.tabText, styles.tabTextActive]}>Đăng ký</Text>
+            </View>
+          </View>
 
           <TextInput
             style={styles.input}
@@ -201,12 +219,6 @@ export default function RegisterScreen({ navigation }) {
             )}
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Đã có tài khoản? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.linkText}>Đăng nhập</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
 
@@ -272,10 +284,10 @@ export default function RegisterScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.authBg },
-  scroll: { flexGrow: 1, padding: 16, paddingTop: 40 },
-  backBtn: { marginBottom: 14 },
-  backText: { color: colors.primary, fontSize: fontSize.md, fontFamily: fontFamily.semibold },
+  scroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32, paddingHorizontal: 16 },
   card: {
+    width: '100%',
+    maxWidth: 400,
     backgroundColor: colors.white,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -283,7 +295,34 @@ const styles = StyleSheet.create({
     padding: 24,
     ...shadow.auth,
   },
-  cardTitle: { fontSize: fontSize.lg, fontFamily: fontFamily.bold, color: colors.text, marginBottom: 18, textAlign: 'center' },
+  header: { alignItems: 'center', marginBottom: 20 },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    ...shadow.soft,
+  },
+  logo: { width: 60, height: 60 },
+  title: { fontSize: 22, fontFamily: fontFamily.extrabold, color: colors.text, marginBottom: 4 },
+  subtitle: { fontSize: fontSize.base, fontFamily: fontFamily.medium, color: colors.textSoft, marginBottom: 2 },
+  subtext: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
+  tabs: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+  },
+  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabText: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
+  tabTextActive: { color: colors.white },
   input: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
@@ -324,9 +363,6 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.6 },
   submitText: { color: colors.white, fontSize: fontSize.md, fontFamily: fontFamily.semibold },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.textSoft },
-  linkText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
   // Modal
   modalOverlay: {
     flex: 1,
