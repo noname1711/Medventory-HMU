@@ -1,9 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,12 +8,15 @@ import {
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
-import { storage } from '../../utils/storage';
+import { API_ENDPOINTS } from '../../api/apiConfig';
+import { apiGet, apiSend } from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
+import DetailModal from '../../components/DetailModal';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
   Section,
+  StatCard,
   Field,
   Input,
   Button,
@@ -28,262 +28,400 @@ import {
 } from '../../theme/ui';
 
 const PAGE_SIZE = 8;
+const HIST_SIZE = 10;
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+}
 
 export default function IssueScreen() {
+  const { user } = useAuth();
+
+  // ── Tabs ──
   const [activeTab, setActiveTab] = useState('create');
-  const [currentUser, setCurrentUser] = useState(null);
-  const [materials, setMaterials] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [subDepartments, setSubDepartments] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
+
+  // ── Eligible list (create tab) ──
+  const [eligible, setEligible] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [eligiblePage, setEligiblePage] = useState(1);      // 1-based UI
+  const [eligibleLoading, setEligibleLoading] = useState(false);
+
+  // ── Preview modal ──
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [previewReq, setPreviewReq] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  // ── History tab ──
+  const [histItems, setHistItems] = useState([]);
+  const [histPage, setHistPage] = useState(1);              // 1-based UI
+  const [histTotalPages, setHistTotalPages] = useState(1);
+  const [histKeyword, setHistKeyword] = useState('');
   const [histLoading, setHistLoading] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [page, setPage] = useState(1);
+  const debounceRef = useRef(null);
 
-  const [form, setForm] = useState({
-    issueDate: new Date().toISOString().split('T')[0],
-    subDepartmentId: '',
-    note: '',
-    details: [createRow()],
-  });
+  // ── Detail modal (history) ──
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
-  function createRow() {
-    return { materialId: null, materialName: '', unitId: '', qtyIssued: '' };
-  }
+  // ────────────────────────────────────────────
+  // Eligible list fetch
+  // ────────────────────────────────────────────
+  const loadEligible = useCallback(
+    async (pg = eligiblePage) => {
+      if (!user?.id) return;
+      setEligibleLoading(true);
+      const page0 = pg - 1;                                 // backend 0-based
+      const url = `${API_ENDPOINTS.ISSUES_ELIGIBLE}?eligiblePage=${page0}&pageSize=${PAGE_SIZE}`;
+      const { ok, data } = await apiGet(url, user.id);
+      if (ok && data) {
+        setEligible(Array.isArray(data.eligible) ? data.eligible : []);
+        setSummary(data.summary ?? null);
+      } else {
+        setEligible([]);
+        setSummary(null);
+      }
+      setEligibleLoading(false);
+    },
+    [user?.id, eligiblePage]
+  );
+
+  // Load eligible when create tab is active or page changes
+  useEffect(() => {
+    if (activeTab !== 'create' || !user?.id) return;
+    loadEligible(eligiblePage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user?.id, eligiblePage]);
+
+  // ────────────────────────────────────────────
+  // History fetch
+  // ────────────────────────────────────────────
+  const loadHistory = useCallback(
+    async (kw = histKeyword, pg = histPage) => {
+      if (!user?.id) return;
+      setHistLoading(true);
+      const page0 = Math.max(0, pg - 1);
+      const url = `${API_ENDPOINTS.ISSUES_FEED}?page=${page0}&limit=${HIST_SIZE}&keyword=${encodeURIComponent(kw || '')}`;
+      const { ok, data } = await apiGet(url, user.id);
+      if (ok && data) {
+        const list = Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data.data)
+          ? data.data
+          : [];
+        const total = Math.max(1, Number(data.summary?.totalPages ?? 1));
+        setHistItems(list);
+        setHistTotalPages(total);
+      } else {
+        setHistItems([]);
+        setHistTotalPages(1);
+      }
+      setHistLoading(false);
+    },
+    [user?.id, histKeyword, histPage]
+  );
 
   useEffect(() => {
-    storage.getUser().then((u) => {
-      setCurrentUser(u);
-      Promise.all([fetchMaterials(), fetchUnits(), fetchSubDepts()]);
-      if (u?.id) fetchHistory(u.id);
-    });
-  }, []);
+    if (activeTab !== 'history' || !user?.id) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => loadHistory(histKeyword, histPage), 300);
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user?.id, histKeyword, histPage]);
 
-  async function fetchMaterials() {
-    try { const r = await fetch(API_ENDPOINTS.MATERIALS); setMaterials(await r.json()); } catch { setMaterials([]); }
-  }
-  async function fetchUnits() {
-    try { const r = await fetch(API_ENDPOINTS.UNITS); setUnits(await r.json()); } catch { setUnits([]); }
-  }
-  async function fetchSubDepts() {
-    try { const r = await fetch(API_ENDPOINTS.SUB_DEPARTMENTS); setSubDepartments(await r.json()); } catch { setSubDepartments([]); }
-  }
-  async function fetchHistory(userId) {
-    setHistLoading(true);
-    try {
-      const r = await fetch(API_ENDPOINTS.ISSUES, { headers: buildHeaders(userId) });
-      const d = await r.json();
-      setHistory(Array.isArray(d) ? d : (d?.content || []));
-    } catch { setHistory([]); }
-    finally { setHistLoading(false); }
-  }
+  // Reset page when keyword changes
+  useEffect(() => {
+    setHistPage(1);
+  }, [histKeyword]);
 
-  const updateRow = (i, key, val) => {
-    setForm((f) => {
-      const details = [...f.details];
-      details[i] = { ...details[i], [key]: val };
-      return { ...f, details };
-    });
-  };
-
-  const handleSubmit = async () => {
-    if (!form.subDepartmentId) { Toast.show({ type: 'error', text1: 'Vui lòng chọn phòng/khoa!' }); return; }
-    const validRows = form.details.filter((d) => d.qtyIssued && Number(d.qtyIssued) > 0);
-    if (!validRows.length) { Toast.show({ type: 'error', text1: 'Vui lòng thêm ít nhất 1 vật tư!' }); return; }
-
-    setLoading(true);
-    try {
-      const payload = {
-        issueDate: form.issueDate,
-        subDepartmentId: Number(form.subDepartmentId),
-        note: form.note,
-        issuedById: currentUser?.id,
-        details: validRows.map((d) => ({
-          materialId: d.materialId || null,
-          materialName: d.materialName,
-          unitId: d.unitId ? Number(d.unitId) : null,
-          qtyIssued: Number(d.qtyIssued),
-        })),
-      };
-      const r = await fetch(API_ENDPOINTS.ISSUES, {
-        method: 'POST',
-        headers: buildHeaders(currentUser?.id),
-        body: JSON.stringify(payload),
-      });
-      const d = await r.json();
-      if (r.ok) {
-        Toast.show({ type: 'success', text1: 'Xuất kho thành công!' });
-        setForm({ issueDate: new Date().toISOString().split('T')[0], subDepartmentId: '', note: '', details: [createRow()] });
-        setActiveTab('history');
-        if (currentUser?.id) fetchHistory(currentUser.id);
-      } else {
-        Toast.show({ type: 'error', text1: d.error || 'Xuất kho thất bại!' });
-      }
-    } catch {
-      Toast.show({ type: 'error', text1: 'Lỗi kết nối server!' });
-    } finally {
-      setLoading(false);
+  // ────────────────────────────────────────────
+  // Preview
+  // ────────────────────────────────────────────
+  async function openPreview(req) {
+    if (!user?.id) return;
+    setPreviewReq(req);
+    setPreviewData(null);
+    setPreviewVisible(true);
+    setPreviewLoading(true);
+    const url = `${API_ENDPOINTS.ISSUE_PREVIEW}?issueReqId=${req.id}`;
+    const { ok, data } = await apiGet(url, user.id);
+    if (ok && data) {
+      setPreviewData(data);
+    } else {
+      Toast.show({ type: 'error', text1: 'Không thể tải xem trước phiếu xuất' });
+      setPreviewVisible(false);
     }
-  };
+    setPreviewLoading(false);
+  }
 
-  // Pagination — reset to page 1 when the history list changes
-  useEffect(() => { setPage(1); }, [history]);
-  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const pagedHistory = history.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  function closePreview() {
+    setPreviewVisible(false);
+    setPreviewReq(null);
+    setPreviewData(null);
+  }
+
+  // ────────────────────────────────────────────
+  // Create issue (AUTO-FEFO)
+  // ────────────────────────────────────────────
+  async function handleCreate() {
+    if (!user?.id || !previewReq?.id) return;
+    setCreating(true);
+    const body = {
+      issueReqId: previewReq.id,
+      autoAllocate: true,
+    };
+    const { ok, data } = await apiSend('POST', API_ENDPOINTS.ISSUE_CREATE_FROM_REQ, body, user.id);
+    setCreating(false);
+
+    if (ok && data?.success !== false) {
+      Toast.show({ type: 'success', text1: 'Xuất kho thành công!' });
+      closePreview();
+      // Reload both tabs
+      loadEligible(1);
+      setEligiblePage(1);
+      if (activeTab === 'history') loadHistory(histKeyword, 1);
+    } else {
+      Toast.show({ type: 'error', text1: data?.message || 'Xuất kho thất bại!' });
+    }
+  }
+
+  // ────────────────────────────────────────────
+  // Detail (history row tap)
+  // ────────────────────────────────────────────
+  async function openDetail(id) {
+    if (!user?.id) return;
+    setDetailLoading(true);
+    setDetailData(null);
+    setDetailVisible(true);
+    const { ok, data } = await apiGet(API_ENDPOINTS.ISSUE_DETAIL(id), user.id);
+    if (ok && data) {
+      setDetailData(data);
+    } else {
+      Toast.show({ type: 'error', text1: 'Không thể tải chi tiết phiếu xuất' });
+      setDetailVisible(false);
+    }
+    setDetailLoading(false);
+  }
+
+  // Build DetailModal props from detail API response
+  const detailHeader = detailData?.header ?? detailData?.data?.header ?? {};
+  const detailLines = Array.isArray(detailData?.details)
+    ? detailData.details
+    : Array.isArray(detailData?.data?.details)
+    ? detailData.data.details
+    : [];
+
+  const detailInfo =
+    detailHeader?.id != null
+      ? [
+          { label: 'Mã phiếu xuất', value: `#${detailHeader.id}` },
+          { label: 'Phiếu xin lĩnh', value: detailHeader.issueReqId ? `#${detailHeader.issueReqId}` : '—' },
+          { label: 'Ngày xuất', value: fmtDate(detailHeader.issueDate) },
+          { label: 'Khoa/Phòng', value: detailHeader.departmentName || '—' },
+          { label: 'Bộ môn', value: detailHeader.subDepartmentName || '—' },
+          { label: 'Người nhận', value: detailHeader.receiverName || '—' },
+        ]
+      : [];
+
+  const detailColumns = [
+    { key: 'name', label: 'Vật tư', flex: 2 },
+    { key: 'unitName', label: 'ĐVT', flex: 1 },
+    { key: 'qtyIssued', label: 'SL xuất', flex: 1 },
+  ];
+
+  const detailRows = detailLines.map((d) => ({
+    name: d.name || d.materialName || '—',
+    unitName: d.unitName || '—',
+    qtyIssued: String(d.qtyIssued ?? '—'),
+  }));
+
+  // Build PreviewModal lines from preview API response
+  const previewLines = Array.isArray(previewData?.lines) ? previewData.lines : [];
+  const previewInfo = previewReq
+    ? [
+        { label: 'Phiếu xin lĩnh', value: `#${previewReq.id}` },
+        { label: 'Bộ môn', value: previewReq.subDepartmentName || '—' },
+        { label: 'Khoa/Phòng', value: previewReq.departmentName || '—' },
+        { label: 'Phân bổ lô', value: 'Tự động (FEFO)' },
+      ]
+    : [];
+
+  const previewColumns = [
+    { key: 'name', label: 'Vật tư', flex: 2 },
+    { key: 'lot', label: 'Lô', flex: 1 },
+    { key: 'qty', label: 'SL xuất', flex: 1 },
+  ];
+
+  const previewRows = previewLines.map((ln) => {
+    const firstLot = Array.isArray(ln.lots) && ln.lots.length ? ln.lots[0] : null;
+    return {
+      name: ln.name || '—',
+      lot: firstLot ? firstLot.lotNumber : 'Auto',
+      qty: String(ln.qtyToIssue ?? ln.qtyRequested ?? '—'),
+    };
+  });
+
+  // Eligible pagination
+  const eligibleTotalPages = Math.max(1, Number(summary?.eligibleTotalPages ?? 1));
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
-      refreshControl={
-        activeTab === 'history' ? (
-          <RefreshControl refreshing={histLoading} onRefresh={() => currentUser?.id && fetchHistory(currentUser.id)} />
-        ) : undefined
-      }
     >
+      <SegmentControl
+        segments={[
+          { key: 'create', label: 'Tạo phiếu xuất' },
+          { key: 'history', label: 'Lịch sử' },
+        ]}
+        active={activeTab}
+        onChange={(tab) => setActiveTab(tab)}
+      />
 
-        <SegmentControl
-          segments={[
-            { key: 'create', label: 'Tạo phiếu xuất' },
-            { key: 'history', label: 'Lịch sử' },
-          ]}
-          active={activeTab}
-          onChange={setActiveTab}
+      {/* ── Stat cards (always visible) ── */}
+      <View style={styles.statRow}>
+        <StatCard
+          label="Đã xét duyệt"
+          value={String(summary?.checked ?? '—')}
+          variant="success"
+          style={styles.statCard}
         />
+        <StatCard
+          label="Đủ điều kiện"
+          value={String(summary?.eligible ?? eligible.length)}
+          variant="primary"
+          style={styles.statCard}
+        />
+        <StatCard
+          label="Không đủ ĐK"
+          value={String(summary?.ineligible ?? '—')}
+          variant="warning"
+          style={styles.statCard}
+        />
+      </View>
 
-        {activeTab === 'create' ? (
-          <>
-            <Section title="Thông tin phiếu xuất">
-              <Field label="Ngày xuất">
-                <Input
-                  value={form.issueDate}
-                  onChangeText={(v) => setForm((f) => ({ ...f, issueDate: v }))}
-                  placeholder="YYYY-MM-DD"
-                />
-              </Field>
-
-              <Field label="Phòng/Khoa nhận *">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                  {subDepartments.map((d) => {
-                    const on = form.subDepartmentId === String(d.id);
-                    return (
-                      <TouchableOpacity key={d.id} style={[styles.chip, on && styles.chipActive]} onPress={() => setForm((f) => ({ ...f, subDepartmentId: String(d.id) }))}>
-                        <Text style={[styles.chipText, on && styles.chipTextActive]} numberOfLines={1}>{d.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </Field>
-
-              <Field label="Ghi chú">
-                <Input
-                  value={form.note}
-                  onChangeText={(v) => setForm((f) => ({ ...f, note: v }))}
-                  placeholder="Ghi chú..."
-                  multiline
-                />
-              </Field>
-            </Section>
-
-            <Section title="Danh sách vật tư xuất kho">
-              {form.details.map((row, i) => (
-                <View key={i} style={styles.rowCard}>
-                  <View style={styles.rowHeader}>
-                    <Text style={styles.rowTitle}>Vật tư #{i + 1}</Text>
-                    {form.details.length > 1 && (
-                      <TouchableOpacity onPress={() => setForm((f) => ({ ...f, details: f.details.filter((_, idx) => idx !== i) }))}>
-                        <Text style={styles.removeText}>✕ Xóa</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <Field label="Tên vật tư">
-                    <Input placeholder="Tên vật tư" value={row.materialName} onChangeText={(v) => updateRow(i, 'materialName', v)} />
-                  </Field>
-                  <Field label="Số lượng xuất">
-                    <Input placeholder="Số lượng xuất" value={row.qtyIssued} onChangeText={(v) => updateRow(i, 'qtyIssued', v)} keyboardType="numeric" />
-                  </Field>
-                  <Field label="Đơn vị tính">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                      {units.map((u) => {
-                        const on = row.unitId === String(u.id);
-                        return (
-                          <TouchableOpacity key={u.id} style={[styles.chip, on && styles.chipActive]} onPress={() => updateRow(i, 'unitId', String(u.id))}>
-                            <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </Field>
-                </View>
-              ))}
-
-              <TouchableOpacity
-                onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}
-                style={styles.addRowBtn}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.addRowText}>＋ Thêm vật tư</Text>
-              </TouchableOpacity>
-
-              <Button title={loading ? '' : 'Xác nhận xuất kho'} onPress={handleSubmit} disabled={loading} style={{ marginTop: 10 }}>
-                {loading ? <ActivityIndicator color={colors.white} /> : null}
-              </Button>
-            </Section>
-          </>
-        ) : (
-          <View>
-            {history.length === 0 ? (
-              <Empty>Chưa có phiếu xuất nào</Empty>
-            ) : (
-              <>
-                {pagedHistory.map((item) => (
-                  <TouchableOpacity key={String(item.id)} style={styles.histCard} onPress={() => setSelected(item)} activeOpacity={0.85}>
-                    <View style={styles.histTop}>
-                      <MonoBadge>PX #{item.id}</MonoBadge>
-                      <Text style={styles.histDate}>
-                        {item.issueDate ? new Date(item.issueDate).toLocaleDateString('vi-VN') : '—'}
-                      </Text>
+      {activeTab === 'create' ? (
+        <Section title="Phiếu đủ điều kiện xuất kho">
+          {eligibleLoading ? (
+            <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} />
+          ) : eligible.length === 0 ? (
+            <Empty>Chưa có phiếu sẵn sàng xuất kho</Empty>
+          ) : (
+            <>
+              {eligible.map((req) => {
+                const count =
+                  req.materialTypeCount ?? req.itemCount ?? req.count ??
+                  (Array.isArray(req.details) ? req.details.length : null);
+                return (
+                  <View key={String(req.id)} style={styles.eligibleCard}>
+                    <View style={styles.eligibleTop}>
+                      <MonoBadge>#{req.id}</MonoBadge>
+                      <Badge variant="success" label="Đủ điều kiện" />
                     </View>
-                    <Text style={styles.histDept} numberOfLines={1}>{item.subDepartmentName || '—'}</Text>
-                    <Text style={styles.histMeta}>{(item.details || []).length} vật tư</Text>
-                  </TouchableOpacity>
-                ))}
-                <Pagination
-                  page={pageSafe}
-                  totalPages={totalPages}
-                  onPrev={() => setPage((p) => Math.max(1, p - 1))}
-                  onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-                />
-              </>
-            )}
-          </View>
-        )}
-
-      <Modal visible={!!selected} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            {selected && (
-              <ScrollView>
-                <Text style={styles.modalTitle}>Phiếu xuất #{selected.id}</Text>
-                {[['Ngày xuất', selected.issueDate ? new Date(selected.issueDate).toLocaleDateString('vi-VN') : '—'], ['Phòng/Khoa', selected.subDepartmentName || '—'], ['Ghi chú', selected.note || '—']].map(([k, v]) => (
-                  <View key={k} style={styles.infoRow}><Text style={styles.infoKey}>{k}:</Text><Text style={styles.infoVal}>{v}</Text></View>
-                ))}
-                <Text style={[styles.detailLabel, { marginTop: 12 }]}>Danh sách vật tư:</Text>
-                {(selected.details || []).map((d, i) => (
-                  <View key={i} style={styles.detailItem}>
-                    <Text style={styles.detailName}>{d.materialName}</Text>
-                    <Text style={styles.detailMeta}>SL: {d.qtyIssued} {d.unitName || ''}</Text>
+                    <Text style={styles.eligibleDept} numberOfLines={1}>
+                      {req.subDepartmentName || req.departmentName || '—'}
+                    </Text>
+                    {count != null && (
+                      <Text style={styles.eligibleMeta}>{count} loại vật tư</Text>
+                    )}
+                    <Button
+                      title="Tạo phiếu xuất"
+                      onPress={() => openPreview(req)}
+                      style={styles.eligibleBtn}
+                    />
                   </View>
-                ))}
-                <Button title="Đóng" variant="secondary" onPress={() => setSelected(null)} style={{ marginTop: 16 }} />
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+                );
+              })}
+              <Pagination
+                page={eligiblePage}
+                totalPages={eligibleTotalPages}
+                onPrev={() => setEligiblePage((p) => Math.max(1, p - 1))}
+                onNext={() => setEligiblePage((p) => Math.min(eligibleTotalPages, p + 1))}
+              />
+            </>
+          )}
+        </Section>
+      ) : (
+        <Section title="Lịch sử phiếu xuất kho">
+          <Field label="Tìm kiếm">
+            <Input
+              value={histKeyword}
+              onChangeText={setHistKeyword}
+              placeholder="Mã phiếu, khoa, bộ môn, người nhận..."
+            />
+          </Field>
+
+          {histLoading ? (
+            <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} />
+          ) : histItems.length === 0 ? (
+            <Empty>Chưa có phiếu xuất nào</Empty>
+          ) : (
+            <>
+              {histItems.map((item) => (
+                <TouchableOpacity
+                  key={String(item.id)}
+                  style={styles.histCard}
+                  onPress={() => openDetail(item.id)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.histTop}>
+                    <MonoBadge>PX #{item.id}</MonoBadge>
+                    <Text style={styles.histDate}>{fmtDate(item.issueDate)}</Text>
+                  </View>
+                  <Text style={styles.histDept} numberOfLines={1}>
+                    {item.subDepartmentName || item.departmentName || '—'}
+                  </Text>
+                  {item.materialTypeCount != null && (
+                    <Text style={styles.histMeta}>{item.materialTypeCount} loại vật tư</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+              <Pagination
+                page={histPage}
+                totalPages={histTotalPages}
+                onPrev={() => setHistPage((p) => Math.max(1, p - 1))}
+                onNext={() => setHistPage((p) => Math.min(histTotalPages, p + 1))}
+              />
+            </>
+          )}
+        </Section>
+      )}
+
+      {/* ── Preview (FEFO) modal ── */}
+      <DetailModal
+        visible={previewVisible}
+        title={previewReq ? `Xem trước xuất kho — Phiếu #${previewReq.id}` : 'Xem trước xuất kho'}
+        info={previewInfo}
+        columns={previewLoading ? [] : previewColumns}
+        rows={previewLoading ? [] : previewRows}
+        onClose={closePreview}
+        footer={
+          previewLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <Button
+              title={creating ? 'Đang xuất kho...' : 'Xác nhận xuất kho'}
+              onPress={handleCreate}
+              disabled={creating || !previewData}
+            />
+          )
+        }
+      />
+
+      {/* ── Detail modal (history) ── */}
+      <DetailModal
+        visible={detailVisible}
+        title={detailHeader?.id ? `Phiếu xuất #${detailHeader.id}` : 'Chi tiết phiếu xuất'}
+        info={detailInfo}
+        columns={detailLoading ? [] : detailColumns}
+        rows={detailLoading ? [] : detailRows}
+        onClose={() => setDetailVisible(false)}
+      />
     </ScrollView>
   );
 }
@@ -291,27 +429,25 @@ export default function IssueScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: 24, paddingHorizontal: 10 },
-  // Chips
-  chipRow: { gap: 8, paddingVertical: 2 },
-  chip: { borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
-  chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
-  // Material row card (Vật tư #n)
-  rowCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, marginBottom: 10, backgroundColor: colors.white },
-  rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  rowTitle: { fontSize: fontSize.md, fontFamily: fontFamily.bold, color: colors.primary },
-  removeText: { fontSize: fontSize.base, color: colors.statRed, fontFamily: fontFamily.semibold },
-  addRowBtn: {
-    paddingVertical: 11,
-    borderRadius: 11,
+
+  // Stat row
+  statRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  statCard: { flex: 1 },
+
+  // Eligible cards
+  eligibleCard: {
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#c7d2e0',
-    backgroundColor: '#f8fafd',
-    alignItems: 'center',
+    borderColor: '#e7ebf2',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
   },
-  addRowText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary },
+  eligibleTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  eligibleDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 2 },
+  eligibleMeta: { fontSize: 12, color: '#94a3b8', marginBottom: 8 },
+  eligibleBtn: { marginTop: 4 },
+
   // History cards
   histCard: {
     backgroundColor: colors.white,
@@ -325,15 +461,4 @@ const styles = StyleSheet.create({
   histDate: { fontSize: 11, color: '#94a3b8' },
   histDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
   histMeta: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
-  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  infoKey: { fontSize: 13, color: colors.textSoft, width: 110 },
-  infoVal: { fontSize: 13, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
-  detailLabel: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.label, marginBottom: 8 },
-  detailItem: { backgroundColor: colors.bg, borderRadius: radius.md, padding: 10, marginBottom: 8 },
-  detailName: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 4 },
-  detailMeta: { fontSize: 12, color: colors.textSoft },
 });
