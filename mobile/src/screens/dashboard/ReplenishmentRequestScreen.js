@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,8 +9,12 @@ import {
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { API_ENDPOINTS, buildHeaders } from '../../api/apiConfig';
-import { storage } from '../../utils/storage';
+import { API_ENDPOINTS } from '../../api/apiConfig';
+import { apiGet, apiSend } from '../../api/apiClient';
+import { useServerHistory } from '../../hooks/useServerHistory';
+import { useAuth } from '../../context/AuthContext';
+import MaterialPicker from '../../components/MaterialPicker';
+import DetailModal from '../../components/DetailModal';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
@@ -27,311 +29,576 @@ import {
   Pagination,
 } from '../../theme/ui';
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ duyệt', variant: 'pending' },
-  APPROVED: { label: 'Đã duyệt', variant: 'approved' },
-  REJECTED: { label: 'Từ chối', variant: 'rejected' },
+  PENDING:  { label: 'Chờ duyệt',  variant: 'pending'  },
+  APPROVED: { label: 'Đã duyệt',   variant: 'approved' },
+  REJECTED: { label: 'Từ chối',    variant: 'rejected' },
 };
 
-const PAGE_SIZE = 8;
+const CURRENT_ACADEMIC_YEAR = '2025-2026';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function createRow() {
+  return {
+    materialId: null,
+    materialName: '',
+    materialCode: '',
+    specification: '',
+    unitId: '',
+    manufacturer: '',
+    qtyAvailable: '',   // currentStock
+    qtyLastYear: '',    // prevYearQty
+    qtyRequested: '',   // thisYearQty
+    reason: '',
+  };
+}
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ReplenishmentRequestScreen() {
-  const [activeTab, setActiveTab] = useState('create');
-  const [currentUser, setCurrentUser] = useState(null);
-  const [materials, setMaterials] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [histLoading, setHistLoading] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [page, setPage] = useState(1);
+  const { user } = useAuth();
 
-  const [form, setForm] = useState({
-    note: '',
-    details: [createRow()],
+  // ── Tabs ──
+  const [activeTab, setActiveTab] = useState('create');
+
+  // ── Create tab state ──
+  const [departments, setDepartments] = useState([]);
+  const [deptsLoaded, setDeptsLoaded] = useState(false);
+  const [selectedDeptId, setSelectedDeptId] = useState(null);
+  const [selectedDeptName, setSelectedDeptName] = useState('');
+  const [showDeptPicker, setShowDeptPicker] = useState(false);
+
+  const [rows, setRows] = useState([createRow()]);
+  const [pickerRowIndex, setPickerRowIndex] = useState(null); // which row is open
+  const [loadingPrev, setLoadingPrev] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── History tab state ──
+  const buildUrl = useCallback(
+    ({ keyword, page0, size }) =>
+      `${API_ENDPOINTS.SUPP_FORECAST_MINE}?userId=${user?.id ?? ''}&keyword=${encodeURIComponent(keyword)}&page=${page0}&size=${size}`,
+    [user?.id],
+  );
+
+  const {
+    items: histItems,
+    page: histPage,
+    setPage: setHistPage,
+    totalPages: histTotalPages,
+    keyword: histKeyword,
+    setKeyword: setHistKeyword,
+    loading: histLoading,
+    reload: histReload,
+  } = useServerHistory({
+    buildUrl,
+    userId: user?.id,
+    pageSize: 8,
+    active: activeTab === 'history',
   });
 
-  function createRow() {
-    return { materialId: null, materialName: '', unitId: '', qtyRequested: '', reason: '' };
+  // ── Detail modal state ──
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // ─── Departments ─────────────────────────────────────────────────────────
+
+  async function ensureDepts() {
+    if (deptsLoaded) { setShowDeptPicker(true); return; }
+    const { ok, data } = await apiGet(API_ENDPOINTS.DEPARTMENTS_ALL, user?.id);
+    const list = ok && Array.isArray(data) ? data : [];
+    setDepartments(list);
+    setDeptsLoaded(true);
+    setShowDeptPicker(true);
   }
 
-  useEffect(() => {
-    storage.getUser().then((u) => {
-      setCurrentUser(u);
-      fetchMaterials();
-      fetchUnits();
-      if (u?.id) fetchHistory(u.id);
+  // ─── Material pick ────────────────────────────────────────────────────────
+
+  async function fetchCurrentStock(code, materialId) {
+    if (!code && !materialId) return null;
+    const kw = code || '';
+    const { ok, data } = await apiGet(
+      `${API_ENDPOINTS.INVENTORY_MATERIALS}?keyword=${encodeURIComponent(kw)}&size=50`,
+      user?.id,
+    );
+    if (!ok || !data) return null;
+    const list = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    const found = list.find((x) => x.materialId === materialId);
+    return found ? (found.closingStock ?? null) : null;
+  }
+
+  async function handleSelectMaterial(dto) {
+    // dto = { id, name, code, spec, unit:{id}, unitId, manufacturer, category }
+    const idx = pickerRowIndex;
+    setPickerRowIndex(null);
+    if (idx === null) return;
+
+    const stock = await fetchCurrentStock(dto.code, dto.id);
+
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = {
+        ...next[idx],
+        materialId:    dto.id,
+        materialName:  dto.name,
+        materialCode:  dto.code || '',
+        specification: dto.spec || '',
+        unitId:        dto.unit?.id ?? dto.unitId ?? '',
+        manufacturer:  dto.manufacturer || '',
+        qtyAvailable:  stock != null ? String(stock) : '',
+      };
+      return next;
     });
-  }, []);
-
-  async function fetchMaterials() {
-    try {
-      const r = await fetch(API_ENDPOINTS.MATERIALS);
-      const d = await r.json();
-      setMaterials(Array.isArray(d) ? d : []);
-    } catch { setMaterials([]); }
   }
 
-  async function fetchUnits() {
-    try {
-      const r = await fetch(API_ENDPOINTS.UNITS);
-      const d = await r.json();
-      setUnits(Array.isArray(d) ? d : []);
-    } catch { setUnits([]); }
-  }
-
-  async function fetchHistory(userId) {
-    setHistLoading(true);
-    try {
-      const r = await fetch(API_ENDPOINTS.REPLENISHMENTS, { headers: buildHeaders(userId) });
-      const d = await r.json();
-      setHistory(Array.isArray(d) ? d : (d?.content || []));
-    } catch { setHistory([]); }
-    finally { setHistLoading(false); }
-  }
-
-  const updateRow = (i, key, val) => {
-    setForm((f) => {
-      const details = [...f.details];
-      details[i] = { ...details[i], [key]: val };
-      return { ...f, details };
+  function updateRow(idx, key, val) {
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [key]: val };
+      return next;
     });
-  };
+  }
 
-  const handleSubmit = async () => {
-    const validRows = form.details.filter((d) => d.qtyRequested && Number(d.qtyRequested) > 0);
-    if (!validRows.length) {
-      Toast.show({ type: 'error', text1: 'Vui lòng thêm ít nhất 1 vật tư!' });
+  function removeRow(idx) {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function addRow() {
+    setRows((prev) => [...prev, createRow()]);
+  }
+
+  // ─── Load previous year forecast ─────────────────────────────────────────
+
+  async function loadPreviousForecast() {
+    if (!selectedDeptId) {
+      Toast.show({ type: 'info', text1: 'Vui lòng chọn bộ môn trước!' });
       return;
     }
-    setLoading(true);
+    setLoadingPrev(true);
     try {
-      const payload = {
-        requestedById: currentUser?.id,
-        note: form.note,
-        details: validRows.map((d) => ({
-          materialId: d.materialId || null,
-          materialName: d.materialName,
-          unitId: d.unitId ? Number(d.unitId) : null,
-          qtyRequested: Number(d.qtyRequested),
-          reason: d.reason,
+      const url = `${API_ENDPOINTS.SUPP_FORECAST_PREVIOUS}?departmentId=${selectedDeptId}`;
+      const { ok, data } = await apiGet(url, user?.id);
+      if (!ok || !Array.isArray(data) || data.length === 0) {
+        Toast.show({ type: 'info', text1: 'Không có dữ liệu dự trù năm trước' });
+        setLoadingPrev(false);
+        return;
+      }
+      const mapped = data.map((item) => {
+        const currentStock = Number(item.currentStock || 0);
+        const prevYearQty  = Number(item.prevYearQty  || 0);
+        const proposed     = Math.max(0, prevYearQty - currentStock);
+        return {
+          materialId:    item.materialId,
+          materialName:  item.materialName  || '',
+          materialCode:  item.materialCode  || '',
+          specification: item.specification || '',
+          unitId:        item.unitId        ?? '',
+          manufacturer:  item.manufacturer  || '',
+          qtyAvailable:  String(currentStock),
+          qtyLastYear:   String(prevYearQty),
+          qtyRequested:  String(proposed),
+          reason:        'Tải từ dự trù năm trước',
+        };
+      });
+      setRows(mapped);
+      Toast.show({ type: 'success', text1: `Đã tải ${mapped.length} dòng từ năm trước` });
+    } catch {
+      Toast.show({ type: 'error', text1: 'Lỗi khi tải dự trù năm trước' });
+    } finally {
+      setLoadingPrev(false);
+    }
+  }
+
+  // ─── Submit ───────────────────────────────────────────────────────────────
+
+  async function handleSubmit() {
+    const validRows = rows.filter((r) => r.materialId && Number(r.qtyRequested) > 0);
+    if (!validRows.length) {
+      Toast.show({ type: 'error', text1: 'Vui lòng thêm ít nhất 1 vật tư với số lượng > 0!' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const body = {
+        academicYear:    CURRENT_ACADEMIC_YEAR,
+        departmentId:    selectedDeptId ? Number(selectedDeptId) : null,
+        createdByEmail:  user?.email ?? null,
+        items: validRows.map((r) => ({
+          materialId:          r.materialId ? Number(r.materialId) : null,
+          currentStock:        Number(r.qtyAvailable  || 0),
+          prevYearQty:         Number(r.qtyLastYear    || 0),
+          thisYearQty:         Number(r.qtyRequested   || 0),
+          proposedCode:        r.materialCode   || null,
+          proposedManufacturer:r.manufacturer   || null,
+          justification:       r.reason         || null,
         })),
       };
-      const r = await fetch(API_ENDPOINTS.REPLENISHMENTS, {
-        method: 'POST',
-        headers: buildHeaders(currentUser?.id),
-        body: JSON.stringify(payload),
-      });
-      const d = await r.json();
-      if (r.ok) {
-        Toast.show({ type: 'success', text1: 'Tạo phiếu dự trù thành công!' });
-        setForm({ note: '', details: [createRow()] });
+
+      const { ok, data } = await apiSend('POST', API_ENDPOINTS.SUPP_FORECAST_CREATE, body, user?.id);
+      if (ok) {
+        Toast.show({ type: 'success', text1: data?.message || 'Tạo phiếu dự trù thành công!' });
+        setRows([createRow()]);
+        setSelectedDeptId(null);
+        setSelectedDeptName('');
         setActiveTab('history');
-        if (currentUser?.id) fetchHistory(currentUser.id);
+        histReload();
       } else {
-        Toast.show({ type: 'error', text1: d.error || 'Tạo phiếu thất bại!' });
+        Toast.show({ type: 'error', text1: data?.message || data?.error || 'Tạo phiếu thất bại!' });
       }
     } catch {
       Toast.show({ type: 'error', text1: 'Lỗi kết nối server!' });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  };
+  }
 
-  // Pagination — reset to page 1 whenever the tab switches to history
-  useEffect(() => { setPage(1); }, [activeTab, history.length]);
-  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const pagedHistory = history.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  // ─── History: open detail ────────────────────────────────────────────────
+
+  async function openDetail(id) {
+    setDetailLoading(true);
+    setDetailVisible(true);
+    setDetailData(null);
+    const { ok, data } = await apiGet(
+      `${API_ENDPOINTS.SUPP_FORECAST_DETAIL(id)}?userId=${user?.id ?? ''}`,
+      user?.id,
+    );
+    if (ok && data) {
+      setDetailData(data);
+    } else {
+      setDetailVisible(false);
+      Toast.show({ type: 'error', text1: 'Không thể tải chi tiết phiếu' });
+    }
+    setDetailLoading(false);
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+
+  const statusOf = (code) => STATUS_MAP[String(code || '').toUpperCase()] || { label: code || '—', variant: 'info' };
+
+  const detailInfo = detailData ? [
+    { label: 'Mã phiếu',   value: `#${detailData.id}`                                                         },
+    { label: 'Năm học',    value: detailData.academicYear || '—'                                                },
+    { label: 'Bộ môn',     value: detailData.department?.name || '—'                                           },
+    { label: 'Người tạo',  value: detailData.createdBy?.fullName || '—'                                        },
+    { label: 'Ngày tạo',   value: detailData.createdAt ? new Date(detailData.createdAt).toLocaleDateString('vi-VN') : '—' },
+    { label: 'Trạng thái', value: statusOf(detailData.status).label                                            },
+    ...(detailData.approvalNote ? [{ label: 'Ghi chú duyệt', value: detailData.approvalNote }] : []),
+  ] : [];
+
+  const detailColumns = [
+    { key: 'stt',       label: 'TT',       flex: 0.4 },
+    { key: 'name',      label: 'Vật tư',   flex: 2   },
+    { key: 'current',   label: 'Hiện có',  flex: 0.8 },
+    { key: 'lastYear',  label: 'Năm trước',flex: 0.8 },
+    { key: 'requested', label: 'Dự trù',   flex: 0.8 },
+  ];
+
+  const detailRows = (detailData?.details || []).map((d, i) => ({
+    stt:       String(i + 1),
+    name:      d.material?.name || '—',
+    current:   d.currentStock  != null ? String(d.currentStock)  : '—',
+    lastYear:  d.prevYearQty   != null ? String(d.prevYearQty)   : '—',
+    requested: d.thisYearQty   != null ? String(d.thisYearQty)   : '—',
+  }));
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        activeTab === 'history' ? (
-          <RefreshControl
-            refreshing={histLoading}
-            onRefresh={() => currentUser?.id && fetchHistory(currentUser.id)}
-          />
-        ) : undefined
-      }
-    >
-
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          activeTab === 'history' ? (
+            <RefreshControl refreshing={histLoading} onRefresh={histReload} />
+          ) : undefined
+        }
+      >
         <SegmentControl
           segments={[
-            { key: 'create', label: 'Tạo phiếu' },
-            { key: 'history', label: 'Lịch sử' },
+            { key: 'create',  label: 'Tạo phiếu' },
+            { key: 'history', label: 'Lịch sử'   },
           ]}
           active={activeTab}
           onChange={setActiveTab}
         />
 
-        {activeTab === 'create' ? (
+        {/* ═══════════════ CREATE TAB ═══════════════ */}
+        {activeTab === 'create' && (
           <>
+            {/* Department selector */}
             <Section title="Thông tin phiếu">
-              <Field label="Ghi chú">
-                <Input
-                  placeholder="Nhập ghi chú..."
-                  value={form.note}
-                  onChangeText={(v) => setForm((f) => ({ ...f, note: v }))}
-                  multiline
-                />
+              <Field label="Bộ môn lập dự trù">
+                <TouchableOpacity style={styles.deptBtn} onPress={ensureDepts} activeOpacity={0.75}>
+                  <Text style={selectedDeptName ? styles.deptSelected : styles.deptPlaceholder}>
+                    {selectedDeptName || 'Chọn bộ môn...'}
+                  </Text>
+                  <Text style={styles.deptArrow}>▾</Text>
+                </TouchableOpacity>
               </Field>
+
+              <TouchableOpacity
+                style={[styles.ghostBtn, loadingPrev && styles.ghostBtnDisabled]}
+                onPress={loadPreviousForecast}
+                disabled={loadingPrev}
+                activeOpacity={0.8}
+              >
+                {loadingPrev
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Text style={styles.ghostBtnText}>↻ Tải dự trù năm trước</Text>
+                }
+              </TouchableOpacity>
             </Section>
 
-            <Section title="Danh sách vật tư cần bổ sung">
-              {form.details.map((row, i) => (
+            {/* Row list */}
+            <Section title="Danh sách vật tư dự trù">
+              {rows.map((row, i) => (
                 <View key={i} style={styles.rowCard}>
                   <View style={styles.rowHeader}>
                     <Text style={styles.rowTitle}>Vật tư #{i + 1}</Text>
-                    {form.details.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() =>
-                          setForm((f) => ({ ...f, details: f.details.filter((_, idx) => idx !== i) }))
-                        }
-                      >
+                    {rows.length > 1 && (
+                      <TouchableOpacity onPress={() => removeRow(i)}>
                         <Text style={styles.removeText}>✕ Xóa</Text>
                       </TouchableOpacity>
                     )}
                   </View>
+
+                  {/* Material picker trigger */}
                   <Field label="Tên vật tư">
+                    <TouchableOpacity
+                      style={styles.pickerTrigger}
+                      onPress={() => setPickerRowIndex(i)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={row.materialName ? styles.pickerSelected : styles.pickerPlaceholder} numberOfLines={1}>
+                        {row.materialName || 'Chọn vật tư...'}
+                      </Text>
+                      <Text style={styles.pickerArrow}>▾</Text>
+                    </TouchableOpacity>
+                  </Field>
+
+                  {/* Read-only auto-filled fields */}
+                  {!!row.specification && (
+                    <Field label="Quy cách">
+                      <Input value={row.specification} editable={false} style={styles.readOnly} />
+                    </Field>
+                  )}
+
+                  <Field label="Tồn kho hiện có">
                     <Input
-                      placeholder="Tên vật tư"
-                      value={row.materialName}
-                      onChangeText={(v) => updateRow(i, 'materialName', v)}
+                      value={row.qtyAvailable}
+                      editable={false}
+                      style={styles.readOnly}
+                      placeholder="—"
                     />
                   </Field>
-                  <Field label="Số lượng yêu cầu">
+
+                  <Field label="Năm trước">
                     <Input
-                      placeholder="Số lượng yêu cầu"
+                      value={row.qtyLastYear}
+                      editable={false}
+                      style={styles.readOnly}
+                      placeholder="—"
+                    />
+                  </Field>
+
+                  {/* Editable fields */}
+                  <Field label="Số lượng dự trù *">
+                    <Input
+                      placeholder="Nhập số lượng"
                       value={row.qtyRequested}
                       onChangeText={(v) => updateRow(i, 'qtyRequested', v)}
                       keyboardType="numeric"
                     />
                   </Field>
-                  <Field label="Lý do bổ sung">
+
+                  <Field label="Lý do">
                     <Input
-                      placeholder="Lý do bổ sung"
+                      placeholder="Lý do dự trù"
                       value={row.reason}
                       onChangeText={(v) => updateRow(i, 'reason', v)}
                     />
                   </Field>
-                  <Field label="Đơn vị tính">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                      {units.map((u) => {
-                        const on = row.unitId === String(u.id);
-                        return (
-                          <TouchableOpacity
-                            key={u.id}
-                            style={[styles.chip, on && styles.chipActive]}
-                            onPress={() => updateRow(i, 'unitId', String(u.id))}
-                          >
-                            <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </Field>
                 </View>
               ))}
 
-              <TouchableOpacity
-                onPress={() => setForm((f) => ({ ...f, details: [...f.details, createRow()] }))}
-                style={styles.addRowBtn}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity style={styles.addRowBtn} onPress={addRow} activeOpacity={0.8}>
                 <Text style={styles.addRowText}>＋ Thêm vật tư</Text>
               </TouchableOpacity>
-              <Button title={loading ? '' : 'Gửi phiếu dự trù'} onPress={handleSubmit} disabled={loading} style={{ marginTop: 10 }}>
-                {loading ? <ActivityIndicator color={colors.white} /> : null}
+
+              <Button
+                title={submitting ? '' : 'Gửi phiếu dự trù'}
+                onPress={handleSubmit}
+                disabled={submitting}
+                style={{ marginTop: 10 }}
+              >
+                {submitting ? <ActivityIndicator color={colors.white} /> : null}
               </Button>
             </Section>
           </>
-        ) : (
-          <View>
-            {history.length === 0 ? (
+        )}
+
+        {/* ═══════════════ HISTORY TAB ═══════════════ */}
+        {activeTab === 'history' && (
+          <Section title="Lịch sử phiếu dự trù">
+            <Field label="">
+              <Input
+                placeholder="Tìm theo mã phiếu / bộ môn / trạng thái..."
+                value={histKeyword}
+                onChangeText={(v) => { setHistKeyword(v); setHistPage(1); }}
+              />
+            </Field>
+
+            {histLoading && histItems.length === 0 ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+            ) : histItems.length === 0 ? (
               <Empty>Chưa có phiếu dự trù nào</Empty>
             ) : (
               <>
-                {pagedHistory.map((item) => {
-                  const status = STATUS_MAP[item.status] || { label: item.status, variant: 'info' };
-                  const count = (item.details || []).length;
+                {histItems.map((item) => {
+                  const s = statusOf(item.status);
                   return (
-                    <TouchableOpacity key={String(item.id)} style={styles.histCard} onPress={() => setSelected(item)} activeOpacity={0.85}>
+                    <TouchableOpacity
+                      key={String(item.id)}
+                      style={styles.histCard}
+                      onPress={() => openDetail(item.id)}
+                      activeOpacity={0.85}
+                    >
                       <View style={styles.histTop}>
                         <MonoBadge>DT #{item.id}</MonoBadge>
-                        <Badge variant={status.variant}>{status.label}</Badge>
+                        <Badge variant={s.variant}>{s.label}</Badge>
                       </View>
                       <Text style={styles.histDept} numberOfLines={1}>
-                        {item.note || 'Phiếu dự trù bổ sung'}
+                        {item.departmentName || 'Chưa rõ bộ môn'}
                       </Text>
-                      <Text style={styles.histDate}>
-                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
-                        {count ? ` · ${count} vật tư` : ''}
+                      <Text style={styles.histMeta}>
+                        {item.academicYear || '—'}
+                        {item.itemCount != null ? ` · ${item.itemCount} vật tư` : ''}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
+
                 <Pagination
-                  page={pageSafe}
-                  totalPages={totalPages}
-                  onPrev={() => setPage((p) => Math.max(1, p - 1))}
-                  onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  page={histPage}
+                  totalPages={histTotalPages}
+                  onPrev={() => setHistPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setHistPage((p) => Math.min(histTotalPages, p + 1))}
                 />
               </>
             )}
-          </View>
+          </Section>
         )}
+      </ScrollView>
 
-      <Modal visible={!!selected} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setSelected(null)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            {selected && (
-              <ScrollView>
-                <Text style={styles.modalTitle}>Phiếu dự trù #{selected.id}</Text>
-                {[
-                  ['Ngày tạo', selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : '—'],
-                  ['Ghi chú', selected.note || '—'],
-                ].map(([k, v]) => (
-                  <View key={k} style={styles.infoRow}><Text style={styles.infoKey}>{k}:</Text><Text style={styles.infoVal}>{v}</Text></View>
-                ))}
-                <Text style={[styles.label, { marginTop: 12 }]}>Danh sách vật tư:</Text>
-                {(selected.details || []).map((d, i) => (
-                  <View key={i} style={styles.detailItem}>
-                    <Text style={styles.detailName}>{d.materialName}</Text>
-                    <Text style={styles.detailMeta}>SL: {d.qtyRequested} {d.unitName || ''}</Text>
-                    {d.reason && <Text style={styles.detailMeta}>Lý do: {d.reason}</Text>}
-                  </View>
-                ))}
-                <Button title="Đóng" variant="secondary" onPress={() => setSelected(null)} style={{ marginTop: 16 }} />
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </ScrollView>
+      {/* ── Department picker modal (reuses the same sheet style) ── */}
+      {showDeptPicker && (
+        <DeptPickerModal
+          departments={departments}
+          onSelect={(dept) => {
+            setSelectedDeptId(dept.id);
+            setSelectedDeptName(dept.name);
+            setShowDeptPicker(false);
+          }}
+          onClose={() => setShowDeptPicker(false)}
+        />
+      )}
+
+      {/* ── Material picker modal ── */}
+      <MaterialPicker
+        visible={pickerRowIndex !== null}
+        onClose={() => setPickerRowIndex(null)}
+        onSelect={handleSelectMaterial}
+      />
+
+      {/* ── Detail modal ── */}
+      <DetailModal
+        visible={detailVisible}
+        title={detailData ? `Phiếu dự trù #${detailData.id}` : 'Đang tải…'}
+        info={detailInfo}
+        columns={detailColumns}
+        rows={detailRows}
+        onClose={() => { setDetailVisible(false); setDetailData(null); }}
+      />
+    </>
   );
 }
 
+// ─── Department picker ────────────────────────────────────────────────────────
+
+function DeptPickerModal({ departments, onSelect, onClose }) {
+  const [kw, setKw] = React.useState('');
+  const filtered = kw
+    ? departments.filter((d) => d.name?.toLowerCase().includes(kw.toLowerCase()))
+    : departments;
+
+  return (
+    <View style={styles.overlay}>
+      <View style={styles.sheet}>
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Chọn bộ môn</Text>
+          <TouchableOpacity onPress={onClose}><Text style={styles.sheetClose}>Đóng</Text></TouchableOpacity>
+        </View>
+        <Input
+          placeholder="Tìm bộ môn..."
+          value={kw}
+          onChangeText={setKw}
+          style={{ marginHorizontal: 16, marginBottom: 8 }}
+        />
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {filtered.length === 0 && (
+            <Text style={styles.sheetEmpty}>Không tìm thấy bộ môn</Text>
+          )}
+          {filtered.map((dept) => (
+            <TouchableOpacity key={dept.id} style={styles.sheetRow} onPress={() => onSelect(dept)}>
+              <Text style={styles.sheetRowText}>{dept.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: 24, paddingHorizontal: 10 },
-  label: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.label, marginBottom: 6 },
-  chipRow: { gap: 8, paddingVertical: 2 },
-  chip: {
+  content:   { paddingBottom: 32, paddingHorizontal: 10 },
+
+  // ── Dept button ──
+  deptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: colors.white,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
-  chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
+  deptSelected:    { flex: 1, fontSize: fontSize.base, color: colors.text,     fontFamily: fontFamily.medium  },
+  deptPlaceholder: { flex: 1, fontSize: fontSize.base, color: colors.textMuted, fontFamily: fontFamily.regular },
+  deptArrow:       { fontSize: 12, color: colors.textSoft, marginLeft: 6 },
+
+  // ── Ghost button (load prev year) ──
+  ghostBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+  },
+  ghostBtnDisabled: { borderColor: colors.border, opacity: 0.6 },
+  ghostBtnText: { fontSize: fontSize.base, color: colors.primary, fontFamily: fontFamily.semibold },
+
+  // ── Row card ──
   rowCard: {
-    backgroundColor: colors.bg,
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.sm,
@@ -339,8 +606,29 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  rowTitle: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
-  removeText: { fontSize: fontSize.sm, color: colors.danger, fontFamily: fontFamily.semibold },
+  rowTitle:  { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
+  removeText:{ fontSize: fontSize.sm, color: colors.danger, fontFamily: fontFamily.semibold },
+
+  // ── Material picker trigger ──
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: colors.white,
+  },
+  pickerSelected:    { flex: 1, fontSize: fontSize.base, color: colors.text,     fontFamily: fontFamily.medium,  marginRight: 4 },
+  pickerPlaceholder: { flex: 1, fontSize: fontSize.base, color: colors.textMuted, fontFamily: fontFamily.regular, marginRight: 4 },
+  pickerArrow:       { fontSize: 12, color: colors.textSoft },
+
+  // ── Read-only input ──
+  readOnly: { backgroundColor: colors.bg, color: colors.textSoft },
+
+  // ── Add row button ──
   addRowBtn: {
     paddingVertical: 11,
     borderRadius: 11,
@@ -351,6 +639,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addRowText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary },
+
+  // ── History cards ──
   histCard: {
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -359,16 +649,38 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
-  histTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  histTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
   histDept: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text },
-  histDate: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary, marginBottom: 16, textAlign: 'center' },
-  infoRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  infoKey: { fontSize: 13, color: colors.textSoft, width: 100 },
-  infoVal: { fontSize: 13, color: colors.text, flex: 1, fontFamily: fontFamily.medium },
-  detailItem: { backgroundColor: colors.bg, borderRadius: 8, padding: 10, marginBottom: 8 },
-  detailName: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.text, marginBottom: 4 },
-  detailMeta: { fontSize: 12, color: colors.textSoft },
+  histMeta: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
+
+  // ── Dept picker modal overlay ──
+  overlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(15,23,42,0.4)',
+    justifyContent: 'flex-end',
+    zIndex: 999,
+  },
+  sheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 24,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sheetTitle:    { fontSize: fontSize.md,   fontFamily: fontFamily.bold,     color: colors.text    },
+  sheetClose:    { fontSize: fontSize.base, fontFamily: fontFamily.semibold, color: colors.primary },
+  sheetRow:      { paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  sheetRowText:  { fontSize: fontSize.base, fontFamily: fontFamily.medium, color: colors.text },
+  sheetEmpty:    { textAlign: 'center', color: colors.textMuted, paddingVertical: 24, fontFamily: fontFamily.regular },
 });
