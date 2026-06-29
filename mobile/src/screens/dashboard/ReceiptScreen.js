@@ -106,7 +106,10 @@ export default function ReceiptScreen() {
       const url = `${API_ENDPOINTS.RECEIPTS_FEED}?page=${page0}&limit=${PAGE_SIZE}&keyword=${encodeURIComponent(kw || '')}`;
       const { ok, data } = await apiGet(url, user.id);
       if (ok && data) {
-        const list = Array.isArray(data.receipts)
+        // Backend ReceiptFeedResponseDTO exposes the list under `items`.
+        const list = Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data.receipts)
           ? data.receipts
           : Array.isArray(data.data)
           ? data.data

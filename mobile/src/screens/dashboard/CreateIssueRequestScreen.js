@@ -86,17 +86,25 @@ export default function CreateIssueRequestScreen() {
     buildUrl: buildHistoryUrl,
     userId: user?.id,
     pageSize: PAGE_SIZE,
-    active: activeTab === 'history',
+    // Load on mount (not only when the history tab is open) so the
+    // "Lịch sử (N)" count is correct immediately and updates after a create.
+    active: !!user?.id,
   });
 
-  // Load sub-departments on mount
+  // Load sub-departments (bộ môn) for the logged-in user's department.
   useEffect(() => {
     async function fetchSubDepts() {
-      const { ok, data } = await apiGet(API_ENDPOINTS.SUB_DEPARTMENTS, user?.id);
-      setSubDepartments(ok && Array.isArray(data) ? data : []);
+      const url = user?.departmentId
+        ? `${API_ENDPOINTS.SUB_DEPARTMENTS}?departmentId=${user.departmentId}`
+        : API_ENDPOINTS.SUB_DEPARTMENTS;
+      const { ok, data } = await apiGet(url, user?.id);
+      const list = ok && Array.isArray(data) ? data : [];
+      setSubDepartments(list);
+      // Convenience: if exactly one bộ môn, pre-select it.
+      if (list.length === 1) setSubDepartmentId(String(list[0].id));
     }
     if (user?.id) fetchSubDepts();
-  }, [user?.id]);
+  }, [user?.id, user?.departmentId]);
 
   // ─── Detail rows helpers ──────────────────────────────────────────────────
   const updateDetail = (index, key, value) => {
@@ -130,10 +138,8 @@ export default function CreateIssueRequestScreen() {
 
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!subDepartmentId) {
-      Toast.show({ type: 'error', text1: 'Vui lòng chọn phòng/khoa!' });
-      return;
-    }
+    // Bộ môn (sub-department) is optional — the backend accepts null, matching
+    // the web. Do not block submit on it.
     const validDetails = details.filter(
       (d) => d.materialId && Number(d.qtyRequested) > 0
     );
@@ -254,24 +260,30 @@ export default function CreateIssueRequestScreen() {
       {/* ── Create tab ───────────────────────────────────────────────────── */}
       {activeTab === 'create' ? (
         <Section>
-          {/* Sub-department picker */}
-          <Field label="Phòng/Khoa xin lĩnh *">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {subDepartments.map((d) => {
-                const active = subDepartmentId === String(d.id);
-                return (
-                  <TouchableOpacity
-                    key={d.id}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => setSubDepartmentId(String(d.id))}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
-                      {d.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+          {/* Bộ môn (sub-department) — optional */}
+          <Field label="Phòng/Khoa xin lĩnh">
+            {subDepartments.length === 0 ? (
+              <Text style={styles.subDeptEmpty}>
+                Không có bộ môn để chọn — phiếu sẽ gửi theo khoa của bạn.
+              </Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                {subDepartments.map((d) => {
+                  const active = subDepartmentId === String(d.id);
+                  return (
+                    <TouchableOpacity
+                      key={d.id}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setSubDepartmentId(active ? '' : String(d.id))}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+                        {d.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </Field>
 
           {/* Note */}
@@ -441,6 +453,7 @@ const styles = StyleSheet.create({
 
   // Chip row (sub-department selector)
   chipRow: { gap: 8, paddingVertical: 2 },
+  subDeptEmpty: { fontSize: fontSize.sm, color: colors.textMuted, fontFamily: fontFamily.regular, paddingVertical: 4 },
   chip: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
