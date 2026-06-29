@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { useFocusEffect } from '@react-navigation/native';
 import { API_ENDPOINTS } from '../../api/apiConfig';
 import { apiGet, apiSend } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
@@ -116,33 +117,13 @@ export default function ForecastApprovalScreen() {
     }
   }, [user?.id, fetchStats]);
 
-  // Refetch active tab only (after action)
-  const refetchActive = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const url =
-        activeTab === 'pending'
-          ? `${API_ENDPOINTS.SUPP_FORECAST_BGH_PENDING}?bghId=${user.id}`
-          : `${API_ENDPOINTS.SUPP_FORECAST_BGH_PROCESSED}?bghId=${user.id}`;
-      const res = await apiGet(url, user.id);
-      const extract = (r) => {
-        if (!r.ok || !r.data) return [];
-        const d = r.data;
-        if (Array.isArray(d)) return d;
-        if (Array.isArray(d.items)) return d.items;
-        if (Array.isArray(d.content)) return d.content;
-        if (Array.isArray(d.data)) return d.data;
-        return [];
-      };
-      if (activeTab === 'pending') setPendingList(extract(res));
-      else setProcessedList(extract(res));
-      await fetchStats();
-    } catch {
-      // silent
-    }
-  }, [user?.id, activeTab, fetchStats]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Reload when the screen regains focus (bottom-tab screens stay mounted,
+  // so without this the processed list shows stale data until logout/login).
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [fetchAll])
+  );
   useEffect(() => { setPage(1); }, [activeTab]);
 
   const onRefresh = async () => {
@@ -199,7 +180,7 @@ export default function ForecastApprovalScreen() {
       if (res.ok) {
         Toast.show({ type: 'success', text1: 'Đã phê duyệt phiếu dự trù!' });
         closeDetail();
-        await refetchActive();
+        await fetchAll();
       } else {
         const msg = res.data?.message || res.data?.error || 'Phê duyệt thất bại!';
         Toast.show({ type: 'error', text1: msg });
@@ -231,7 +212,7 @@ export default function ForecastApprovalScreen() {
       if (res.ok) {
         Toast.show({ type: 'success', text1: 'Đã từ chối phiếu dự trù!' });
         closeDetail();
-        await refetchActive();
+        await fetchAll();
       } else {
         const msg = res.data?.message || res.data?.error || 'Thao tác thất bại!';
         Toast.show({ type: 'error', text1: msg });

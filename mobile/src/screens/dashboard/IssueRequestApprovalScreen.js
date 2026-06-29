@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { useFocusEffect } from '@react-navigation/native';
 import { API_ENDPOINTS } from '../../api/apiConfig';
 import { apiGet, apiSend } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
@@ -104,33 +105,13 @@ export default function IssueRequestApprovalScreen() {
     }
   }, [user?.id]);
 
-  // Refetch only the active tab (after approve/reject)
-  const refetchActiveTab = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      if (activeTab === 'pending') {
-        const res = await apiGet(API_ENDPOINTS.ISSUE_REQ_LEADER_PENDING, user.id);
-        if (res.ok && res.data?.success) {
-          setPendingRequests(res.data.requests || []);
-          setStats((prev) => ({ ...prev, pendingCount: res.data.pendingCount ?? 0 }));
-        }
-      } else {
-        const res = await apiGet(API_ENDPOINTS.ISSUE_REQ_LEADER_PROCESSED, user.id);
-        if (res.ok && res.data?.success) {
-          setProcessedRequests(res.data.requests || []);
-          setStats((prev) => ({
-            ...prev,
-            approvedCount: res.data.approvedCount ?? 0,
-            rejectedCount: res.data.rejectedCount ?? 0,
-          }));
-        }
-      }
-    } catch {
-      // silent
-    }
-  }, [user?.id, activeTab]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Reload when the screen regains focus (bottom-tab screens stay mounted,
+  // so without this the list shows stale data until logout/login).
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [fetchAll])
+  );
 
   // Reset page when tab changes
   useEffect(() => { setPage(1); }, [activeTab]);
@@ -185,7 +166,7 @@ export default function IssueRequestApprovalScreen() {
       if (res.ok) {
         Toast.show({ type: 'success', text1: 'Đã phê duyệt phiếu xin lĩnh!' });
         closeDetail();
-        await refetchActiveTab();
+        await fetchAll();
       } else {
         const msg = res.data?.message || res.data?.error || 'Phê duyệt thất bại!';
         Toast.show({ type: 'error', text1: msg });
@@ -211,7 +192,7 @@ export default function IssueRequestApprovalScreen() {
       if (res.ok) {
         Toast.show({ type: 'success', text1: 'Đã từ chối phiếu xin lĩnh!' });
         closeDetail();
-        await refetchActiveTab();
+        await fetchAll();
       } else {
         const msg = res.data?.message || res.data?.error || 'Thao tác thất bại!';
         Toast.show({ type: 'error', text1: msg });

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   ScrollView,
@@ -97,6 +98,16 @@ export default function IssueScreen() {
     loadEligible(eligiblePage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user?.id, eligiblePage]);
+
+  // Refresh the eligible list whenever the screen regains focus — a request
+  // becomes eligible after a leader approves it elsewhere, so the Thủ kho must
+  // see it without logging out/in. (Screens stay mounted in the bottom tabs.)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id && activeTab === 'create') loadEligible(eligiblePage);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, activeTab, eligiblePage])
+  );
 
   // ────────────────────────────────────────────
   // History fetch

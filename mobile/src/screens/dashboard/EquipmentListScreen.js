@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -67,6 +68,15 @@ export default function EquipmentListScreen() {
 
   // Quay về trang 1 khi đổi từ khóa / bộ lọc
   useEffect(() => { setPage(1); }, [keyword, matFilter]);
+
+  // Tồn kho thay đổi sau khi nhập/xuất kho ở màn khác → tải lại khi quay lại
+  // màn này (các tab dưới luôn được mount sẵn nên cần focus reload).
+  useFocusEffect(
+    useCallback(() => {
+      fetchStockItems(keyword, matFilter, page);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keyword, matFilter, page])
+  );
 
   async function fetchPermissions() {
     if (!user?.id) return;
