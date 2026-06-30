@@ -17,7 +17,6 @@ README này tự chứa đầy đủ các bước để chạy độc lập: cà
 - [Cấu trúc thư mục mobile](#cấu-trúc-thư-mục-mobile)
 - [Khối dùng chung](#khối-dùng-chung)
 - [Xác thực và phiên](#xác-thực-và-phiên)
-- [Lưu ý kỹ thuật](#lưu-ý-kỹ-thuật)
 
 ## Kiến trúc
 
@@ -208,11 +207,3 @@ mobile/
 - "Remember me" lưu email đăng nhập.
 - Mọi API cần định danh người dùng gửi header `X-User-Id`.
 - `DashboardScreen` poll `GET /api/auth/my-permissions` mỗi 60 giây để cập nhật tab khả dụng.
-
-## Lưu ý kỹ thuật
-
-- Không có test runner trong `mobile/`; kiểm tra cú pháp bằng cách bundle Expo hoặc parse từng file bằng `babel-preset-expo`.
-- Auth đơn giản: backend trả token dạng `user-token-{id}`, app dùng header `X-User-Id` cho hầu hết endpoint.
-- App bám sát các endpoint thật của backend; các đường dẫn không tồn tại (ví dụ `/users`, `/roles`) đã được loại bỏ.
-- Toàn bộ danh sách lọc và phân trang ở backend; app chỉ tải đúng một trang.
-- Giao diện dùng hệ token trong `theme/`, không thêm hệ style mới.

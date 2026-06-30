@@ -31,7 +31,6 @@ README gốc này mô tả tổng quan toàn hệ thống, backend và database.
 - [Luồng nghiệp vụ](#luồng-nghiệp-vụ)
 - [RBAC và phân quyền](#rbac-và-phân-quyền)
 - [Kiểm thử và build](#kiểm-thử-và-build)
-- [Lưu ý kỹ thuật](#lưu-ý-kỹ-thuật)
 
 ## Tổng quan chức năng
 
@@ -576,21 +575,4 @@ npm run lint
 ```
 
 Frontend hiện chưa có test suite riêng.
-
-## Lưu ý kỹ thuật
-
-- Backend đang chạy ở port `8080`.
-- Frontend Vite đang chạy ở port `5173`.
-- CORS backend chỉ cho phép origin `http://localhost:5173`.
-- Frontend đang hardcode API URL là `http://localhost:8080/api` trong nhiều component, chưa có API client/env abstraction tập trung.
-- Authentication hiện đơn giản: nhiều endpoint dùng header `X-User-Id` thay vì Bearer token.
-- Login trả token dạng `user-token-{userId}` và token được lưu in-memory, restart server sẽ mất token.
-- Mật khẩu trong dữ liệu hiện đang lưu plaintext. Không tự ý thêm BCrypt nếu chưa có migration plan cho dữ liệu cũ.
-- `spring.jpa.hibernate.ddl-auto=update`, nên Hibernate có thể tự cập nhật schema khi app chạy.
-- `database/final_database.sql` là script reset/seed chính, có tạo role, permission, user mẫu, system settings, notification, phiếu mẫu, thẻ kho và reservation.
-- `issue_req.auto_approve_enabled` mặc định `false`; có thể bật/tắt qua màn hình phân quyền/admin hoặc API admin settings.
-- Tồn kho hiển thị ở frontend lấy từ `/api/inventory/materials`, đã trừ lượng reservation đang active.
-- Các danh sách (tồn kho, người dùng, lịch sử nhập/xuất/xin lĩnh/dự trù, phiếu đủ điều kiện xuất) đã **lọc và phân trang ở backend** qua các tham số `keyword`/`status`/`page`/`size`/`limit`/`eligiblePage` — client chỉ tải đúng một trang, không tải-hết-rồi-lọc.
-- **Bản mobile (Expo/React Native)** dùng chung backend này nhưng thu gọn phạm vi: bỏ quản trị người dùng, phân quyền và thêm vật tư (web-only); Phiếu dự trù chỉ xem; Nhập kho rút gọn; Xuất kho auto-FEFO. Chi tiết ở [`mobile/README.md`](mobile/README.md).
-- Mobile có lớp API client tập trung (`mobile/src/api/apiClient.js`) tự gắn header `X-User-Id` và tự dò host backend — khác với web vẫn hardcode URL.
 

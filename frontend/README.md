@@ -17,7 +17,6 @@ README này tự chứa đầy đủ các bước để chạy độc lập: cà
 - [Tab dashboard theo quyền](#tab-dashboard-theo-quyền)
 - [Lọc và phân trang phía server](#lọc-và-phân-trang-phía-server)
 - [Xác thực và phiên](#xác-thực-và-phiên)
-- [Lưu ý kỹ thuật](#lưu-ý-kỹ-thuật)
 
 ## Kiến trúc
 
@@ -190,11 +189,3 @@ Mọi danh sách lọc/tìm/phân trang ở backend (trình duyệt không tải
 - Sau đăng nhập, `data.user` lưu vào `localStorage.currentUser`.
 - "Remember me" lưu `rememberedEmail`, `rememberedPassword`, `rememberMe` vào cookie 30 ngày.
 - Các API cần định danh gửi header `X-User-Id`.
-
-## Lưu ý kỹ thuật
-
-- API URL đang hardcode `http://localhost:8080/api` trong nhiều component.
-- CORS backend chỉ cho phép origin `http://localhost:5173`; nếu đổi cổng web phải sửa `spring.web.cors.allowed-origins`.
-- Mật khẩu trong dữ liệu seed đang lưu dạng plaintext; không tự thêm mã hóa nếu chưa có kế hoạch migration.
-- Nền `#eef1f6`, font Be Vietnam Pro, reset `box-sizing: border-box` toàn cục.
-- Chưa có test suite riêng cho web.
