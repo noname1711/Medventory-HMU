@@ -127,7 +127,7 @@ Mật khẩu mặc định của dữ liệu seed: `12345`.
 | Phê duyệt phiếu xin lĩnh (Lãnh đạo) | Có | Có |
 | Duyệt dự trù (BGH) | Có | Có |
 | Xuất kho (Thủ kho) | Có (auto-FEFO) | Có (FEFO và chỉnh lô thủ công) |
-| Nhập kho (Thủ kho) | Có (rút gọn: vật tư, số lượng, đơn giá, số lô) | Có (đầy đủ: lô, NSX, HSD) |
+| Nhập kho (Thủ kho) | Có | Có |
 | Phiếu dự trù (Thủ kho) | Chỉ xem lịch sử | Có (tạo và xem) |
 | Quản lý người dùng / Phân quyền (Admin) | Không (chỉ web) | Có |
 | Thêm vật tư mới (master data) | Không (chỉ web) | Có |
@@ -144,7 +144,7 @@ Tab dưới hiển thị theo `permissionCodes` lấy từ `GET /api/auth/my-per
 | Tạo phiếu xin | `ISSUE_REQ.CREATE` | Cán bộ | Tạo và xem lịch sử, kèm số đếm Lịch sử (N) |
 | Phê duyệt lĩnh | `ISSUE_REQ.APPROVE` | Lãnh đạo | Duyệt/Từ chối trong modal chi tiết |
 | Phiếu dự trù | `SUPP_FORECAST.CREATE` | Thủ kho | Chỉ xem lịch sử |
-| Nhập kho | `RECEIPT.CREATE` | Thủ kho | Tạo rút gọn và xem lịch sử |
+| Nhập kho | `RECEIPT.CREATE` | Thủ kho | Tạo đầy đủ và xem lịch sử |
 | Xuất kho | `ISSUE.CREATE` | Thủ kho | auto-FEFO: chọn phiếu đủ điều kiện rồi xác nhận |
 | Duyệt dự trù | `SUPP_FORECAST.APPROVE` | BGH | Duyệt/Từ chối, kèm thẻ thống kê |
 
@@ -180,7 +180,7 @@ mobile/
     │       ├── CreateIssueRequestScreen.js     # Tạo phiếu xin
     │       ├── IssueRequestApprovalScreen.js   # Phê duyệt lĩnh
     │       ├── ReplenishmentRequestScreen.js   # Phiếu dự trù (chỉ lịch sử)
-    │       ├── ReceiptScreen.js                # Nhập kho (rút gọn)
+    │       ├── ReceiptScreen.js                # Nhập kho (đầy đủ)
     │       ├── IssueScreen.js                  # Xuất kho (auto-FEFO)
     │       └── ForecastApprovalScreen.js       # Duyệt dự trù
     ├── theme/
