@@ -327,17 +327,26 @@ public class ReceiptService {
 
     @Transactional(readOnly = true)
     public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId, Integer page) {
+        return feedReceipts(afterId, limit, userId, page, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ReceiptFeedResponseDTO feedReceipts(Long afterId, Integer limit, Long userId, Integer page, String keyword) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User không tồn tại"));
             if (!user.isApproved()) throw new RuntimeException("Tài khoản chưa được kích hoạt");
 
             int size = (limit == null || limit <= 0) ? 20 : Math.min(limit, 200);
+            String kw = keyword == null ? "" : keyword.trim().toLowerCase();
 
             if (page != null) {
                 int pageNumber = Math.max(0, page);
-                Page<ReceiptHeader> pageResult = receiptHeaderRepository
-                        .findAll(PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
+                Page<ReceiptHeader> pageResult = kw.isEmpty()
+                        ? receiptHeaderRepository.findAll(
+                                PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")))
+                        : receiptHeaderRepository.searchByKeyword(kw,
+                                PageRequest.of(pageNumber, size, Sort.by(Sort.Direction.DESC, "id")));
 
                 List<ReceiptFeedItemDTO> items = pageResult.getContent().stream().map(this::toReceiptFeedItemDTO).toList();
 

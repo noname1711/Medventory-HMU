@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./ForecastApproval.css";
 
@@ -11,16 +12,6 @@ function fmtDate(s) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
 }
 
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
-}
 
 export default function ForecastApproval({ adminInfo }) {
   const PAGE_SIZE = 10;
@@ -271,31 +262,26 @@ export default function ForecastApproval({ adminInfo }) {
     safeCurrentPage * PAGE_SIZE + PAGE_SIZE
   );
 
-  const pageTitle = "Phê duyệt dự trù";
   return (
     <div className="ui-page">
-      <div className="ui-page-frame">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">{pageTitle}</h1>
-          </div>
+      <div className="ui-page-stack">
+        <div className="ui-screen-head">
+          <div className="ui-eyebrow">Phê duyệt</div>
+          <h1 className="ui-screen-title">Phê duyệt dự trù</h1>
         </div>
 
         <div className="ui-stat-grid fa-stat-grid">
           <div className="ui-stat-card is-primary">
-            <p className="ui-stat-label">Tổng dự trù đang hiển thị</p>
             <p className="ui-stat-value">{stats.total}</p>
-            <p className="ui-stat-note">Theo tab hiện tại</p>
+            <p className="ui-stat-label">Tổng dự trù</p>
           </div>
           <div className="ui-stat-card is-warning">
-            <p className="ui-stat-label">Dự trù chờ duyệt</p>
             <p className="ui-stat-value">{stats.pending}</p>
-            <p className="ui-stat-note">Cần xử lý</p>
+            <p className="ui-stat-label">Chờ duyệt</p>
           </div>
-          <div className="ui-stat-card">
-            <p className="ui-stat-label">Dự trù đã xử lý</p>
+          <div className="ui-stat-card is-success">
             <p className="ui-stat-value">{stats.processed}</p>
-            <p className="ui-stat-note">Đã duyệt hoặc từ chối</p>
+            <p className="ui-stat-label">Đã xử lý</p>
           </div>
         </div>
 
@@ -312,10 +298,10 @@ export default function ForecastApproval({ adminInfo }) {
             </div>
           </div>
 
-          <div className="ui-tabs">
+          <div className="ui-segment">
             <button
               type="button"
-              className={`ui-tab ${activeForecastTab === "pending" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeForecastTab === "pending" ? "is-active" : ""}`}
               onClick={() => {
                 setActiveForecastTab("pending");
                 setCurrentPage(0);
@@ -325,7 +311,7 @@ export default function ForecastApproval({ adminInfo }) {
             </button>
             <button
               type="button"
-              className={`ui-tab ${activeForecastTab === "processed" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeForecastTab === "processed" ? "is-active" : ""}`}
               onClick={() => {
                 setActiveForecastTab("processed");
                 setCurrentPage(0);
@@ -360,7 +346,10 @@ export default function ForecastApproval({ adminInfo }) {
 
                       return (
                         <tr key={forecast.id}>
-                          <td data-label="Khoa/Phòng">{forecast.department?.name || "Không xác định"}</td>
+                          <td data-label="Khoa/Phòng">
+                            {forecast.department?.name || "Không xác định"}{" "}
+                            <span className="ui-mono" style={{ fontSize: "0.7rem" }}>#{forecast.id}</span>
+                          </td>
                           <td data-label="Năm học">{forecast.academicYear || "-"}</td>
                           <td data-label="Người tạo">{forecast.createdBy?.fullName || "Không xác định"}</td>
                           <td data-label="Ngày tạo">
@@ -375,10 +364,10 @@ export default function ForecastApproval({ adminInfo }) {
                             <div className="fa-action-group">
                               <button
                                 type="button"
-                                className="ui-btn ui-btn-secondary ui-btn-sm"
+                                className="ui-btn-outline"
                                 onClick={() => setSelectedForecast(forecast)}
                               >
-                                Xem
+                                Xem &amp; duyệt
                               </button>
                             </div>
                           </td>
@@ -399,39 +388,12 @@ export default function ForecastApproval({ adminInfo }) {
             </div>
           )}
 
-          {!isLoading && forecasts.length > 0 ? (
-            <div className="ui-pagination" aria-label="Phân trang danh sách dự trù">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                disabled={safeCurrentPage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
-                  onClick={() => setCurrentPage(page)}
-                  disabled={page === safeCurrentPage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
-                disabled={safeCurrentPage >= totalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
-          ) : null}
+          <Pagination
+            page={safeCurrentPage}
+            totalPages={isLoading ? 1 : totalPages}
+            onChange={setCurrentPage}
+            ariaLabel="Phân trang danh sách dự trù"
+          />
         </div>
       </div>
 

@@ -44,9 +44,10 @@ public class ReceiptController {
             @RequestParam(value = "afterId", required = false) Long afterId,
             @RequestParam(value = "page", required = false) Integer page,
             @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestHeader("X-User-Id") Long userId) {
         try {
-            return ResponseEntity.ok(receiptService.feedReceipts(afterId, limit, userId, page));
+            return ResponseEntity.ok(receiptService.feedReceipts(afterId, limit, userId, page, keyword));
         } catch (Exception e) {
             return ResponseEntity.ok(ReceiptFeedResponseDTO.error("Không thể lấy feed: " + e.getMessage()));
         }

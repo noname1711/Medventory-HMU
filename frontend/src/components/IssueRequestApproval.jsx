@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Swal from "sweetalert2";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./IssueRequestApproval.css";
 
@@ -20,16 +21,6 @@ function fmtDateTime(s) {
   return fmtDate(s);
 }
 
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
-}
 
 export default function IssueRequestApproval() {
   const PAGE_SIZE = 10;
@@ -382,8 +373,14 @@ export default function IssueRequestApproval() {
       total: pendingRequests.length + processedRequests.length,
       pending: pendingRequests.length,
       processed: processedRequests.length,
+      // "Phiếu khẩn ưu tiên" — real heuristic over the loaded data (note/priority marks urgency)
+      urgent: pendingRequests.filter(
+        (r) =>
+          String(r?.note || "").toLowerCase().includes("khẩn") ||
+          String(r?.priority || "").toLowerCase() === "urgent"
+      ).length,
     }),
-    [pendingRequests.length, processedRequests.length]
+    [pendingRequests, processedRequests.length]
   );
 
   if (checkingAccess) {
@@ -413,44 +410,40 @@ export default function IssueRequestApproval() {
 
   return (
     <div className="ui-page issue-request-approval-page">
-      <div className="ui-page-frame">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">Phê duyệt Phiếu xin lĩnh</h1>
-          </div>
+      <div className="ui-page-stack">
+        <div className="ui-screen-head">
+          <div className="ui-eyebrow">Phê duyệt</div>
+          <h1 className="ui-screen-title">Phê duyệt phiếu xin lĩnh</h1>
         </div>
 
         <div className="ui-stat-grid">
           <div className="ui-stat-card is-primary">
-            <p className="ui-stat-label">Tổng phiếu</p>
-            <p className="ui-stat-value">{summary.total}</p>
-            <p className="ui-stat-note">Cả đang chờ và đã xử lý</p>
-          </div>
-          <div className="ui-stat-card is-warning">
-            <p className="ui-stat-label">Chờ phê duyệt</p>
             <p className="ui-stat-value">{summary.pending}</p>
-            <p className="ui-stat-note">Cần xử lý ngay</p>
+            <p className="ui-stat-label">Chờ duyệt</p>
           </div>
-          <div className="ui-stat-card">
-            <p className="ui-stat-label">Đã xử lý</p>
+          <div className="ui-stat-card is-success">
             <p className="ui-stat-value">{summary.processed}</p>
-            <p className="ui-stat-note">Đã duyệt hoặc từ chối</p>
+            <p className="ui-stat-label">Đã xử lý</p>
+          </div>
+          <div className="ui-stat-card is-primary">
+            <p className="ui-stat-value">{summary.urgent}</p>
+            <p className="ui-stat-label">Phiếu khẩn ưu tiên</p>
           </div>
         </div>
 
         <div className="ui-section">
-          <div className="ui-tabs">
+          <div className="ui-segment">
             <button
-              className={`ui-tab ${activeTab === "pending" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "pending" ? "is-active" : ""}`}
               onClick={() => {
                 setActiveTab("pending");
                 setCurrentPage(0);
               }}
             >
-              Chờ phê duyệt ({pendingRequests.length})
+              Chờ duyệt ({pendingRequests.length})
             </button>
             <button
-              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "history" ? "is-active" : ""}`}
               onClick={() => {
                 setActiveTab("history");
                 setCurrentPage(0);
@@ -486,7 +479,7 @@ export default function IssueRequestApproval() {
                 <tbody>
                   {pagedRequests.map((request) => (
                     <tr key={request.id}>
-                      <td className="ira-cell-id" data-label="Mã phiếu">#{request.id}</td>
+                      <td className="ira-cell-id" data-label="Mã phiếu"><span className="ui-mono">#{request.id}</span></td>
                       <td data-label="Người gửi">{request.createdByName}</td>
                       <td data-label="Đơn vị">{request.departmentName}</td>
                       <td data-label="Thời gian">{fmtDateTime(request.requestedAt)}</td>
@@ -498,8 +491,8 @@ export default function IssueRequestApproval() {
                       </td>
                       <td>
                         <div className="ira-action-group">
-                          <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => fetchRequestDetail(request.id)}>
-                            Xem
+                          <button className="ui-btn-outline" onClick={() => fetchRequestDetail(request.id)}>
+                            Xem &amp; duyệt
                           </button>
                         </div>
                       </td>
@@ -510,39 +503,12 @@ export default function IssueRequestApproval() {
             </div>
           )}
 
-          {!currentTabLoading && currentRequests.length > 0 ? (
-            <div className="ui-pagination" aria-label="Phân trang phê duyệt phiếu xin lĩnh">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                disabled={safeCurrentPage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(totalPages, safeCurrentPage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === safeCurrentPage ? "is-active" : ""}`}
-                  onClick={() => setCurrentPage(page)}
-                  disabled={page === safeCurrentPage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))}
-                disabled={safeCurrentPage >= totalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
-          ) : null}
+          <Pagination
+            page={safeCurrentPage}
+            totalPages={currentTabLoading ? 1 : totalPages}
+            onChange={setCurrentPage}
+            ariaLabel="Phân trang phê duyệt phiếu xin lĩnh"
+          />
         </div>
       </div>
 

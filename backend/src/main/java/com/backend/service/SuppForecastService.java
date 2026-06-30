@@ -212,10 +212,19 @@ public class SuppForecastService {
 
     @Transactional(readOnly = true)
     public ResponseEntity<?> getMyForecasts(Long userId) {
+        return getMyForecasts(userId, null, 0, 10);
+    }
+
+    /**
+     * Danh sách phiếu dự trù của người dùng — lọc theo keyword (mã / năm học /
+     * bộ môn / trạng thái) và phân trang ở backend.
+     */
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getMyForecasts(Long userId, String keyword, Integer page, Integer size) {
         try {
             User actor = rbacService.requireApprovedUser(userId);
             List<SuppForecastHeader> forecasts = headerRepository.findByCreatedBy_IdOrderByCreatedAtDesc(actor.getId());
-            List<Map<String, Object>> items = forecasts.stream()
+            List<Map<String, Object>> all = forecasts.stream()
                     .map(h -> {
                         Map<String, Object> dto = new HashMap<>();
                         dto.put("id", h.getId());
@@ -229,7 +238,33 @@ public class SuppForecastService {
                         return dto;
                     })
                     .collect(Collectors.toList());
-            return ResponseEntity.ok(Map.of("success", true, "items", items));
+
+            String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+            List<Map<String, Object>> filtered = kw.isEmpty() ? all : all.stream()
+                    .filter(d -> {
+                        String id = String.valueOf(d.getOrDefault("id", ""));
+                        String year = String.valueOf(d.getOrDefault("academicYear", "")).toLowerCase();
+                        String dept = String.valueOf(d.getOrDefault("departmentName", "")).toLowerCase();
+                        String status = String.valueOf(d.getOrDefault("status", "")).toLowerCase();
+                        return id.contains(kw) || year.contains(kw) || dept.contains(kw) || status.contains(kw);
+                    })
+                    .collect(Collectors.toList());
+
+            int safeSize = (size == null || size <= 0) ? 10 : size;
+            int totalPages = (int) Math.max(1, Math.ceil((double) filtered.size() / safeSize));
+            int safePage = Math.max(0, Math.min(page == null ? 0 : page, totalPages - 1));
+            int from = Math.min(safePage * safeSize, filtered.size());
+            int to = Math.min(from + safeSize, filtered.size());
+            List<Map<String, Object>> pageItems = new ArrayList<>(filtered.subList(from, to));
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("items", pageItems);
+            resp.put("page", safePage);
+            resp.put("totalPages", totalPages);
+            resp.put("totalCount", (long) all.size());
+            resp.put("filteredCount", (long) filtered.size());
+            return ResponseEntity.ok(resp);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         }

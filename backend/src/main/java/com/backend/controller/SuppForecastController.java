@@ -72,8 +72,12 @@ public class SuppForecastController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<?> getMyForecasts(@RequestParam Long userId) {
-        return forecastService.getMyForecasts(userId);
+    public ResponseEntity<?> getMyForecasts(
+            @RequestParam Long userId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer size) {
+        return forecastService.getMyForecasts(userId, keyword, page, size);
     }
 
     @GetMapping("/previous")

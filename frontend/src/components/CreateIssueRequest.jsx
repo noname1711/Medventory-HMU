@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./CreateIssueRequest.css";
 import MaterialSearchInput from "./MaterialSearchInput";
@@ -13,17 +14,6 @@ const API_ENDPOINTS = {
   SUB_DEPARTMENTS: `${API_URL}/departments/sub-departments`,
   ISSUE_REQUESTS: `${API_URL}/issue-requests`
 };
-
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
-}
 
 export default function CreateIssueRequest() {
   const HISTORY_PAGE_SIZE = 10;
@@ -47,7 +37,6 @@ export default function CreateIssueRequest() {
   });
 
   const [units, setUnits] = useState([]);
-  const [materials, setMaterials] = useState([]);
   const [subDepartments, setSubDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -55,18 +44,17 @@ export default function CreateIssueRequest() {
   const [requestHistory, setRequestHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [showHelp, setShowHelp] = useState(false);
   const [historyPage, setHistoryPage] = useState(0);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyTotalCount, setHistoryTotalCount] = useState(0);
 
   // Lấy thông tin user và dữ liệu
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         await fetchUserInfo();
-        await Promise.all([
-          fetchUnits(),
-          fetchMaterials()
-        ]);
+        await fetchUnits();
       } catch {
         setMessage("Lỗi khi tải dữ liệu từ server");
       }
@@ -77,14 +65,15 @@ export default function CreateIssueRequest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch lịch sử khi user đã được thiết lập
+  // Fetch lịch sử (lọc + phân trang ở backend); debounce theo từ khóa.
   useEffect(() => {
-    if (currentUser?.id) {
-      fetchRequestHistory();
-    }
-    // Refresh history when the loaded user changes.
+    if (!currentUser?.id) return undefined;
+    const t = setTimeout(() => {
+      fetchRequestHistory(historySearch, historyPage);
+    }, 300);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]);
+  }, [currentUser, historySearch, historyPage]);
 
   const fetchUserInfo = async () => {
     try {
@@ -127,52 +116,75 @@ export default function CreateIssueRequest() {
     }
   };
 
-  const fetchMaterials = async () => {
-    try {
-      const response = await fetch(API_ENDPOINTS.MATERIALS);
-      if (response.ok) {
-        const data = await response.json();
-        const validMaterials = Array.isArray(data) ? data.map(m => ({
-          id: m.materialId,
-          name: m.materialName,
-          code: m.materialCode,
-          spec: m.specification,
-          unitId: m.unitId,
-          manufacturer: m.manufacturer,
-          category: m.category || "",
-          unit: { id: m.unitId }
-        }))
-          : [];
+  // Map 1 entity Material (từ /materials/search) sang shape dùng nội bộ + cho ô tìm kiếm.
+  const mapMaterialEntity = (m) => ({
+    id: m.id,
+    name: m.name,
+    materialName: m.name,
+    code: m.code || "",
+    materialCode: m.code || "",
+    spec: m.spec || "",
+    unitId: m.unit?.id ?? m.unitId ?? "",
+    unit: { id: m.unit?.id ?? m.unitId ?? "" },
+    manufacturer: m.manufacturer || "",
+    category: m.category || "",
+  });
 
-        setMaterials(validMaterials);
-      } else {
-        throw new Error(`HTTP ${response.status}`);
-      }
+  // Tìm vật tư ở backend (server-side) cho ô gợi ý — không tải toàn bộ danh mục về FE.
+  const searchMaterials = async (kw) => {
+    try {
+      const response = await fetch(
+        `${API_ENDPOINTS.MATERIALS}/search?keyword=${encodeURIComponent(kw || "")}&limit=20`
+      );
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (Array.isArray(data) ? data : []).map(mapMaterialEntity);
     } catch {
-      setMaterials([]);
+      return [];
     }
   };
 
-  // Hàm lấy lịch sử phiếu xin lĩnh
-  const fetchRequestHistory = async () => {
+  // Tra cứu chính xác theo mã code ở backend (thay cho việc dò trong mảng đã tải sẵn).
+  const lookupMaterialByCode = async (code) => {
+    if (!code || !code.trim()) return null;
+    try {
+      const response = await fetch(
+        `${API_ENDPOINTS.MATERIALS}/search?keyword=${encodeURIComponent(code.trim())}&limit=10`
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      const exact = (Array.isArray(data) ? data : []).find(
+        (m) => (m.code || "").toString().trim().toLowerCase() === code.trim().toLowerCase()
+      );
+      return exact ? mapMaterialEntity(exact) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Lấy lịch sử phiếu xin lĩnh — lọc (keyword) + phân trang ở backend.
+  const fetchRequestHistory = async (kw = historySearch, page = historyPage) => {
     if (!currentUser?.id) return;
 
     setHistoryLoading(true);
     try {
-      const response = await fetch(`${API_ENDPOINTS.ISSUE_REQUESTS}/canbo/my-requests`, {
-        method: "GET",
-        headers: {
-          "X-User-Id": currentUser.id.toString()
-        }
+      const qs = new URLSearchParams({
+        keyword: kw || "",
+        page: String(page),
+        size: String(HISTORY_PAGE_SIZE),
       });
+      const response = await fetch(
+        `${API_ENDPOINTS.ISSUE_REQUESTS}/canbo/my-requests?${qs.toString()}`,
+        { method: "GET", headers: { "X-User-Id": currentUser.id.toString() } }
+      );
 
       if (response.ok) {
         const result = await response.json();
 
         if (result.success) {
-          const historyData = result.requests || [];
-          setRequestHistory(historyData);
-          setHistoryPage(0);
+          setRequestHistory(result.requests || []);
+          setHistoryTotalPages(Math.max(1, result.totalPages || 1));
+          setHistoryTotalCount(result.totalCount || 0);
         } else {
           throw new Error(result.message || "Lỗi không xác định");
         }
@@ -258,85 +270,15 @@ export default function CreateIssueRequest() {
     }
   };
 
-  // Hàm xử lý thay đổi chi tiết 
+  // Hàm xử lý thay đổi chi tiết — chỉ cập nhật giá trị ô. Việc tra cứu theo
+  // mã code được thực hiện ở backend khi rời ô (onBlur → handleCodeBlur).
   const handleDetailChange = (index, field, value) => {
-
-    // First update the field
     setFormData(prev => ({
       ...prev,
       details: prev.details.map((detail, i) =>
         i === index ? { ...detail, [field]: value } : detail
       )
     }));
-
-    // Auto-fill khi nhập mã code trùng
-    if (field === 'proposedCode' && value && value.trim()) {
-      const existingMaterial = materials.find(m =>
-        m.code && m.code.toString().trim().toLowerCase() === value.trim().toLowerCase()
-      );
-
-      if (existingMaterial) {
-        // Use setTimeout to ensure state is updated properly
-        setTimeout(() => {
-          setFormData(prev => ({
-            ...prev,
-            details: prev.details.map((detail, i) =>
-              i === index ? {
-                materialId: existingMaterial.id,
-                materialName: existingMaterial.name || "",
-                spec: existingMaterial.spec || "",
-                unitId: existingMaterial.unit?.id || existingMaterial.unitId || "",
-                proposedCode: existingMaterial.code || "",
-                proposedManufacturer: existingMaterial.manufacturer || "",
-                category: existingMaterial.category || "", // TỰ ĐỘNG ĐIỀN CATEGORY
-                qtyRequested: prev.details[index].qtyRequested || "" // Keep existing quantity
-              } : detail
-            )
-          }));
-        }, 0);
-      } else {
-        // Nếu không tìm thấy mã, reset materialId để đánh dấu là vật tư mới
-        setTimeout(() => {
-          setFormData(prev => ({
-            ...prev,
-            details: prev.details.map((detail, i) =>
-              i === index ? {
-                ...detail,
-                materialId: null,
-                // Keep other values except reset materialId
-              } : detail
-            )
-          }));
-        }, 0);
-      }
-    }
-
-    // BỔ SUNG: Tự động điền tên vật tư và CATEGORY khi mã code trùng (trường hợp người dùng nhập mã code trước)
-    if (field === 'proposedCode' && value && value.trim() && !formData.details[index].materialName) {
-      const existingMaterial = materials.find(m =>
-        m.code && m.code.toString().trim().toLowerCase() === value.trim().toLowerCase()
-      );
-
-      if (existingMaterial && existingMaterial.name) {
-        // Tự động điền tên vật tư và CATEGORY nếu tìm thấy mã code trùng
-        setTimeout(() => {
-          setFormData(prev => ({
-            ...prev,
-            details: prev.details.map((detail, i) =>
-              i === index ? {
-                ...detail,
-                materialName: existingMaterial.name,
-                materialId: existingMaterial.id,
-                spec: existingMaterial.spec || detail.spec,
-                unitId: existingMaterial.unit?.id || existingMaterial.unitId || detail.unitId,
-                proposedManufacturer: existingMaterial.manufacturer || detail.proposedManufacturer,
-                category: existingMaterial.category || detail.category // TỰ ĐỘNG ĐIỀN CATEGORY
-              } : detail
-            )
-          }));
-        }, 0);
-      }
-    }
   };
 
   // Hàm thêm hàng mới
@@ -372,13 +314,11 @@ export default function CreateIssueRequest() {
     }));
   };
 
-  // Hàm xử lý khi blur khỏi ô mã code 
-  const handleCodeBlur = (index, value) => {
+  // Hàm xử lý khi blur khỏi ô mã code — tra cứu chính xác ở backend.
+  const handleCodeBlur = async (index, value) => {
     if (!value || !value.trim()) return;
 
-    const existingMaterial = materials.find(m =>
-      m.code && m.code.toString().trim().toLowerCase() === value.trim().toLowerCase()
-    );
+    const existingMaterial = await lookupMaterialByCode(value);
 
     if (existingMaterial) {
       setFormData(prev => ({
@@ -391,9 +331,17 @@ export default function CreateIssueRequest() {
             unitId: existingMaterial.unit?.id || existingMaterial.unitId || detail.unitId,
             proposedCode: existingMaterial.code || value,
             proposedManufacturer: existingMaterial.manufacturer || detail.proposedManufacturer,
-            category: existingMaterial.category || detail.category, // TỰ ĐỘNG ĐIỀN CATEGORY
+            category: existingMaterial.category || detail.category,
             qtyRequested: detail.qtyRequested || ""
           } : detail
+        )
+      }));
+    } else {
+      // Mã không có trong danh mục → đánh dấu là vật tư mới (materialId = null).
+      setFormData(prev => ({
+        ...prev,
+        details: prev.details.map((detail, i) =>
+          i === index ? { ...detail, materialId: null } : detail
         )
       }));
     }
@@ -629,45 +577,32 @@ export default function CreateIssueRequest() {
     return detail.unitName || detail.unit?.name || units.find(u => u.id === detail.unitId)?.name || 'N/A';
   };
 
-  // Adapter array for MaterialSearchInput — maps raw materials to expected shape
-  const materialSearchItems = useMemo(
-    () => materials.map((m) => ({
-      id: m.id,
-      materialName: m.name,
-      materialCode: m.code || '',
-      unitName: units.find((u) => u.id === m.unitId)?.name || '',
-    })),
-    [materials, units]
-  );
-
-  const historyTotalPages = Math.max(1, Math.ceil(requestHistory.length / HISTORY_PAGE_SIZE));
+  // Dữ liệu đã được lọc + phân trang ở backend.
   const safeHistoryPage = Math.min(historyPage, historyTotalPages - 1);
-  const pagedRequestHistory = requestHistory.slice(
-    safeHistoryPage * HISTORY_PAGE_SIZE,
-    safeHistoryPage * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
-  );
+  const pagedRequestHistory = requestHistory;
 
   return (
     <div className="ui-page">
-      <div className="ui-page-frame create-issue-request">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">Tạo phiếu xin lĩnh</h1>
+      <div className="ui-page-stack create-issue-request">
+        <div className="ui-screen-bar">
+          <div className="ui-screen-head">
+            <div className="ui-eyebrow">Phiếu xin lĩnh</div>
+            <h1 className="ui-screen-title">Tạo phiếu xin lĩnh vật tư</h1>
           </div>
-          <div className="ui-tabs" style={{ marginBottom: 0 }}>
+          <div className="ui-segment">
             <button
               type="button"
-              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "create" ? "is-active" : ""}`}
               onClick={() => setActiveTab("create")}
             >
-              Tạo phiếu xin lĩnh
+              Tạo phiếu
             </button>
             <button
               type="button"
-              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "history" ? "is-active" : ""}`}
               onClick={() => setActiveTab("history")}
             >
-              Lịch sử đã gửi ({requestHistory.length})
+              Lịch sử ({historyTotalCount})
             </button>
           </div>
         </div>
@@ -683,17 +618,15 @@ export default function CreateIssueRequest() {
         <form onSubmit={handleSubmit} className="issue-form">
           {/* Form gộp: thông tin + bảng vật tư */}
           <div className="ui-section">
-            {/* Thông tin người xin lĩnh — hàng ngang */}
-            <div className="cir-sender-row">
-              <span><span className="cir-sender-label">Họ và tên:</span> {currentUser?.fullName || "—"}</span>
-              <span className="cir-sender-sep">|</span>
-              <span><span className="cir-sender-label">Khoa / Phòng:</span> {currentUser?.departmentName || "—"}</span>
-              <span className="cir-sender-sep">|</span>
-              <span><span className="cir-sender-label">Bộ môn:</span> {subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || "—"}</span>
-              <span className="cir-sender-sep">|</span>
-              <span><span className="cir-sender-label">Email:</span> {currentUser?.email || "—"}</span>
-              <span className="cir-sender-sep">|</span>
-              <span><span className="cir-sender-label">Chức vụ:</span> {currentUser?.role || "Cán bộ"}</span>
+            {/* Thông tin người xin lĩnh — pill-bar (prototype) */}
+            <div className="ui-info-bar">
+              <span>Họ và tên: <b>{currentUser?.fullName || "—"}</b></span>
+              <span className="ui-info-sep">|</span>
+              <span>Khoa / Phòng: <b>{currentUser?.departmentName || "—"}</b></span>
+              <span className="ui-info-sep">|</span>
+              <span>Bộ môn: <b>{subDepartments.find(sd => sd.id.toString() === formData.subDepartmentId)?.name || "—"}</b></span>
+              <span className="ui-info-sep">|</span>
+              <span>Chức vụ: <b>{currentUser?.role || "Cán bộ"}</b></span>
             </div>
 
             <div className="ui-field">
@@ -715,15 +648,13 @@ export default function CreateIssueRequest() {
               <table className="ui-table issue-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 50 }}>TT</th>
+                    <th style={{ width: 44 }}>TT</th>
                     <th style={{ width: 110 }}>Mã code</th>
                     <th>Tên vật tư hóa chất</th>
-                    <th>Quy cách đóng gói</th>
                     <th style={{ width: 110 }}>Đơn vị tính</th>
-                    <th style={{ width: 120 }}>Số lượng xin cấp</th>
+                    <th style={{ width: 130 }}>Số lượng xin cấp</th>
                     <th>Hãng sản xuất</th>
-                    <th style={{ width: 80 }}>Loại</th>
-                    <th style={{ width: 80 }}>Thao tác</th>
+                    <th style={{ width: 64 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -744,16 +675,10 @@ export default function CreateIssueRequest() {
                         <MaterialSearchInput
                           value={detail.materialName || ""}
                           onChange={(text) => handleDetailChange(index, "materialName", text)}
-                          onSelect={(item) => {
-                            const original = materials.find((m) => m.id === item.id);
-                            if (original) handleMaterialSelect(original, index);
-                          }}
-                          items={materialSearchItems}
+                          onSelect={(item) => handleMaterialSelect(item, index)}
+                          onSearch={searchMaterials}
                           placeholder="Nhập tên vật tư để tìm kiếm..."
                         />
-                      </td>
-                      <td data-label="Quy cách">
-                        <input className="ui-input table-input" type="text" value={detail.spec || ""} readOnly />
                       </td>
                       <td data-label="Đơn vị">
                         <input className="ui-input table-input" type="text" value={units.find(u => u.id == detail.unitId)?.name || ""} readOnly />
@@ -773,18 +698,15 @@ export default function CreateIssueRequest() {
                       <td data-label="Hãng SX">
                         <input className="ui-input table-input" type="text" value={detail.proposedManufacturer || ""} readOnly />
                       </td>
-                      <td data-label="Loại">
-                        <input className="ui-input table-input" type="text" value={detail.category ? getCategoryLabel(detail.category) : ""} readOnly />
-                      </td>
                       <td className="text-center" data-label="Thao tác">
                         <button
                           type="button"
                           onClick={() => removeRow(index)}
-                          className="ui-btn ui-btn-danger ui-btn-sm btn-remove-row"
+                          className="ui-remove-btn btn-remove-row"
                           disabled={formData.details.length <= 1}
                           title="Xóa hàng này"
                         >
-                          Xóa
+                          ✕
                         </button>
                       </td>
                     </tr>
@@ -793,55 +715,33 @@ export default function CreateIssueRequest() {
               </table>
             </div>
 
-            <div className="cir-table-footer">
+            <div className="cir-form-footer">
               <button
                 type="button"
                 onClick={addNewRow}
-                className="ui-btn ui-btn-secondary ui-btn-sm btn-add-row"
+                className="ui-add-dashed btn-add-row"
                 disabled={loading}
               >
-                + Thêm hàng
+                ＋ Thêm hàng
               </button>
+              <div className="cir-footer-actions">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="ui-btn ui-btn-light btn-cancel"
+                  disabled={loading}
+                >
+                  Làm mới
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !currentUser?.departmentId}
+                  className="ui-btn ui-btn-primary btn-submit"
+                >
+                  {loading ? "Đang tạo..." : "Gửi Phiếu Xin Lĩnh"}
+                </button>
+              </div>
             </div>
-
-            <div className="cir-help">
-              <button
-                type="button"
-                className="cir-help-toggle"
-                onClick={() => setShowHelp((v) => !v)}
-              >
-                <span>? Hướng dẫn nhập bảng</span>
-                <span className="cir-help-chevron">{showHelp ? "▲" : "▼"}</span>
-              </button>
-              {showHelp && (
-                <ul className="cir-help-list">
-                  <li><strong>Nhập mã code</strong>: Hệ thống tự động điền thông tin nếu mã tồn tại trong danh mục</li>
-                  <li><strong>Nhập tên vật tư</strong>: Click vào ô để mở cửa sổ tìm kiếm thông minh</li>
-                  <li><strong>Vật tư có sẵn</strong>: Thông tin được khóa, chỉ nhập số lượng</li>
-                  <li><strong>Vật tư mới</strong>: Cần nhập đầy đủ tất cả thông tin</li>
-                  <li><strong>Loại vật tư</strong>: Tự động điền khi chọn vật tư có sẵn, không thể thay đổi</li>
-                  <li><strong>Số lượng</strong>: Chỉ nhập số nguyên dương</li>
-                </ul>
-              )}
-            </div>
-          </div>
-
-          <div className="ui-modal-footer">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="ui-btn ui-btn-secondary btn-cancel"
-              disabled={loading}
-            >
-              Làm mới
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !currentUser?.departmentId}
-              className="ui-btn ui-btn-primary btn-submit"
-            >
-              {loading ? "Đang tạo..." : "Gửi Phiếu Xin Lĩnh"}
-            </button>
           </div>
         </form>
       )}
@@ -850,23 +750,30 @@ export default function CreateIssueRequest() {
       {activeTab === "history" && (
         <div className="ui-section history-section">
           <div className="ui-section-head">
-            <div><h2 className="ui-section-title">Lịch sử phiếu xin lĩnh đã gửi</h2></div>
-            <div className="ui-toolbar-actions">
-              <button
-                type="button"
-                onClick={fetchRequestHistory}
-                className="ui-btn ui-btn-secondary ui-btn-sm btn-refresh"
-                disabled={historyLoading}
-              >
-                {historyLoading ? "Đang tải..." : "Làm mới"}
-              </button>
-            </div>
+            <h2 className="ui-section-title">Lịch sử phiếu xin lĩnh đã gửi</h2>
+            <button
+              type="button"
+              onClick={fetchRequestHistory}
+              className="ui-btn ui-btn-light"
+              disabled={historyLoading}
+            >
+              {historyLoading ? "Đang tải..." : "Tải lại"}
+            </button>
+          </div>
+
+          <div className="cir-history-toolbar">
+            <input
+              className="ui-input cir-history-search"
+              placeholder="Tìm theo mã phiếu / mục đích sử dụng..."
+              value={historySearch}
+              onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }}
+            />
           </div>
 
           {historyLoading ? (
             <div className="ui-empty">Đang tải lịch sử phiếu xin lĩnh...</div>
           ) : requestHistory.length === 0 ? (
-            <div className="ui-empty">Chưa có phiếu xin lĩnh nào được gửi</div>
+            <div className="ui-empty">{historyTotalCount === 0 ? "Chưa có phiếu xin lĩnh nào được gửi" : "Không tìm thấy kết quả phù hợp"}</div>
           ) : (
             <div className="ui-table-wrap table-container">
               <table className="ui-table history-table">
@@ -883,7 +790,7 @@ export default function CreateIssueRequest() {
                 <tbody>
                   {pagedRequestHistory.map((request) => (
                     <tr key={request.id}>
-                      <td className="text-center" data-label="Mã phiếu">{request.id}</td>
+                      <td className="text-center" data-label="Mã phiếu"><span className="ui-mono">{request.id}</span></td>
                       <td className="text-center" data-label="Ngày gửi">{formatDate(request.requestedAt)}</td>
                       <td data-label="Mục đích">{request.note}</td>
                       <td className="text-center" data-label="Số vật tư">{request.details?.length || 0}</td>
@@ -896,7 +803,7 @@ export default function CreateIssueRequest() {
                         <button
                           type="button"
                           onClick={() => showRequestDetails(request)}
-                          className="ui-btn ui-btn-secondary ui-btn-sm"
+                          className="ui-btn-ghost"
                           title="Xem"
                         >
                           Xem
@@ -908,39 +815,12 @@ export default function CreateIssueRequest() {
               </table>
             </div>
           )}
-          {!historyLoading && requestHistory.length > 0 ? (
-            <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu xin lĩnh">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setHistoryPage((page) => Math.max(0, page - 1))}
-                disabled={safeHistoryPage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(historyTotalPages, safeHistoryPage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === safeHistoryPage ? "is-active" : ""}`}
-                  onClick={() => setHistoryPage(page)}
-                  disabled={page === safeHistoryPage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setHistoryPage((page) => Math.min(historyTotalPages - 1, page + 1))}
-                disabled={safeHistoryPage >= historyTotalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
-          ) : null}
+          <Pagination
+            page={safeHistoryPage}
+            totalPages={historyLoading ? 1 : historyTotalPages}
+            onChange={setHistoryPage}
+            ariaLabel="Phân trang lịch sử phiếu xin lĩnh"
+          />
         </div>
       )}
 

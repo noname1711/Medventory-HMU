@@ -52,15 +52,15 @@ export default function Dashboard() {
     <div className="dashboard-page">
       <DashboardHeader userInfo={userInfo} />
 
-      <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <DashboardTabs
-          active={activeTab}
-          setActive={setActiveTab}
-          isAdmin={isAdmin}
-          onVisibleTabsChange={handleVisibleTabsChange}
-        />
+      <DashboardTabs
+        active={activeTab}
+        setActive={setActiveTab}
+        isAdmin={isAdmin}
+        onVisibleTabsChange={handleVisibleTabsChange}
+      />
 
-        <div className="mt-4">
+      <main className="dashboard-main">
+        <div className="dashboard-content">
           {tabsLoading && <div className="ui-empty">Đang đồng bộ quyền...</div>}
           {canRenderActiveTab && activeTab === "equipment" && <EquipmentList />}
           {canRenderActiveTab && activeTab === "approval" && <IssueRequestApproval />}
@@ -72,7 +72,7 @@ export default function Dashboard() {
           {canRenderActiveTab && activeTab === "admin" && <Admin />}
           {canRenderActiveTab && activeTab === "rbac" && <RBACSection />}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

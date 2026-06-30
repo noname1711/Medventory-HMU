@@ -7,6 +7,7 @@ import com.backend.repository.MaterialRepository;
 import com.backend.service.MaterialService;
 import com.backend.service.RbacService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,13 +34,18 @@ public class MaterialController {
 
     @GetMapping("/search")
     public ResponseEntity<List<Material>> searchMaterials(
-            @RequestParam(value = "keyword", required = false) String keyword) {
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "limit", required = false, defaultValue = "20") int limit) {
         try {
+            int cap = limit <= 0 ? 20 : Math.min(limit, 100);
             List<Material> materials;
             if (keyword == null || keyword.trim().isEmpty()) {
-                materials = materialRepository.findAll();
+                materials = materialRepository.findAll(PageRequest.of(0, cap)).getContent();
             } else {
                 materials = materialRepository.findByNameOrCodeContainingIgnoreCase(keyword.trim());
+                if (materials.size() > cap) {
+                    materials = new ArrayList<>(materials.subList(0, cap));
+                }
             }
             return ResponseEntity.ok(materials);
         } catch (Exception e) {

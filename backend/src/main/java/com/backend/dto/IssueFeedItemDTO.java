@@ -18,4 +18,6 @@ public class IssueFeedItemDTO {
     private Long subDepartmentId;
     private String subDepartmentName;
     private BigDecimal totalAmount;
+    /** Số loại vật tư (số dòng vật tư khác nhau) trong phiếu xuất */
+    private Integer materialTypeCount;
 }

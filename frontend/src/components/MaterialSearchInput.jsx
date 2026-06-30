@@ -10,6 +10,9 @@ import './MaterialSearchInput.css';
  *   onChange(text)        — called on every keystroke
  *   onSelect(item)        — called when user picks a suggestion
  *   items        array    — pre-loaded list: { id, materialName, materialCode?, unitName? }
+ *   onSearch(keyword)     — optional async server search → returns items array.
+ *                           When provided, suggestions come from the backend
+ *                           (debounced) instead of filtering `items` in the browser.
  *   placeholder  string   — default "Tên vật tư"
  *   disabled     boolean  — disables input
  *   className    string   — extra class on wrapper div
@@ -20,11 +23,17 @@ export default function MaterialSearchInput({
   onChange,
   onSelect,
   items = [],
+  onSearch = null,
   placeholder = 'Tên vật tư',
   disabled = false,
   className = '',
   emptyText = 'Không tìm thấy vật tư',
 }) {
+  const [remoteItems, setRemoteItems] = useState([]);
+  const [searching, setSearching] = useState(false);
+  // Keep latest onSearch in a ref so an inline prop doesn't retrigger the effect.
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
   const instanceId = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -34,8 +43,27 @@ export default function MaterialSearchInput({
   const [isOpen, setIsOpen] = useState(false);
   const [style, setStyle] = useState({});
 
-  // Filter items based on current value
+  // Server-side search (debounced) when onSearch is provided.
+  useEffect(() => {
+    if (!onSearchRef.current || !isOpen) return undefined;
+    let active = true;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await onSearchRef.current(value || '');
+        if (active) setRemoteItems(Array.isArray(res) ? res : []);
+      } catch {
+        if (active) setRemoteItems([]);
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 250);
+    return () => { active = false; clearTimeout(t); };
+  }, [value, isOpen]);
+
+  // Suggestions: backend results when onSearch is set, else client-side filter of `items`.
   const filtered = (() => {
+    if (onSearch) return remoteItems.filter(m => m && m.id).slice(0, 10);
     const validItems = items.filter(m => m && m.id);
     if (!value?.trim()) return validItems.slice(0, 10);
     const terms = value.toLowerCase().trim().split(/\s+/);
@@ -120,7 +148,7 @@ export default function MaterialSearchInput({
                   {item.materialCode && <span className="msi-item-code">{item.materialCode}</span>}
                 </div>
               ))
-            : <div className="msi-empty">{emptyText}</div>
+            : <div className="msi-empty">{onSearch && searching ? 'Đang tìm...' : emptyText}</div>
           }
         </div>,
         document.body

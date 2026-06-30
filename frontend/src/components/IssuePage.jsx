@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { createPortal } from "react-dom";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./IssuePage.css";
 
@@ -32,17 +33,6 @@ function fmtDate(s) {
   if (!s) return "—";
   const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
-}
-
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
 }
 
 function fmtDateTime(s) {
@@ -158,7 +148,6 @@ function normalizeIneligibleRow(x) {
 export default function IssuePage() {
   const HISTORY_LIMIT = 20;
   const ELIGIBLE_PAGE_SIZE = 10;
-  const ELIGIBLE_FETCH_LIMIT = 200;
 
   // -------- Current user (thủ kho) ----------
   const [currentUser, setCurrentUser] = useState(null);
@@ -291,7 +280,12 @@ export default function IssuePage() {
   };
 
   // ------------------ load list ------------------
-  const loadEligibleList = async () => {
+  const loadEligibleList = async (
+    dept = departmentSearch,
+    sub = subDepartmentSearch,
+    ePage = eligiblePage,
+    iPage = ineligiblePage
+  ) => {
     if (!currentUser?.id) {
       setListMsg({ type: "error", text: "Chưa xác định được tài khoản đang dùng." });
       return;
@@ -302,7 +296,12 @@ export default function IssuePage() {
 
     try {
       const params = new URLSearchParams();
-      params.set("limit", String(ELIGIBLE_FETCH_LIMIT));
+      // Lọc + phân trang ở backend.
+      params.set("pageSize", String(ELIGIBLE_PAGE_SIZE));
+      params.set("eligiblePage", String(ePage));
+      params.set("ineligiblePage", String(iPage));
+      if (dept && dept.trim()) params.set("deptKeyword", dept.trim());
+      if (sub && sub.trim()) params.set("subDeptKeyword", sub.trim());
 
       // ưu tiên endpoint có reasons
       const url = `${API_ENDPOINTS.ISSUES}/eligible-requests-with-reasons?${params.toString()}`;
@@ -321,8 +320,6 @@ export default function IssuePage() {
       setEligible(norm.eligible);
       setIneligible(norm.ineligible);
       if (!norm.ineligible.length) setShowIneligible(false);
-      setEligiblePage(0);
-      setIneligiblePage(0);
       setSummary(norm.summary);
 
       setListMsg({
@@ -355,10 +352,15 @@ export default function IssuePage() {
     }
   };
 
+  // Lọc khoa/bộ môn + phân trang ở backend; debounce theo từ khóa/trang.
   useEffect(() => {
-    if (currentUser?.id) loadEligibleList();
+    if (!currentUser?.id) return undefined;
+    const t = setTimeout(() => {
+      loadEligibleList(departmentSearch, subDepartmentSearch, eligiblePage, ineligiblePage);
+    }, 250);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]);
+  }, [currentUser?.id, departmentSearch, subDepartmentSearch, eligiblePage, ineligiblePage]);
 
   // ------------------ select & preview ------------------
   const loadPreview = async (req) => {
@@ -410,22 +412,10 @@ export default function IssuePage() {
     setCreatedIssueId(null);
   };
 
-  const filteredEligible = useMemo(() => {
-    const dept = departmentSearch.trim().toLowerCase();
-    const sub = subDepartmentSearch.trim().toLowerCase();
-    return eligible.filter((r) => {
-      if (dept && !safeStr(r.departmentName).toLowerCase().includes(dept)) return false;
-      if (sub && !safeStr(r.subDepartmentName).toLowerCase().includes(sub)) return false;
-      return true;
-    });
-  }, [eligible, departmentSearch, subDepartmentSearch]);
-
-  const eligibleTotalPages = Math.max(1, Math.ceil(filteredEligible.length / ELIGIBLE_PAGE_SIZE));
+  // Đã lọc theo khoa/bộ môn + phân trang ở backend.
+  const filteredEligible = eligible;
+  const eligibleTotalPages = Math.max(1, Number(summary?.eligibleTotalPages ?? 1));
   const safeEligiblePage = Math.min(eligiblePage, eligibleTotalPages - 1);
-  const pagedEligible = filteredEligible.slice(
-    safeEligiblePage * ELIGIBLE_PAGE_SIZE,
-    safeEligiblePage * ELIGIBLE_PAGE_SIZE + ELIGIBLE_PAGE_SIZE
-  );
 
   const previewLines = useMemo(() => {
     const lines = previewData?.lines || [];
@@ -618,7 +608,7 @@ export default function IssuePage() {
     return { list, currentPage, totalPages };
   }
 
-  async function loadHistory(page = 0) {
+  async function loadHistory(page = 0, kw = historySearch) {
     if (!currentUser?.id) return;
 
     setHistoryErr("");
@@ -629,6 +619,7 @@ export default function IssuePage() {
       const qs = new URLSearchParams();
       qs.set("limit", String(HISTORY_LIMIT));
       qs.set("page", String(nextPage));
+      if (kw && kw.trim()) qs.set("keyword", kw.trim());
 
       const { ok, status, data } = await fetchJson(`${API_ENDPOINTS.ISSUES}/feed?${qs.toString()}`, {
         headers: authHeaders,
@@ -815,45 +806,23 @@ export default function IssuePage() {
     return { ok: total > 0, total };
   };
 
+  // Tải lịch sử (lọc keyword + phân trang ở backend); debounce theo từ khóa.
   useEffect(() => {
-    if (activeTab === "history" && currentUser?.id && historyItems.length === 0 && !historyLoading) {
-      loadHistory(0);
-    }
+    if (activeTab !== "history" || !currentUser?.id) return undefined;
+    const t = setTimeout(() => loadHistory(0, historySearch), 300);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, currentUser?.id]);
+  }, [activeTab, currentUser?.id, historySearch]);
 
-  const filteredHistory = useMemo(() => {
-    const search = String(historySearch || "").trim().toLowerCase();
-    if (!search) return historyItems;
-
-    return historyItems.filter((item) => {
-      const id = String(item?.id ?? "").toLowerCase();
-      const issueReqId = String(item?.issueReqId ?? "").toLowerCase();
-      const receiver = cleanReceiverName(item?.receiverName).toLowerCase();
-      const dept = String(item?.departmentName ?? "").toLowerCase();
-      const subDept = String(item?.subDepartmentName ?? "").toLowerCase();
-      const creator = String(item?.createdByName ?? "").toLowerCase();
-      const date = String(item?.issueDate ?? "").toLowerCase();
-      return (
-        id.includes(search) ||
-        issueReqId.includes(search) ||
-        receiver.includes(search) ||
-        dept.includes(search) ||
-        subDept.includes(search) ||
-        creator.includes(search) ||
-        date.includes(search)
-      );
-    });
-  }, [historyItems, historySearch]);
+  // Dữ liệu đã được lọc + phân trang ở backend.
+  const filteredHistory = historyItems;
 
   const ineligibleCount = Number(summary?.ineligible ?? ineligible.length);
   const hasIneligible = ineligibleCount > 0;
-  const ineligibleTotalPages = Math.max(1, Math.ceil(ineligible.length / ELIGIBLE_PAGE_SIZE));
+  // Phân trang ở backend.
+  const ineligibleTotalPages = Math.max(1, Number(summary?.ineligibleTotalPages ?? 1));
   const safeIneligiblePage = Math.min(ineligiblePage, ineligibleTotalPages - 1);
-  const pagedIneligible = ineligible.slice(
-    safeIneligiblePage * ELIGIBLE_PAGE_SIZE,
-    safeIneligiblePage * ELIGIBLE_PAGE_SIZE + ELIGIBLE_PAGE_SIZE
-  );
+  const pagedIneligible = ineligible;
 
   if (bootError) {
     return (
@@ -872,229 +841,95 @@ export default function IssuePage() {
 
   return (
     <div className="ui-page issue-page">
-      <div className="ui-page-frame">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">Xuất kho</h1>
-          </div>
+      <div className="ui-page-stack">
+        <div className="ui-screen-head">
+          <div className="ui-eyebrow">Xuất kho</div>
+          <h1 className="ui-screen-title">Xuất kho theo phiếu xin lĩnh</h1>
+        </div>
 
-          <div className="ui-tabs" style={{ marginBottom: 0 }}>
-            <button
-              type="button"
-              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("create")}
-            >
-              Tạo phiếu xuất
-            </button>
-            <button
-              type="button"
-              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("history")}
-            >
-              Lịch sử phiếu xuất
-            </button>
+        <div className="ui-stat-grid">
+          <div className="ui-stat-card is-success">
+            <p className="ui-stat-value">{summary?.checked ?? (eligible.length + ineligible.length)}</p>
+            <p className="ui-stat-label">Đã xét duyệt</p>
           </div>
+          <div className="ui-stat-card is-primary">
+            <p className="ui-stat-value">{summary?.eligible ?? eligible.length}</p>
+            <p className="ui-stat-label">Đủ điều kiện xuất</p>
+          </div>
+          <div className="ui-stat-card is-warning">
+            <p className="ui-stat-value">{summary?.ineligible ?? ineligible.length}</p>
+            <p className="ui-stat-label">Không đủ điều kiện</p>
+          </div>
+        </div>
+
+        <div className="ui-segment">
+          <button
+            type="button"
+            className={`ui-segment-btn ${activeTab === "create" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("create")}
+          >
+            Tạo phiếu xuất
+          </button>
+          <button
+            type="button"
+            className={`ui-segment-btn ${activeTab === "history" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("history")}
+          >
+            Lịch sử
+          </button>
         </div>
 
         <div className="issue-stack">
           {activeTab === "create" ? (
             <div className="ui-section">
-      {/* DANH SÁCH PHIẾU ĐỦ ĐIỀU KIỆN */}
-        <div className="ui-section-head">
-          <h2 className="ui-section-title">Phiếu xin lĩnh đủ điều kiện xuất</h2>
-          <div className="issue-inline-actions">
-            <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={loadEligibleList} disabled={loadingList}>
-              {loadingList ? "Đang tải..." : "Tải lại"}
-            </button>
-          </div>
-        </div>
+              <h3 className="ui-section-title issue-card-title">Phiếu đủ điều kiện xuất</h3>
+              {listMsg.text && listMsg.type === "error" ? (
+                <div className="ui-alert is-error">{listMsg.text}</div>
+              ) : null}
 
-        {listMsg.text ? (
-          <div className={`ui-alert ${listMsg.type === "error" ? "is-error" : "is-success"}`}>{listMsg.text}</div>
-        ) : null}
-
-        <div className="issue-filter-grid">
-          <div className="ui-field">
-            <label className="ui-label">Khoa / Phòng</label>
-            <input
-              className="ui-input"
-              value={departmentSearch}
-              onChange={(e) => {
-                setDepartmentSearch(e.target.value);
-                setEligiblePage(0);
-              }}
-              placeholder="Tìm theo tên khoa..."
-            />
-          </div>
-
-          <div className="ui-field">
-            <label className="ui-label">Bộ môn</label>
-            <input
-              className="ui-input"
-              value={subDepartmentSearch}
-              onChange={(e) => {
-                setSubDepartmentSearch(e.target.value);
-                setEligiblePage(0);
-              }}
-              placeholder="Tìm theo tên bộ môn..."
-            />
-          </div>
-        </div>
-
-        {pagedEligible.length ? (
-          <div className="ui-table-wrap">
-            <table className="ui-table issue-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 90 }}>Mã phiếu</th>
-                  <th style={{ minWidth: 220 }}>Bộ môn / Đơn vị</th>
-                  <th style={{ minWidth: 220 }}>Khoa / Phòng</th>
-                  <th style={{ minWidth: 190 }}>Người tạo</th>
-                  <th style={{ minWidth: 190 }}>Ngày gửi</th>
-                  <th style={{ minWidth: 320 }}>Ghi chú</th>
-                  <th style={{ width: 150 }} className="text-right">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedEligible.map((r) => (
-                  <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
-                    <td data-label="Mã phiếu" className="issue-mono">{r.id}</td>
-                    <td data-label="Bộ môn / Đơn vị">{r.subDepartmentName || "-"}</td>
-                    <td data-label="Khoa / Phòng">{r.departmentName || "-"}</td>
-                    <td data-label="Người tạo">{r.createdByName || "-"}</td>
-                    <td data-label="Ngày gửi" className="issue-mono">{fmtDateTime(r.requestedAt)}</td>
-                    <td data-label="Ghi chú" className="issue-muted">{r.note || ""}</td>
-                    <td className="text-right">
-                      <button
-                        className="ui-btn ui-btn-primary ui-btn-sm"
-                        onClick={() => loadPreview(r)}
-                        disabled={loadingPreview && selected?.id === r.id}
-                      >
-                        {loadingPreview && selected?.id === r.id ? "Đang tải..." : "Xem trước"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="issue-empty-panel">
-            <h3>{eligible.length === 0 ? "Không có phiếu sẵn sàng xuất kho" : "Không có phiếu khớp bộ lọc"}</h3>
-            <p>
-              {eligible.length === 0
-                ? "Các phiếu đã xét hiện đều đã xuất kho hoặc chưa đủ điều kiện nghiệp vụ để đưa vào danh sách xuất."
-                : "Thử đổi bộ lọc khoa/phòng hoặc bộ môn để xem phiếu khác."}
-            </p>
-          </div>
-        )}
-
-        <div className="ui-pagination" aria-label="Phân trang phiếu đủ điều kiện xuất">
-          <button
-            type="button"
-            className="ui-pagination-btn"
-            onClick={() => setEligiblePage((page) => Math.max(0, page - 1))}
-            disabled={loadingList || safeEligiblePage <= 0}
-          >
-            Trang trước
-          </button>
-
-          {visiblePageNumbers(eligibleTotalPages, safeEligiblePage).map((page) => (
-            <button
-              key={page}
-              type="button"
-              className={`ui-pagination-btn ${page === safeEligiblePage ? "is-active" : ""}`}
-              onClick={() => setEligiblePage(page)}
-              disabled={loadingList || page === safeEligiblePage}
-            >
-              {page + 1}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            className="ui-pagination-btn"
-            onClick={() => setEligiblePage((page) => Math.min(eligibleTotalPages - 1, page + 1))}
-            disabled={loadingList || safeEligiblePage >= eligibleTotalPages - 1}
-          >
-            Trang sau
-          </button>
-        </div>
-
-        {hasIneligible ? (
-          <div className="issue-toggle-row">
-            <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => setShowIneligible((p) => !p)}>
-              {showIneligible ? "Ẩn phiếu không đủ điều kiện" : "Xem phiếu không đủ điều kiện"}
-            </button>
-          </div>
-        ) : null}
-
-        {hasIneligible && showIneligible ? (
-          <div className="issue-collapse-box">
-            <div className="issue-collapse-title">Phiếu không đủ điều kiện (tóm tắt lý do)</div>
-            <div className="ui-table-wrap">
-              <table className="ui-table issue-table issue-table-sm">
-                <thead>
-                  <tr>
-                    <th style={{ width: 90 }}>Mã phiếu</th>
-                    <th style={{ minWidth: 190 }}>Ngày gửi</th>
-                    <th style={{ minWidth: 420 }}>Lý do</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedIneligible.map((raw, idx) => {
-                    const x = normalizeIneligibleRow(raw);
-                    const reasonText = vnReason(x.reasonCode);
-                    const rowIndex = safeIneligiblePage * ELIGIBLE_PAGE_SIZE + idx;
-                    return (
-                      <tr key={`${x.reqId}-${rowIndex}`}>
-                        <td data-label="Mã phiếu" className="issue-mono">{x.reqId}</td>
-                        <td data-label="Ngày gửi" className="issue-mono">{fmtDateTime(x.requestedAt)}</td>
-                        <td data-label="Lý do" className="issue-muted">
-                          {reasonText}
-                          {x.reasonMessage ? <div style={{ marginTop: 6 }}>{x.reasonMessage}</div> : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="ui-pagination" aria-label="Phân trang phiếu không đủ điều kiện">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setIneligiblePage((page) => Math.max(0, page - 1))}
-                disabled={loadingList || safeIneligiblePage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(ineligibleTotalPages, safeIneligiblePage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === safeIneligiblePage ? "is-active" : ""}`}
-                  onClick={() => setIneligiblePage(page)}
-                  disabled={loadingList || page === safeIneligiblePage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => setIneligiblePage((page) => Math.min(ineligibleTotalPages - 1, page + 1))}
-                disabled={loadingList || safeIneligiblePage >= ineligibleTotalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
-          </div>
-        ) : null}
+              {filteredEligible.length ? (
+                <div className="ui-table-wrap">
+                  <table className="ui-table issue-table issue-eligible-table">
+                    <tbody>
+                      {filteredEligible.map((r) => {
+                        const count = r.materialTypeCount ?? r.itemCount ?? r.count ?? (Array.isArray(r.details) ? r.details.length : null);
+                        return (
+                          <tr key={r.id} className={selected?.id === r.id ? "row-active" : ""}>
+                            <td data-label="Mã phiếu" className="issue-mono" style={{ width: 120 }}>{r.id}</td>
+                            <td data-label="Khoa / Phòng">
+                              <div className="issue-cell-main">{r.departmentName || "-"}</div>
+                              <div className="issue-cell-sub">{r.subDepartmentName || ""}</div>
+                            </td>
+                            <td data-label="Số loại vật tư" className="issue-muted">{count != null ? `${count} loại` : ""}</td>
+                            <td data-label="Trạng thái"><span className="ui-status-badge is-approved">Đủ điều kiện</span></td>
+                            <td className="text-right">
+                              <button
+                                className="ui-btn ui-btn-primary ui-btn-sm"
+                                onClick={() => loadPreview(r)}
+                                disabled={loadingPreview && selected?.id === r.id}
+                              >
+                                {loadingPreview && selected?.id === r.id ? "Đang tải..." : "Tạo phiếu xuất"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <Pagination
+                    page={safeEligiblePage}
+                    totalPages={eligibleTotalPages}
+                    onChange={setEligiblePage}
+                    disabled={loadingList}
+                    ariaLabel="Phân trang phiếu đủ điều kiện xuất"
+                  />
+                </div>
+              ) : (
+                <div className="issue-empty-panel">
+                  <h3>Chưa có phiếu sẵn sàng xuất kho</h3>
+                  <p>Các phiếu đã duyệt và đủ tồn kho sẽ hiển thị ở đây.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="ui-section">
@@ -1117,7 +952,7 @@ export default function IssuePage() {
                 <div className="issue-actions">
                   <button
                     type="button"
-                    className="ui-btn ui-btn-secondary"
+                    className="ui-btn ui-btn-light"
                     onClick={() => loadHistory(historyPage)}
                     disabled={historyLoading}
                   >
@@ -1166,7 +1001,7 @@ export default function IssuePage() {
                             <td className="text-center">
                               <button
                                 type="button"
-                                className="ui-btn ui-btn-secondary ui-btn-sm"
+                                className="ui-btn-ghost"
                                 onClick={() => openIssueDetail(id)}
                                 disabled={!id}
                               >
@@ -1187,37 +1022,13 @@ export default function IssuePage() {
                 </table>
               </div>
 
-              <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu xuất">
-                <button
-                  type="button"
-                  className="ui-pagination-btn"
-                  onClick={() => loadHistory(historyPage - 1)}
-                  disabled={historyLoading || historyPage <= 0}
-                >
-                  Trang trước
-                </button>
-
-                {visiblePageNumbers(historyTotalPages, historyPage).map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    className={`ui-pagination-btn ${page === historyPage ? "is-active" : ""}`}
-                    onClick={() => loadHistory(page)}
-                    disabled={historyLoading || page === historyPage}
-                  >
-                    {page + 1}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  className="ui-pagination-btn"
-                  onClick={() => loadHistory(historyPage + 1)}
-                  disabled={historyLoading || historyPage >= historyTotalPages - 1}
-                >
-                  Trang sau
-                </button>
-              </div>
+              <Pagination
+                page={historyPage}
+                totalPages={historyTotalPages}
+                onChange={loadHistory}
+                disabled={historyLoading}
+                ariaLabel="Phân trang lịch sử phiếu xuất"
+              />
             </div>
           )}
         </div>

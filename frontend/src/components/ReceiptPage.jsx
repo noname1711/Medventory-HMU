@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { createPortal } from "react-dom";
+import Pagination from "./Pagination";
 import "./dashboard-ui.css";
 import "./ReceiptPage.css";
 
@@ -17,17 +18,6 @@ function fmtDate(s) {
   if (!s) return "—";
   const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
-}
-
-function visiblePageNumbers(totalPages, currentPage) {
-  const total = Math.max(1, Number(totalPages) || 1);
-  const current = Math.min(Math.max(0, Number(currentPage) || 0), total - 1);
-  const start = Math.max(0, current - 2);
-  const end = Math.min(total - 1, start + 4);
-  const adjustedStart = Math.max(0, end - 4);
-  const pages = [];
-  for (let i = adjustedStart; i <= end; i += 1) pages.push(i);
-  return pages;
 }
 
 function toNumber(value) {
@@ -261,11 +251,13 @@ export default function ReceiptPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "history") return;
-    if (!currentUser?.id) return;
-    loadHistory(0);
+    if (activeTab !== "history") return undefined;
+    if (!currentUser?.id) return undefined;
+    // Debounce theo từ khóa; tải lại từ trang 0 khi đổi keyword.
+    const t = setTimeout(() => loadHistory(0, historySearch), 300);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, currentUser?.id]);
+  }, [activeTab, currentUser?.id, historySearch]);
 
   async function fetchMaterials(keyword) {
     const q = (keyword || "").trim();
@@ -561,7 +553,7 @@ export default function ReceiptPage() {
     return { list: filtered, currentPage, totalPages };
   }
 
-  async function loadHistory(page = 0) {
+  async function loadHistory(page = 0, kw = historySearch) {
     if (!currentUser?.id) return;
 
     setHistoryErr("");
@@ -572,6 +564,7 @@ export default function ReceiptPage() {
       const qs = new URLSearchParams();
       qs.set("limit", String(HISTORY_LIMIT));
       qs.set("page", String(nextPage));
+      if (kw && kw.trim()) qs.set("keyword", kw.trim());
 
       const res = await fetch(`${API_ENDPOINTS.RECEIPTS}/feed?${qs.toString()}`, {
         headers: { "X-User-Id": String(currentUser.id) },
@@ -713,41 +706,31 @@ export default function ReceiptPage() {
     }
   }
 
-  const filteredHistory = useMemo(() => {
-    const search = String(historySearch || "").trim().toLowerCase();
-    if (!search) return historyItems;
-
-    return historyItems.filter((item) => {
-      const id = String(item?.id ?? "").toLowerCase();
-      const from = String(item?.receivedFrom ?? item?.received_from ?? "").toLowerCase();
-      const reason = String(item?.reason ?? "").toLowerCase();
-      const date = String(item?.receiptDate ?? item?.receipt_date ?? "").toLowerCase();
-      return id.includes(search) || from.includes(search) || reason.includes(search) || date.includes(search);
-    });
-  }, [historyItems, historySearch]);
+  // Dữ liệu đã được lọc (keyword) + phân trang ở backend.
+  const filteredHistory = historyItems;
 
   return (
     <div className="ui-page receipt-page">
-      <div className="ui-page-frame">
-        <div className="ui-page-head">
-          <div>
-            <h1 className="ui-page-title">Nhập kho</h1>
+      <div className="ui-page-stack">
+        <div className="ui-screen-bar">
+          <div className="ui-screen-head">
+            <div className="ui-eyebrow">Nhập kho</div>
+            <h1 className="ui-screen-title">Tạo phiếu nhập kho</h1>
           </div>
-
-          <div className="ui-tabs" style={{ marginBottom: 0 }}>
+          <div className="ui-segment">
             <button
               type="button"
-              className={`ui-tab ${activeTab === "create" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "create" ? "is-active" : ""}`}
               onClick={() => setActiveTab("create")}
             >
-              Tạo phiếu nhập
+              Tạo phiếu
             </button>
             <button
               type="button"
-              className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`}
+              className={`ui-segment-btn ${activeTab === "history" ? "is-active" : ""}`}
               onClick={() => setActiveTab("history")}
             >
-              Lịch sử phiếu nhập
+              Lịch sử
             </button>
           </div>
         </div>
@@ -759,13 +742,8 @@ export default function ReceiptPage() {
         ) : null}
 
         {activeTab === "create" ? (
-          <div className="receipt-stack">
-            <div className="ui-section">
-              <div className="ui-section-head">
-                <div>
-                  <h2 className="ui-section-title">Thông tin phiếu nhập</h2>
-                </div>
-              </div>
+          <div className="ui-section receipt-card">
+              <h3 className="ui-section-title receipt-subhead">Thông tin phiếu nhập</h3>
 
               <div className="receipt-header-grid">
                 <div className="ui-field">
@@ -798,14 +776,8 @@ export default function ReceiptPage() {
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="ui-section">
-              <div className="ui-section-head">
-                <div>
-                  <h2 className="ui-section-title">Danh sách vật tư nhập</h2>
-                </div>
-              </div>
+              <h3 className="ui-section-title receipt-subhead2">Danh sách vật tư nhập</h3>
 
               {(duplicateNames.size > 0 || duplicateCodes.size > 0) && (
                 <div className="ui-alert is-warning receipt-duplicate-alert">
@@ -831,7 +803,7 @@ export default function ReceiptPage() {
                       <th style={{ minWidth: 120 }}>Ngày SX</th>
                       <th style={{ minWidth: 120 }}>Hạn dùng</th>
                       <th style={{ minWidth: 110 }} className="text-right">Thành tiền</th>
-                      <th style={{ width: 72 }} className="text-center">Xóa</th>
+                      <th style={{ width: 56 }} className="text-center"></th>
                     </tr>
                   </thead>
 
@@ -933,11 +905,12 @@ export default function ReceiptPage() {
                           <td className="text-center">
                             <button
                               type="button"
-                              className="ui-btn ui-btn-danger ui-btn-sm"
+                              className="ui-remove-btn"
                               onClick={() => removeRow(row.key)}
                               disabled={rows.length <= 1}
+                              title="Xóa dòng"
                             >
-                              Xóa
+                              ✕
                             </button>
                           </td>
                         </tr>
@@ -949,8 +922,8 @@ export default function ReceiptPage() {
 
               {/* Hàng phụ: thêm dòng (hành động nhỏ, nằm sát bảng) */}
               <div className="receipt-add-row-bar">
-                <button type="button" className="ui-btn ui-btn-secondary ui-btn-sm" onClick={addRow}>
-                  + Thêm dòng
+                <button type="button" className="ui-add-dashed" onClick={addRow}>
+                  ＋ Thêm dòng
                 </button>
               </div>
 
@@ -963,7 +936,7 @@ export default function ReceiptPage() {
                 <div className="receipt-primary-actions">
                   <button
                     type="button"
-                    className="ui-btn ui-btn-secondary"
+                    className="ui-btn ui-btn-light"
                     onClick={() => {
                       setHeader({ receivedFrom: "", reason: "", receiptDate: todayISO() });
                       setRows([makeRow()]);
@@ -983,7 +956,6 @@ export default function ReceiptPage() {
                   </button>
                 </div>
               </div>
-            </div>
           </div>
         ) : (
           <div className="ui-section">
@@ -1006,7 +978,7 @@ export default function ReceiptPage() {
               <div className="receipt-actions">
                 <button
                   type="button"
-                  className="ui-btn ui-btn-secondary"
+                  className="ui-btn ui-btn-light"
                   onClick={() => loadHistory(historyPage)}
                   disabled={historyLoading}
                 >
@@ -1026,10 +998,9 @@ export default function ReceiptPage() {
                     <th style={{ minWidth: 260 }}>Nhà cung cấp / người giao</th>
                     <th style={{ minWidth: 260 }}>Lý do</th>
                     <th style={{ minWidth: 140 }} className="text-right">Tổng tiền</th>
-                    <th style={{ width: 120 }} className="text-center">Thao tác</th>
+                    <th style={{ width: 100 }} className="text-right">Thao tác</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {filteredHistory.length > 0 ? (
                     filteredHistory.map((item) => {
@@ -1038,18 +1009,17 @@ export default function ReceiptPage() {
                       const from = item?.receivedFrom ?? item?.received_from ?? "";
                       const reason = item?.reason ?? "";
                       const total = item?.totalAmount ?? item?.total_amount ?? 0;
-
                       return (
                         <tr key={id ?? Math.random()}>
-                          <td data-label="Mã phiếu">#{id}</td>
+                          <td data-label="Mã phiếu"><span className="ui-mono">#{id}</span></td>
                           <td data-label="Ngày nhập">{date}</td>
                           <td data-label="Nhà cung cấp">{from}</td>
                           <td data-label="Lý do">{reason}</td>
                           <td className="text-right" data-label="Tổng tiền">{moneyFmt.format(total)}</td>
-                          <td className="text-center">
+                          <td className="text-right">
                             <button
                               type="button"
-                              className="ui-btn ui-btn-secondary ui-btn-sm"
+                              className="ui-btn-ghost"
                               onClick={() => openReceiptDetail(id)}
                               disabled={!id}
                             >
@@ -1070,37 +1040,13 @@ export default function ReceiptPage() {
               </table>
             </div>
 
-            <div className="ui-pagination" aria-label="Phân trang lịch sử phiếu nhập">
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => loadHistory(historyPage - 1)}
-                disabled={historyLoading || historyPage <= 0}
-              >
-                Trang trước
-              </button>
-
-              {visiblePageNumbers(historyTotalPages, historyPage).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`ui-pagination-btn ${page === historyPage ? "is-active" : ""}`}
-                  onClick={() => loadHistory(page)}
-                  disabled={historyLoading || page === historyPage}
-                >
-                  {page + 1}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="ui-pagination-btn"
-                onClick={() => loadHistory(historyPage + 1)}
-                disabled={historyLoading || historyPage >= historyTotalPages - 1}
-              >
-                Trang sau
-              </button>
-            </div>
+            <Pagination
+              page={historyPage}
+              totalPages={historyTotalPages}
+              onChange={loadHistory}
+              disabled={historyLoading}
+              ariaLabel="Phân trang lịch sử phiếu nhập"
+            />
           </div>
         )}
       </div>

@@ -13,6 +13,11 @@ public class IssueReqListResponseDTO {
     private Integer approvedCount;
     private Integer rejectedCount;
 
+    // Phân trang (cho danh sách của cán bộ — lọc + phân trang ở backend)
+    private Integer page;
+    private Integer totalPages;
+    private Long filteredCount;
+
     public IssueReqListResponseDTO(boolean success, String message, List<IssueReqHeaderDTO> requests,
                                    Long totalCount, Integer pendingCount, Integer approvedCount, Integer rejectedCount) {
         this.success = success;

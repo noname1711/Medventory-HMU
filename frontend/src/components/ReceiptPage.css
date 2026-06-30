@@ -8,6 +8,11 @@
   width: 100%;
 }
 
+/* Merged single-card create form (prototype "one canvas") */
+.receipt-card { padding: 22px 24px; }
+.receipt-subhead { margin-bottom: 14px; }
+.receipt-subhead2 { margin: 22px 0 12px; }
+
 .receipt-stack {
   display: flex;
   flex-direction: column;

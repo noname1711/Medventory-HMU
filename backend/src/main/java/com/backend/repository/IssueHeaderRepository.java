@@ -1,6 +1,7 @@
 package com.backend.repository;
 
 import com.backend.entity.IssueHeader;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,4 +19,11 @@ public interface IssueHeaderRepository extends JpaRepository<IssueHeader, Long> 
     Optional<IssueHeader> findByIssueReqId(Long issueReqId);
 
     List<IssueHeader> findByIdLessThanOrderByIdDesc(Long beforeId, Pageable pageable);
+
+    /** Tìm phiếu xuất theo mã / người nhận / khoa / ngày (lọc ở DB, có phân trang). */
+    @Query("SELECT h FROM IssueHeader h LEFT JOIN h.department d WHERE "
+            + "CAST(h.id AS string) LIKE CONCAT('%', :kw, '%') "
+            + "OR LOWER(COALESCE(h.receiverName, '')) LIKE CONCAT('%', :kw, '%') "
+            + "OR LOWER(COALESCE(d.name, '')) LIKE CONCAT('%', :kw, '%')")
+    Page<IssueHeader> searchByKeyword(@Param("kw") String kw, Pageable pageable);
 }

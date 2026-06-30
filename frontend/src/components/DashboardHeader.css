@@ -21,16 +21,26 @@
 ========================= */
 .dh-header {
   background: var(--dh-white);
-  border-bottom: 4px solid var(--dh-blue);
-  box-shadow: var(--dh-shadow-soft);
+  border-bottom: 1px solid #e7ebf2;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.dh-stripe {
+  height: 4px;
+  background: linear-gradient(90deg, #1e40af, #3b62d6 60%, #1e40af);
 }
 
 .dh-inner {
+  max-width: 1280px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 14px 20px;
+  padding: 0 28px;
+  height: 70px;
 }
 
 /* LEFT */
@@ -42,12 +52,12 @@
 }
 
 .dh-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
   overflow: hidden;
-  background: var(--dh-white);
-  border: 1px solid var(--dh-border);
+  background: #fff;
+  border: 1px solid #e7ebf2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -67,9 +77,10 @@
 
 .dh-brand h1 {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: var(--dh-text);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f1c3f;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,9 +88,9 @@
 
 .dh-sub {
   margin: 2px 0 0;
-  color: var(--dh-blue);
-  font-weight: 700;
-  font-size: 0.875rem;
+  color: #1e40af;
+  font-weight: 500;
+  font-size: 0.78rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -97,23 +108,29 @@
 ========================= */
 .dh-noti {
   position: relative;
+  /* Stretch to the row height so the button's border lines up with the user box. */
+  align-self: stretch;
+  display: flex;
+  align-items: stretch;
 }
 
 .dh-noti-btn {
-  width: 54px;
-  height: 54px;
-  border-radius: 10px;
+  position: relative;
+  width: 52px;
+  border-radius: 12px;
   border: 1px solid var(--dh-border);
   background: var(--dh-white);
+  color: #475569;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.08s ease, border-color 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.08s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .dh-noti-btn:hover {
   border-color: #d1d5db;
+  color: var(--dh-blue);
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.08);
 }
 
@@ -122,26 +139,24 @@
 }
 
 .dh-noti-icon {
-  font-size: 24px;
-  line-height: 1;
+  display: block;
 }
 
 .dh-noti-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  top: 7px;
+  right: 8px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
   border-radius: 999px;
   background: #ef4444;
   color: #fff;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
 }
 
 .dh-noti-panel {
@@ -152,7 +167,7 @@
   max-width: min(92vw, 360px);
   background: var(--dh-white);
   border-radius: 14px;
-  box-shadow: var(--dh-shadow);
+  box-shadow: 0 20px 50px -15px rgba(15, 23, 42, 0.3);
   border: 1px solid var(--dh-border);
   overflow: hidden;
   z-index: 1100;
@@ -164,13 +179,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 14px 14px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-bottom: 1px solid var(--dh-border-soft);
+  padding: 14px 16px;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .dh-noti-title {
-  font-weight: 800;
+  font-weight: 700;
   color: var(--dh-text);
   font-size: 14px;
 }
@@ -179,27 +193,27 @@
   border: none;
   background: transparent;
   color: var(--dh-blue);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 10px;
+  padding: 0;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .dh-noti-mark-all:hover {
-  background: #eff6ff;
+  opacity: 0.75;
 }
 
 .dh-noti-content {
-  max-height: 380px;
-  overflow: auto;
+  max-height: 340px;
+  overflow-y: auto;
 }
 
 .dh-noti-empty {
-  padding: 14px;
+  padding: 18px 16px;
   color: var(--dh-muted);
   font-size: 13px;
+  text-align: center;
 }
 
 .dh-noti-list {
@@ -208,61 +222,77 @@
 }
 
 .dh-noti-item {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--dh-border-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.18s ease;
 }
 
-.dh-noti-item:hover {
-  background: #f8fafc;
+.dh-noti-item:last-child {
+  border-bottom: none;
 }
 
 .dh-noti-item.unread {
-  background: #ffffff;
+  background: #fafcff;
 }
 
 .dh-noti-item.read {
-  opacity: 0.92;
+  background: #ffffff;
 }
 
-.dh-noti-item-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.dh-noti-item-title {
-  font-weight: 700;
-  color: var(--dh-text);
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.dh-noti-item.unread .dh-noti-item-title {
-  font-weight: 900;
+.dh-noti-item:hover {
+  background: #f5f8ff;
 }
 
 .dh-noti-dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
-  background: var(--dh-blue);
-  flex: 0 0 auto;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex: none;
+}
+
+.dh-noti-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dh-noti-item-title {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .dh-noti-item-body {
-  margin-top: 6px;
-  color: #4b5563;
-  font-size: 12px;
-  line-height: 1.4;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
 .dh-noti-item-time {
-  margin-top: 6px;
-  color: #9ca3af;
+  margin-top: 4px;
+  color: #9aa6b8;
   font-size: 11px;
+}
+
+/* Thin scrollbar (prototype .scry) */
+.dh-noti-content.scry {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.dh-noti-content.scry::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dh-noti-content.scry::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
 }
 
 /* =========================
@@ -598,49 +628,57 @@
 }
 
 /* =========================
-   Responsive
+   Responsive — compact single-row header on narrow screens
 ========================= */
 @media (max-width: 768px) {
-  .dh-inner {
-    padding: 12px 14px;
-  }
-
   .dh-usertext {
     display: none;
   }
-
   .dh-dropdown {
     width: 250px;
     right: -8px;
   }
-
   .dh-noti-panel {
     width: 320px;
   }
-
-  .dh-brand h1 {
-    font-size: 1rem;
-  }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
+  /* Keep header as ONE compact row — never wrap/center (that overlaps the nav) */
   .dh-inner {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
+    height: 58px;
+    padding: 0 14px;
+    gap: 8px;
+    flex-wrap: nowrap;
   }
-
-  .dh-left,
+  .dh-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 9px;
+  }
   .dh-right {
-    width: 100%;
-    justify-content: center;
+    flex: 0 0 auto;
+    gap: 8px;
   }
-
   .dh-sub {
     display: none;
   }
-
-  /* Center panels on very small screens */
+  .dh-brand h1 {
+    font-size: 0.92rem;
+  }
+  .dh-logo {
+    width: 34px;
+    height: 34px;
+  }
+  .dh-noti-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .dh-userinfo {
+    padding: 0;
+    border: none;
+    background: none;
+  }
   .dh-noti-panel,
   .dh-dropdown {
     right: 50%;
