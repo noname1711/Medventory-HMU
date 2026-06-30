@@ -52,10 +52,14 @@ export default function DashboardScreen() {
   useEffect(() => {
     if (!user?.id) { setLoadingPerms(false); return; }
     let cancelled = false;
+    let initialDone = false;
 
     async function fetchPerms() {
+      // Only show the full-screen spinner on the very first load.
+      // Background refreshes (interval) silently update permissions
+      // without unmounting the tab screens.
+      if (!initialDone) setLoadingPerms(true);
       try {
-        setLoadingPerms(true);
         const r = await fetch(API_ENDPOINTS.MY_PERMISSIONS, { headers: buildHeaders(user.id) });
         if (!r.ok) { if (!cancelled) setPermCodes([]); return; }
         const d = await r.json();
@@ -64,6 +68,7 @@ export default function DashboardScreen() {
         if (!cancelled) setPermCodes([]);
       } finally {
         if (!cancelled) setLoadingPerms(false);
+        initialDone = true;
       }
     }
 
