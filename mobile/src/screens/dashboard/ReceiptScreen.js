@@ -14,7 +14,7 @@ import { apiGet, apiSend } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import MaterialPicker from '../../components/MaterialPicker';
 import DetailModal from '../../components/DetailModal';
-import { colors, radius, spacing, fontSize } from '../../theme/tokens';
+import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
 import {
   Section,
@@ -45,12 +45,9 @@ function createRow() {
     materialCode: '',
     unitId: '',
     unitName: '',
-    qtyDoc: '',
     qtyActual: '',
     price: '',
     lotNumber: '',
-    mfgDate: '',
-    expDate: '',
     pickerVisible: false,
   };
 }
@@ -195,6 +192,12 @@ export default function ReceiptScreen() {
       return;
     }
 
+    const missingLot = validRows.find((r) => !r.lotNumber.trim());
+    if (missingLot) {
+      Toast.show({ type: 'error', text1: 'Vui lòng nhập số lô cho tất cả vật tư!' });
+      return;
+    }
+
     const payload = {
       receivedFrom: header.receivedFrom.trim(),
       reason: header.reason.trim() || null,
@@ -202,11 +205,9 @@ export default function ReceiptScreen() {
       details: validRows.map((r) => ({
         materialId: r.materialId,
         price: Number(r.price) || 0,
-        qtyDoc: r.qtyDoc !== '' ? Number(r.qtyDoc) : null,
         qtyActual: Number(r.qtyActual),
-        lotNumber: r.lotNumber.trim() || '',
-        mfgDate: r.mfgDate || null,
-        expDate: r.expDate || null,
+        qtyDoc: Number(r.qtyActual),
+        lotNumber: r.lotNumber.trim(),
       })),
     };
 
@@ -360,32 +361,18 @@ export default function ReceiptScreen() {
                   onSelect={(dto) => onPickMaterial(row.key, dto)}
                 />
 
-                {/* Qty Doc + Qty Actual */}
-                <View style={styles.twoCol}>
-                  <View style={styles.colHalf}>
-                    <Field label="SL chứng từ">
-                      <Input
-                        placeholder="0"
-                        value={row.qtyDoc}
-                        onChangeText={(v) => updateRow(row.key, { qtyDoc: v })}
-                        keyboardType="numeric"
-                      />
-                    </Field>
-                  </View>
-                  <View style={styles.colHalf}>
-                    <Field label="SL thực nhập">
-                      <Input
-                        placeholder="0"
-                        value={row.qtyActual}
-                        onChangeText={(v) => updateRow(row.key, { qtyActual: v })}
-                        keyboardType="numeric"
-                      />
-                    </Field>
-                  </View>
-                </View>
+                {/* Qty Actual */}
+                <Field label="Số lượng *">
+                  <Input
+                    placeholder="0"
+                    value={row.qtyActual}
+                    onChangeText={(v) => updateRow(row.key, { qtyActual: v })}
+                    keyboardType="numeric"
+                  />
+                </Field>
 
                 {/* Price */}
-                <Field label="Đơn giá">
+                <Field label="Đơn giá *">
                   <Input
                     placeholder="0"
                     value={row.price}
@@ -394,34 +381,14 @@ export default function ReceiptScreen() {
                   />
                 </Field>
 
-                {/* Lot + Dates */}
-                <Field label="Số lô">
+                {/* Lot */}
+                <Field label="Số lô *">
                   <Input
                     placeholder="Ví dụ: LOT-0125-A"
                     value={row.lotNumber}
                     onChangeText={(v) => updateRow(row.key, { lotNumber: v })}
                   />
                 </Field>
-                <View style={styles.twoCol}>
-                  <View style={styles.colHalf}>
-                    <Field label="Ngày SX">
-                      <Input
-                        placeholder="YYYY-MM-DD"
-                        value={row.mfgDate}
-                        onChangeText={(v) => updateRow(row.key, { mfgDate: v })}
-                      />
-                    </Field>
-                  </View>
-                  <View style={styles.colHalf}>
-                    <Field label="Hạn dùng">
-                      <Input
-                        placeholder="YYYY-MM-DD"
-                        value={row.expDate}
-                        onChangeText={(v) => updateRow(row.key, { expDate: v })}
-                      />
-                    </Field>
-                  </View>
-                </View>
 
                 {/* Row subtotal */}
                 {(Number(row.qtyActual) > 0 && Number(row.price) > 0) && (
@@ -550,9 +517,6 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 32, paddingHorizontal: 10, paddingTop: 14 },
 
   // ── Create rows ──
-  twoCol: { flexDirection: 'row', gap: 8 },
-  colHalf: { flex: 1 },
-
   rowCard: {
     borderWidth: 1,
     borderColor: colors.border,

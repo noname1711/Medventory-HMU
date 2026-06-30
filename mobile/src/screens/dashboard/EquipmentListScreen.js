@@ -10,22 +10,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 import { API_ENDPOINTS } from '../../api/apiConfig';
-import { apiGet } from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import { colors, radius, fontSize } from '../../theme/tokens';
 import { fontFamily } from '../../theme/typography';
-import { Section, StatCard, Field, Input, Button, Badge, Empty, Pagination } from '../../theme/ui';
+import { StatCard, Badge, Empty, Pagination } from '../../theme/ui';
 
-const CATEGORIES = ['A', 'B', 'C', 'D'];
 const PAGE_SIZE = 8;
 
 export default function EquipmentListScreen() {
   const { user } = useAuth();
   const [stockItems, setStockItems] = useState([]);
-  const [units, setUnits] = useState([]);
   const [keyword, setKeyword] = useState('');
   const [matFilter, setMatFilter] = useState('all');
   const [page, setPage] = useState(1); // 1-based ở UI; backend dùng 0-based
@@ -33,25 +29,11 @@ export default function EquipmentListScreen() {
   const [summary, setSummary] = useState({ totalItems: 0, lowStock: 0, outOfStock: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [addLoading, setAddLoading] = useState(false);
-  const [canManageMaterial, setCanManageMaterial] = useState(false);
-  const [form, setForm] = useState({
-    materialCode: '',
-    materialName: '',
-    specification: '',
-    unitId: '',
-    manufacturer: '',
-    category: 'C',
-  });
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await Promise.all([
-        fetchUnits(),
-        fetchStockItems(keyword, matFilter, page),
-        fetchPermissions(),
-      ]);
+      await fetchStockItems(keyword, matFilter, page);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,28 +59,6 @@ export default function EquipmentListScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [keyword, matFilter, page])
   );
-
-  async function fetchPermissions() {
-    if (!user?.id) return;
-    try {
-      const { ok, data } = await apiGet(API_ENDPOINTS.MY_PERMISSIONS, user.id);
-      if (ok && Array.isArray(data?.permissionCodes)) {
-        setCanManageMaterial(data.permissionCodes.includes('MATERIAL.MANAGE'));
-      }
-    } catch {
-      // permission check failed — default to no access (safe)
-    }
-  }
-
-  async function fetchUnits() {
-    try {
-      const res = await fetch(API_ENDPOINTS.UNITS);
-      const data = await res.json();
-      setUnits(Array.isArray(data) ? data : []);
-    } catch {
-      setUnits([]);
-    }
-  }
 
   async function fetchStockItems(kw = keyword, status = matFilter, pageNum = page) {
     try {
@@ -137,30 +97,6 @@ export default function EquipmentListScreen() {
   const lowStock = summary.lowStock;
   const outOfStock = summary.outOfStock;
 
-  const handleAdd = async () => {
-    if (!form.materialCode || !form.materialName || !form.unitId) {
-      Toast.show({ type: 'error', text1: 'Vui lòng điền đủ mã, tên và đơn vị tính!' });
-      return;
-    }
-    setAddLoading(true);
-    try {
-      const res = await fetch(API_ENDPOINTS.MATERIALS, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Không thể thêm vật tư');
-      Toast.show({ type: 'success', text1: 'Thêm vật tư thành công!' });
-      setForm({ materialCode: '', materialName: '', specification: '', unitId: '', manufacturer: '', category: 'C' });
-      fetchStockItems();
-    } catch (e) {
-      Toast.show({ type: 'error', text1: e.message });
-    } finally {
-      setAddLoading(false);
-    }
-  };
-
   const stockVariant = (qty) => {
     const n = Number(qty);
     if (n <= 0) return 'zero';
@@ -190,55 +126,6 @@ export default function EquipmentListScreen() {
           <StatCard variant="warning" label="Sắp hết hàng" value={lowStock} style={styles.statItem} />
           <StatCard variant="danger" label="Hết hàng" value={outOfStock} style={styles.statItem} />
         </View>
-
-        {/* Add material form (web "Thêm vật tư mới" section) — only for Thủ kho (MATERIAL.MANAGE) */}
-        {canManageMaterial && <Section title="Thêm vật tư mới" collapsible defaultOpen={false}>
-          <Field label="Mã vật tư">
-            <Input placeholder="VD: VT001" value={form.materialCode}
-              onChangeText={(v) => setForm((f) => ({ ...f, materialCode: v }))} />
-          </Field>
-          <Field label="Tên vật tư">
-            <Input placeholder="Nhập tên vật tư" value={form.materialName}
-              onChangeText={(v) => setForm((f) => ({ ...f, materialName: v }))} />
-          </Field>
-          <Field label="Quy cách đóng gói">
-            <Input placeholder="VD: Hộp 50 chiếc" value={form.specification}
-              onChangeText={(v) => setForm((f) => ({ ...f, specification: v }))} />
-          </Field>
-          <Field label="Đơn vị tính">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {units.map((u) => {
-                const on = form.unitId === String(u.id);
-                return (
-                  <TouchableOpacity key={u.id} onPress={() => setForm((f) => ({ ...f, unitId: String(u.id) }))}
-                    style={[styles.chip, on && styles.chipActive]}>
-                    <Text style={[styles.chipText, on && styles.chipTextActive]}>{u.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </Field>
-          <Field label="Hãng sản xuất">
-            <Input placeholder="Nhập hãng sản xuất" value={form.manufacturer}
-              onChangeText={(v) => setForm((f) => ({ ...f, manufacturer: v }))} />
-          </Field>
-          <Field label="Phân loại">
-            <View style={styles.chipRowWrap}>
-              {CATEGORIES.map((c) => {
-                const on = form.category === c;
-                return (
-                  <TouchableOpacity key={c} onPress={() => setForm((f) => ({ ...f, category: c }))}
-                    style={[styles.chip, on && styles.chipActive]}>
-                    <Text style={[styles.chipText, on && styles.chipTextActive]}>Loại {c}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </Field>
-          <Button title={addLoading ? '' : 'Thêm vật tư'} onPress={handleAdd} disabled={addLoading}>
-            {addLoading ? <ActivityIndicator color={colors.white} /> : null}
-          </Button>
-        </Section>}
 
         {/* Search with leading icon */}
         <View style={styles.searchBox}>
@@ -345,18 +232,6 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12.5, fontFamily: fontFamily.bold, color: colors.textSoft },
   filterTextActive: { color: colors.white },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
-  chipRow: { gap: 8, paddingVertical: 2 },
-  chipRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: fontSize.base, color: colors.textSoft, fontFamily: fontFamily.medium },
-  chipTextActive: { color: colors.white, fontFamily: fontFamily.bold },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -16,8 +16,7 @@ import ReplenishmentRequestScreen from './ReplenishmentRequestScreen';
 import ReceiptScreen from './ReceiptScreen';
 import IssueScreen from './IssueScreen';
 import ForecastApprovalScreen from './ForecastApprovalScreen';
-import AdminScreen from './AdminScreen';
-import RBACScreen from './RBACScreen';
+
 
 const Tab = createBottomTabNavigator();
 
@@ -30,8 +29,6 @@ const TAB_ICONS = {
   'Nhập kho': 'arrow-down-circle-outline',
   'Xuất kho': 'arrow-up-circle-outline',
   'Duyệt dự trù': 'checkmark-done-circle-outline',
-  'Người dùng': 'people-outline',
-  'Phân quyền': 'shield-checkmark-outline',
 };
 
 function tabIcon(name) {
@@ -47,7 +44,7 @@ function tabLabel(name) {
 }
 
 export default function DashboardScreen() {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [permCodes, setPermCodes] = useState([]);
   const [loadingPerms, setLoadingPerms] = useState(true);
@@ -150,21 +147,7 @@ export default function DashboardScreen() {
           />
         )}
 
-        {(hasPerm('USERS.MANAGE') || isAdmin) && (
-          <Tab.Screen
-            name="Người dùng"
-            component={AdminScreen}
-            options={{ tabBarIcon: tabIcon('Người dùng'), tabBarLabel: tabLabel('Người dùng') }}
-          />
-        )}
 
-        {hasPerm('PERMISSIONS.MANAGE') && (
-          <Tab.Screen
-            name="Phân quyền"
-            component={RBACScreen}
-            options={{ tabBarIcon: tabIcon('Phân quyền'), tabBarLabel: tabLabel('Phân quyền') }}
-          />
-        )}
       </Tab.Navigator>
     </View>
   );
