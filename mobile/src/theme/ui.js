@@ -11,12 +11,12 @@ import { colors, radius, shadow, fontSize } from './tokens';
 import { fontFamily } from './typography';
 
 // ---- Page frame (web .ui-page-frame): the white titled container ----
-export function PageFrame({ children, style }) {
+export const PageFrame = React.memo(function PageFrame({ children, style }) {
   return <View style={[s.pageFrame, style]}>{children}</View>;
-}
+});
 
 // ---- Page / section head (web .ui-page-head / .ui-card-header) ----
-export function PageHead({ title, subtitle, right }) {
+export const PageHead = React.memo(function PageHead({ title, subtitle, right }) {
   return (
     <View style={s.head}>
       <View style={{ flex: 1 }}>
@@ -26,12 +26,13 @@ export function PageHead({ title, subtitle, right }) {
       {right}
     </View>
   );
-}
+});
 
 // ---- Section / card (web .ui-section / .ui-card) ----
 // `collapsible` makes the header tappable to expand/collapse the body.
 export function Section({ title, subtitle, right, collapsible, defaultOpen = true, children, style }) {
   const [open, setOpen] = React.useState(defaultOpen);
+  const toggle = React.useCallback(() => setOpen((o) => !o), []);
   const showBody = collapsible ? open : true;
   const hasHeader = title || right || collapsible;
 
@@ -48,7 +49,7 @@ export function Section({ title, subtitle, right, collapsible, defaultOpen = tru
   return (
     <View style={[s.section, style]}>
       {collapsible ? (
-        <TouchableOpacity activeOpacity={0.7} onPress={() => setOpen((o) => !o)}>{header}</TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.7} onPress={toggle}>{header}</TouchableOpacity>
       ) : header}
       {showBody && children}
     </View>
@@ -56,7 +57,7 @@ export function Section({ title, subtitle, right, collapsible, defaultOpen = tru
 }
 
 // ---- Pagination (mobile list page nav) ----
-export function Pagination({ page, totalPages, onPrev, onNext }) {
+export const Pagination = React.memo(function Pagination({ page, totalPages, onPrev, onNext }) {
   if (totalPages <= 1) return null;
   return (
     <View style={s.pager}>
@@ -71,17 +72,17 @@ export function Pagination({ page, totalPages, onPrev, onNext }) {
       </TouchableOpacity>
     </View>
   );
-}
+});
 
 // ---- Stat card (web .ui-stat-card.is-*) ----
 const STAT_VARIANTS = {
   primary: { border: '#e7ebf2', accent: '#0f1c3f' },
   success: { border: '#e7ebf2', accent: '#15803d' },
   warning: { border: '#fde9c8', accent: '#b45309' },
-  danger: { border: '#fbd5d5', accent: '#b91c1c' },
+  danger:  { border: '#fbd5d5', accent: '#b91c1c' },
   neutral: { border: '#e7ebf2', accent: colors.text },
 };
-export function StatCard({ label, value, note, variant = 'neutral', style }) {
+export const StatCard = React.memo(function StatCard({ label, value, note, variant = 'neutral', style }) {
   const v = STAT_VARIANTS[variant] || STAT_VARIANTS.neutral;
   return (
     <View style={[s.statCard, { borderColor: v.border }, style]}>
@@ -90,10 +91,10 @@ export function StatCard({ label, value, note, variant = 'neutral', style }) {
       {!!note && <Text style={[s.statNote, { color: v.accent }]}>{note}</Text>}
     </View>
   );
-}
+});
 
 // ---- Form field (web .ui-field / .ui-label / .ui-input) ----
-export function Field({ label, help, children }) {
+export const Field = React.memo(function Field({ label, help, children }) {
   return (
     <View style={s.field}>
       {!!label && <Text style={s.label}>{label}</Text>}
@@ -101,9 +102,9 @@ export function Field({ label, help, children }) {
       {!!help && <Text style={s.help}>{help}</Text>}
     </View>
   );
-}
+});
 
-export function Input(props) {
+export const Input = React.memo(function Input(props) {
   return (
     <TextInput
       placeholderTextColor={colors.textMuted}
@@ -111,20 +112,20 @@ export function Input(props) {
       style={[s.input, props.multiline && s.textarea, props.style]}
     />
   );
-}
+});
 
-export function Label({ children, style }) {
+export const Label = React.memo(function Label({ children, style }) {
   return <Text style={[s.label, style]}>{children}</Text>;
-}
+});
 
 // ---- Button (web .ui-btn.ui-btn-*) ----
 const BTN_VARIANTS = {
-  primary: { bg: colors.primary, fg: colors.white },
-  secondary: { bg: '#6b7280', fg: colors.white },
-  danger: { bg: colors.danger, fg: colors.white },
-  warning: { bg: colors.warning, fg: colors.white },
+  primary:   { bg: colors.primary, fg: colors.white },
+  secondary: { bg: '#6b7280',      fg: colors.white },
+  danger:    { bg: colors.danger,  fg: colors.white },
+  warning:   { bg: colors.warning, fg: colors.white },
 };
-export function Button({ title, onPress, variant = 'primary', size, disabled, style, children }) {
+export const Button = React.memo(function Button({ title, onPress, variant = 'primary', size, disabled, style, children }) {
   const v = BTN_VARIANTS[variant] || BTN_VARIANTS.primary;
   return (
     <TouchableOpacity
@@ -142,30 +143,39 @@ export function Button({ title, onPress, variant = 'primary', size, disabled, st
       {children || <Text style={[s.btnText, size === 'sm' && s.btnTextSm, { color: v.fg }]}>{title}</Text>}
     </TouchableOpacity>
   );
-}
+});
 
 // ---- Status / stock badge (web .ui-status-badge / .ui-stock-badge) ----
+// Variants mirror what statusBadge() in status.js produces:
+//   'warning'  → PENDING   (yellow)
+//   'success'  → APPROVED  (green)
+//   'danger'   → REJECTED  (red)
+//   'info'     → default   (blue)
+//   'neutral'  → fallback  (grey)
 const BADGE_VARIANTS = {
-  ok: { bg: colors.successBg, fg: colors.successText },
-  approved: { bg: colors.successBg, fg: colors.successText },
-  low: { bg: colors.warningBg, fg: colors.warningText },
-  pending: { bg: colors.warningBg, fg: colors.warningText },
-  zero: { bg: colors.dangerBg, fg: colors.dangerText },
-  danger: { bg: colors.dangerBg, fg: colors.dangerText },
-  rejected: { bg: colors.dangerBg, fg: colors.dangerText },
-  info: { bg: colors.infoBg, fg: colors.infoText },
+  ok:       { bg: colors.successBg,  fg: colors.successText },
+  success:  { bg: colors.successBg,  fg: colors.successText },
+  approved: { bg: colors.successBg,  fg: colors.successText },
+  warning:  { bg: colors.warningBg,  fg: colors.warningText },
+  low:      { bg: colors.warningBg,  fg: colors.warningText },
+  pending:  { bg: colors.warningBg,  fg: colors.warningText },
+  danger:   { bg: colors.dangerBg,   fg: colors.dangerText  },
+  zero:     { bg: colors.dangerBg,   fg: colors.dangerText  },
+  rejected: { bg: colors.dangerBg,   fg: colors.dangerText  },
+  info:     { bg: colors.infoBg,     fg: colors.infoText    },
+  neutral:  { bg: '#f1f5f9',         fg: '#64748b'          },
 };
-export function Badge({ children, variant = 'info', style }) {
+export const Badge = React.memo(function Badge({ children, variant = 'info', style }) {
   const v = BADGE_VARIANTS[variant] || BADGE_VARIANTS.info;
   return (
     <View style={[s.badge, { backgroundColor: v.bg }, style]}>
       <Text style={[s.badgeText, { color: v.fg }]}>{children}</Text>
     </View>
   );
-}
+});
 
 // ---- Tabs (web .ui-tabs / .ui-tab.is-active) — horizontal scroll ----
-export function Tabs({ tabs, active, onChange }) {
+export const Tabs = React.memo(function Tabs({ tabs, active, onChange }) {
   return (
     <View style={s.tabsWrapper}>
       <ScrollView
@@ -175,9 +185,9 @@ export function Tabs({ tabs, active, onChange }) {
         keyboardShouldPersistTaps="handled"
       >
         {tabs.map((t) => {
-          const key = typeof t === 'string' ? t : t.key;
+          const key   = typeof t === 'string' ? t : t.key;
           const label = typeof t === 'string' ? t : t.label;
-          const on = key === active;
+          const on    = key === active;
           return (
             <TouchableOpacity
               key={key}
@@ -192,18 +202,16 @@ export function Tabs({ tabs, active, onChange }) {
       </ScrollView>
     </View>
   );
-}
+});
 
 // ---- Segment control (prototype in-screen pill sub-nav) ----
-// Filled-pill segments (Tạo phiếu / Lịch sử, Chờ duyệt / Đã xử lý …),
-// distinct from the underline `Tabs`. Content-width, left-aligned.
-export function SegmentControl({ segments, active, onChange, style }) {
+export const SegmentControl = React.memo(function SegmentControl({ segments, active, onChange, style }) {
   return (
     <View style={[s.segmentRow, style]}>
       {segments.map((seg) => {
-        const key = typeof seg === 'string' ? seg : seg.key;
+        const key   = typeof seg === 'string' ? seg : seg.key;
         const label = typeof seg === 'string' ? seg : seg.label;
-        const on = key === active;
+        const on    = key === active;
         return (
           <TouchableOpacity
             key={key}
@@ -217,31 +225,31 @@ export function SegmentControl({ segments, active, onChange, style }) {
       })}
     </View>
   );
-}
+});
 
 // ---- Monospace code badge (prototype .mono code chips) ----
-export function MonoBadge({ children, style }) {
+export const MonoBadge = React.memo(function MonoBadge({ children, style }) {
   return <Text style={[s.monoBadge, style]}>{children}</Text>;
-}
+});
 
 // ---- Alert (web .ui-alert.is-*) ----
 const ALERT_VARIANTS = {
   success: { bg: '#f0fdf4', fg: colors.successText, edge: '#22c55e' },
-  error: { bg: '#fef2f2', fg: colors.danger, edge: colors.statRed },
-  warning: { bg: '#fffbeb', fg: colors.warningText, edge: colors.warning },
+  error:   { bg: '#fef2f2', fg: colors.danger,      edge: colors.statRed },
+  warning: { bg: '#fffbeb', fg: colors.warningText,  edge: colors.warning },
 };
-export function Alert({ children, variant = 'success' }) {
+export const Alert = React.memo(function Alert({ children, variant = 'success' }) {
   const v = ALERT_VARIANTS[variant] || ALERT_VARIANTS.success;
   return (
     <View style={[s.alert, { backgroundColor: v.bg, borderLeftColor: v.edge }]}>
       <Text style={[s.alertText, { color: v.fg }]}>{children}</Text>
     </View>
   );
-}
+});
 
-export function Empty({ children }) {
+export const Empty = React.memo(function Empty({ children }) {
   return <Text style={s.empty}>{children}</Text>;
-}
+});
 
 const s = StyleSheet.create({
   pageFrame: {
@@ -254,9 +262,9 @@ const s = StyleSheet.create({
     margin: 10,
   },
   head: { marginBottom: 10 },
-  pageTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.text },
+  pageTitle:    { fontSize: 20, fontFamily: fontFamily.black, color: colors.text },
   sectionTitle: { fontSize: fontSize.md, fontFamily: fontFamily.extrabold, color: colors.text },
-  subtitle: { marginTop: 4, color: colors.textSoft, fontSize: fontSize.sm, fontFamily: fontFamily.regular, lineHeight: 18 },
+  subtitle:     { marginTop: 4, color: colors.textSoft, fontSize: fontSize.sm, fontFamily: fontFamily.regular, lineHeight: 18 },
   section: {
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -266,10 +274,10 @@ const s = StyleSheet.create({
     padding: 12,
     marginTop: 10,
   },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
+  sectionHead:          { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
   sectionHeadCollapsed: { marginBottom: 0 },
   chevron: { fontSize: 16, color: colors.textSoft, paddingLeft: 4 },
-  // Stat card — clean white card matching prototype
+  // Stat card
   statCard: {
     borderWidth: 1,
     borderRadius: 13,
@@ -279,11 +287,11 @@ const s = StyleSheet.create({
   },
   statLabel: { color: colors.textSoft, fontSize: 10.5, fontFamily: fontFamily.medium, marginTop: 2 },
   statValue: { fontSize: 22, fontFamily: fontFamily.extrabold, lineHeight: 24 },
-  statNote: { marginTop: 2, fontSize: fontSize.xs, fontFamily: fontFamily.medium },
+  statNote:  { marginTop: 2, fontSize: fontSize.xs, fontFamily: fontFamily.medium },
   // Field
   field: { marginBottom: 10 },
   label: { color: colors.label, fontSize: fontSize.base, fontFamily: fontFamily.bold, marginBottom: 6 },
-  help: { fontSize: fontSize.sm, color: colors.textSoft, marginTop: 4 },
+  help:  { fontSize: fontSize.sm, color: colors.textSoft, marginTop: 4 },
   input: {
     minHeight: 44,
     borderWidth: 1,
@@ -298,13 +306,13 @@ const s = StyleSheet.create({
   },
   textarea: { minHeight: 96, textAlignVertical: 'top' },
   // Button
-  btn: { minHeight: 44, borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  btnSm: { minHeight: 34, paddingHorizontal: 12 },
+  btn:         { minHeight: 44, borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  btnSm:       { minHeight: 34, paddingHorizontal: 12 },
   btnDisabled: { opacity: 0.6 },
-  btnText: { fontSize: fontSize.base, fontFamily: fontFamily.bold },
-  btnTextSm: { fontSize: fontSize.sm },
+  btnText:     { fontSize: fontSize.base, fontFamily: fontFamily.bold },
+  btnTextSm:   { fontSize: fontSize.sm },
   // Badge
-  badge: { alignSelf: 'flex-start', minWidth: 68, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs, alignItems: 'center' },
+  badge:     { alignSelf: 'flex-start', minWidth: 68, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs, alignItems: 'center' },
   badgeText: { fontSize: fontSize.sm, fontFamily: fontFamily.bold },
   // Tabs
   tabsWrapper: {
@@ -313,29 +321,16 @@ const s = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.white,
   },
-  tabs: { flexDirection: 'row', paddingHorizontal: 10, gap: 4 },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-    justifyContent: 'center',
-  },
-  tabActive: { borderBottomColor: colors.primary },
-  tabText: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
+  tabs:        { flexDirection: 'row', paddingHorizontal: 10, gap: 4 },
+  tab:         { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 3, borderBottomColor: 'transparent', justifyContent: 'center' },
+  tabActive:   { borderBottomColor: colors.primary },
+  tabText:     { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
   tabTextActive: { color: colors.primary },
-  // Segment control (prototype pills)
-  segmentRow: { flexDirection: 'row', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
-  segment: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-  },
-  segmentActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  segmentText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.textSoft },
+  // Segment control
+  segmentRow:       { flexDirection: 'row', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
+  segment:          { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 9, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  segmentActive:    { backgroundColor: colors.primary, borderColor: colors.primary },
+  segmentText:      { fontSize: 13, fontFamily: fontFamily.bold, color: colors.textSoft },
   segmentTextActive: { color: colors.white },
   // Monospace code badge
   monoBadge: {
@@ -350,7 +345,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   // Alert
-  alert: { padding: 14, borderRadius: radius.md, borderLeftWidth: 4, marginBottom: 12 },
+  alert:     { padding: 14, borderRadius: radius.md, borderLeftWidth: 4, marginBottom: 12 },
   alertText: { fontFamily: fontFamily.bold, fontSize: fontSize.base },
   // Empty
   empty: { textAlign: 'center', color: colors.textSoft, paddingVertical: 32, fontSize: fontSize.base, lineHeight: 22 },
@@ -364,22 +359,14 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  pagerBtn: {
-    minHeight: 36,
-    paddingHorizontal: 14,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-  },
+  pagerBtn:         { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.white, justifyContent: 'center' },
   pagerBtnDisabled: { opacity: 0.45 },
-  pagerText: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
+  pagerText:        { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.primary },
   pagerTextDisabled: { color: colors.textMuted },
-  pagerInfo: { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
+  pagerInfo:        { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
 });
 
 export default {
   PageFrame, PageHead, Section, StatCard, Field, Input, Label, Button, Badge, Tabs,
-  SegmentControl, MonoBadge, Alert, Empty,
+  SegmentControl, MonoBadge, Alert, Empty, Pagination,
 };
