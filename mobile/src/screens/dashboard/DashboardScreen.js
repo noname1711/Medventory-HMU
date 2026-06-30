@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
@@ -89,15 +89,57 @@ export default function DashboardScreen() {
     tabBarInactiveTintColor: colors.textMuted,
   };
 
+  // Tabs the current user can access (each tied to a permission, matching the
+  // DB role_permissions seed). "Vật tư" requires MATERIAL.VIEW, so roles without
+  // it (e.g. ADMIN, whose admin/RBAC functions are web-only) don't see it.
+  const hasAnyTab =
+    hasPerm('MATERIAL.VIEW') ||
+    hasPerm('ISSUE_REQ.CREATE') ||
+    hasPerm('ISSUE_REQ.APPROVE') ||
+    hasPerm('SUPP_FORECAST.CREATE') ||
+    hasPerm('RECEIPT.CREATE') ||
+    hasPerm('ISSUE.CREATE') ||
+    hasPerm('SUPP_FORECAST.APPROVE');
+
+  if (loadingPerms) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <AppHeader />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!hasAnyTab) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <AppHeader />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Ionicons name="desktop-outline" size={48} color={colors.textMuted} />
+          <Text style={{ marginTop: 16, fontSize: 16, color: colors.text, fontFamily: fontFamily.bold, textAlign: 'center' }}>
+            Không có chức năng trên ứng dụng di động
+          </Text>
+          <Text style={{ marginTop: 8, fontSize: 13.5, color: colors.textMuted, fontFamily: fontFamily.regular, textAlign: 'center', lineHeight: 20 }}>
+            Tài khoản của bạn (quản trị/phân quyền) được sử dụng trên phiên bản web. Vui lòng đăng nhập bản web để quản lý.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
       <Tab.Navigator screenOptions={screenOptions}>
-        <Tab.Screen
-          name="Vật tư"
-          component={EquipmentListScreen}
-          options={{ tabBarIcon: tabIcon('Vật tư'), tabBarLabel: tabLabel('Vật tư') }}
-        />
+        {hasPerm('MATERIAL.VIEW') && (
+          <Tab.Screen
+            name="Vật tư"
+            component={EquipmentListScreen}
+            options={{ tabBarIcon: tabIcon('Vật tư'), tabBarLabel: tabLabel('Vật tư') }}
+          />
+        )}
 
         {hasPerm('ISSUE_REQ.CREATE') && (
           <Tab.Screen
