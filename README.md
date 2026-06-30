@@ -1,6 +1,20 @@
 # Medventory-HMU
 
-Medventory-HMU là hệ thống quản lý vật tư y tế cho đơn vị bệnh viện/trường Đại học Y Hà Nội. Project gồm backend Spring Boot REST API, frontend React/Vite SPA và bộ script PostgreSQL để khởi tạo dữ liệu mẫu.
+Medventory-HMU là hệ thống quản lý vật tư y tế cho đơn vị bệnh viện/trường Đại học Y Hà Nội. Project gồm:
+
+- **Backend** — Spring Boot REST API (`backend/`).
+- **Web** — React/Vite SPA, bản đầy đủ chức năng (`frontend/`).
+- **Mobile** — Expo/React Native, dùng chung backend với bản web, thu gọn cho thao tác tại hiện trường (`mobile/`).
+- **Database** — bộ script PostgreSQL khởi tạo + seed dữ liệu mẫu (`database/`).
+
+Web và Mobile gọi cùng một backend. Web có đầy đủ quản trị/phân quyền; Mobile tập trung *tra cứu — tạo yêu cầu — phê duyệt — nhập/xuất nhanh*.
+
+## Tài liệu chi tiết
+
+- **Web (React/Vite):** [`frontend/README.md`](frontend/README.md)
+- **Mobile (Expo/React Native):** [`mobile/README.md`](mobile/README.md)
+
+README gốc này mô tả tổng quan toàn hệ thống, backend và database.
 
 ## Mục lục
 
@@ -60,6 +74,17 @@ Hệ thống hỗ trợ quản lý nghiệp vụ vật tư y tế:
 - React Hot Toast
 - Chart.js
 - ESLint
+
+### Mobile
+
+- Expo SDK 54
+- React Native 0.81 + React 19
+- React Navigation 6 (native-stack + bottom-tabs)
+- AsyncStorage (lưu phiên)
+- `@expo/vector-icons` (Ionicons), `@expo-google-fonts/inter`
+- React Native Toast Message
+
+Chi tiết: [`mobile/README.md`](mobile/README.md).
 
 ### Database
 
@@ -130,9 +155,25 @@ Medventory-HMU/
 │   ├── taiwind.config.js
 │   ├── vite.config.js
 │   ├── eslint.config.js
+│   ├── README.md                    # Hướng dẫn riêng cho bản web
 │   ├── .gitignore
 │   ├── vite-dev.err.log
 │   └── vite-dev.out.log
+├── mobile/                          # Expo / React Native app
+│   ├── App.js
+│   ├── app.json                     # Cấu hình Expo (name, icon, splash, bundle id)
+│   ├── package.json
+│   ├── assets/                      # icon, splash, logo
+│   ├── README.md                    # Hướng dẫn riêng cho bản mobile
+│   └── src/
+│       ├── api/                     # apiConfig (tự dò host) + apiClient
+│       ├── components/              # AppHeader, MaterialPicker, DetailModal
+│       ├── context/                 # AuthContext
+│       ├── hooks/                   # useServerHistory (lọc + phân trang server)
+│       ├── navigation/              # AppNavigator
+│       ├── screens/                 # auth/ + dashboard/ (7 tab nghiệp vụ)
+│       ├── theme/                   # tokens, typography, ui (design system)
+│       └── utils/                   # storage, status
 ├── database/                        # SQL khởi tạo database
 │   └── final_database.sql
 ├── report/                          # Báo cáo và slide
@@ -247,6 +288,18 @@ Frontend gọi backend qua base URL hardcode:
 ```txt
 http://localhost:8080/api
 ```
+
+### 3. Chạy mobile (tùy chọn)
+
+```bash
+cd mobile
+npm install
+npx expo start        # quét QR bằng Expo Go, hoặc:
+npm run android       # Android emulator
+npm run ios           # iOS Simulator (macOS)
+```
+
+Mobile tự dò IP backend: thiết bị thật dùng IP LAN của máy chạy Expo (cùng Wi-Fi, mở cổng 8080), Android emulator dùng `10.0.2.2`. Xem [`mobile/README.md`](mobile/README.md). Nếu Pixel_9 AVD treo lúc boot, chạy `emulator -avd Pixel_9 -gpu angle_indirect`.
 
 ## Backend
 
@@ -537,4 +590,7 @@ Frontend hiện chưa có test suite riêng.
 - `database/final_database.sql` là script reset/seed chính, có tạo role, permission, user mẫu, system settings, notification, phiếu mẫu, thẻ kho và reservation.
 - `issue_req.auto_approve_enabled` mặc định `false`; có thể bật/tắt qua màn hình phân quyền/admin hoặc API admin settings.
 - Tồn kho hiển thị ở frontend lấy từ `/api/inventory/materials`, đã trừ lượng reservation đang active.
+- Các danh sách (tồn kho, người dùng, lịch sử nhập/xuất/xin lĩnh/dự trù, phiếu đủ điều kiện xuất) đã **lọc và phân trang ở backend** qua các tham số `keyword`/`status`/`page`/`size`/`limit`/`eligiblePage` — client chỉ tải đúng một trang, không tải-hết-rồi-lọc.
+- **Bản mobile (Expo/React Native)** dùng chung backend này nhưng thu gọn phạm vi: bỏ quản trị người dùng, phân quyền và thêm vật tư (web-only); Phiếu dự trù chỉ xem; Nhập kho rút gọn; Xuất kho auto-FEFO. Chi tiết ở [`mobile/README.md`](mobile/README.md).
+- Mobile có lớp API client tập trung (`mobile/src/api/apiClient.js`) tự gắn header `X-User-Id` và tự dò host backend — khác với web vẫn hardcode URL.
 
