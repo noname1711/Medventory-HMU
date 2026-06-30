@@ -174,36 +174,6 @@ export const Badge = React.memo(function Badge({ children, variant = 'info', sty
   );
 });
 
-// ---- Tabs (web .ui-tabs / .ui-tab.is-active) — horizontal scroll ----
-export const Tabs = React.memo(function Tabs({ tabs, active, onChange }) {
-  return (
-    <View style={s.tabsWrapper}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.tabs}
-        keyboardShouldPersistTaps="handled"
-      >
-        {tabs.map((t) => {
-          const key   = typeof t === 'string' ? t : t.key;
-          const label = typeof t === 'string' ? t : t.label;
-          const on    = key === active;
-          return (
-            <TouchableOpacity
-              key={key}
-              onPress={() => onChange(key)}
-              activeOpacity={0.8}
-              style={[s.tab, on && s.tabActive]}
-            >
-              <Text style={[s.tabText, on && s.tabTextActive]}>{label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-});
-
 // ---- Segment control (prototype in-screen pill sub-nav) ----
 export const SegmentControl = React.memo(function SegmentControl({ segments, active, onChange, style }) {
   return (
@@ -314,18 +284,6 @@ const s = StyleSheet.create({
   // Badge
   badge:     { alignSelf: 'flex-start', minWidth: 68, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs, alignItems: 'center' },
   badgeText: { fontSize: fontSize.sm, fontFamily: fontFamily.bold },
-  // Tabs
-  tabsWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 12,
-    backgroundColor: colors.white,
-  },
-  tabs:        { flexDirection: 'row', paddingHorizontal: 10, gap: 4 },
-  tab:         { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 3, borderBottomColor: 'transparent', justifyContent: 'center' },
-  tabActive:   { borderBottomColor: colors.primary },
-  tabText:     { fontSize: fontSize.base, fontFamily: fontFamily.bold, color: colors.textSoft },
-  tabTextActive: { color: colors.primary },
   // Segment control
   segmentRow:       { flexDirection: 'row', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
   segment:          { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 9, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
@@ -367,6 +325,6 @@ const s = StyleSheet.create({
 });
 
 export default {
-  PageFrame, PageHead, Section, StatCard, Field, Input, Label, Button, Badge, Tabs,
+  PageFrame, PageHead, Section, StatCard, Field, Input, Label, Button, Badge,
   SegmentControl, MonoBadge, Alert, Empty, Pagination,
 };
