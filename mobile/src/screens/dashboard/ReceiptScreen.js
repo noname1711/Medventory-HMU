@@ -48,6 +48,8 @@ function createRow() {
     qtyActual: '',
     price: '',
     lotNumber: '',
+    mfgDate: '',
+    expDate: '',
     pickerVisible: false,
   };
 }
@@ -198,6 +200,12 @@ export default function ReceiptScreen() {
       return;
     }
 
+    const invalidDateRow = validRows.find((r) => r.mfgDate && r.expDate && r.mfgDate > r.expDate);
+    if (invalidDateRow) {
+      Toast.show({ type: 'error', text1: 'Ngày sản xuất không được sau hạn dùng!' });
+      return;
+    }
+
     const payload = {
       receivedFrom: header.receivedFrom.trim(),
       reason: header.reason.trim() || null,
@@ -208,6 +216,8 @@ export default function ReceiptScreen() {
         qtyActual: Number(r.qtyActual),
         qtyDoc: Number(r.qtyActual),
         lotNumber: r.lotNumber.trim(),
+        mfgDate: r.mfgDate || null,
+        expDate: r.expDate || null,
       })),
     };
 
@@ -264,6 +274,8 @@ export default function ReceiptScreen() {
     { key: 'stt', label: 'STT', flex: 0.5 },
     { key: 'name', label: 'Tên vật tư', flex: 2 },
     { key: 'lot', label: 'Số lô', flex: 0.9 },
+    { key: 'mfgDate', label: 'NSX', flex: 0.9 },
+    { key: 'expDate', label: 'HSD', flex: 0.9 },
     { key: 'qty', label: 'SL', flex: 0.7 },
     { key: 'price', label: 'Đơn giá', flex: 1 },
   ];
@@ -272,6 +284,8 @@ export default function ReceiptScreen() {
     ? detailLines.map((d) => ({
         name: d?.name ?? d?.materialName ?? '—',
         lot: d?.lotNumber ?? d?.lot_number ?? '—',
+        mfgDate: fmtDate(d?.mfgDate ?? d?.mfg_date),
+        expDate: fmtDate(d?.expDate ?? d?.exp_date),
         qty: String(d?.qtyActual ?? d?.qty_actual ?? 0),
         price: fmtMoney(d?.price ?? 0),
       }))
@@ -387,6 +401,22 @@ export default function ReceiptScreen() {
                     placeholder="Ví dụ: LOT-0125-A"
                     value={row.lotNumber}
                     onChangeText={(v) => updateRow(row.key, { lotNumber: v })}
+                  />
+                </Field>
+
+                <Field label="Ngày sản xuất">
+                  <Input
+                    placeholder="YYYY-MM-DD"
+                    value={row.mfgDate}
+                    onChangeText={(v) => updateRow(row.key, { mfgDate: v })}
+                  />
+                </Field>
+
+                <Field label="Hạn sử dụng">
+                  <Input
+                    placeholder="YYYY-MM-DD"
+                    value={row.expDate}
+                    onChangeText={(v) => updateRow(row.key, { expDate: v })}
                   />
                 </Field>
 
