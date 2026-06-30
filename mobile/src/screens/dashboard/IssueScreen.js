@@ -335,7 +335,7 @@ export default function IssueScreen() {
                   <View key={String(req.id)} style={styles.eligibleCard}>
                     <View style={styles.eligibleTop}>
                       <MonoBadge>#{req.id}</MonoBadge>
-                      <Badge variant="success" label="Đủ điều kiện" />
+                      <Badge variant="success">Đủ điều kiện</Badge>
                     </View>
                     <Text style={styles.eligibleDept} numberOfLines={1}>
                       {req.subDepartmentName || req.departmentName || '—'}

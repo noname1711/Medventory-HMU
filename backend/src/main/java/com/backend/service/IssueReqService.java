@@ -268,6 +268,7 @@ public class IssueReqService {
             rbacService.requirePermission(creator, RbacService.PERM_ISSUE_REQ_CREATE, "Bạn không có quyền tạo phiếu xin lĩnh");
 
             validateCreateRequest(request);
+            validateStockForDetails(request.getDetails());
 
             IssueReqHeader header = new IssueReqHeader();
             header.setCreatedBy(creator);
@@ -462,6 +463,44 @@ public class IssueReqService {
                 RbacService.PERM_RECEIPT_CREATE,        // thủ kho (nhập kho)
                 RbacService.PERM_SUPP_FORECAST_APPROVE  // bgh
         );
+    }
+
+    private void validateStockForDetails(List<CreateIssueReqDetailDTO> details) {
+        if (details == null) return;
+
+        // Aggregate requested qty per materialId (skip new materials with no materialId)
+        Map<Long, BigDecimal> requestedByMaterial = new LinkedHashMap<>();
+        for (CreateIssueReqDetailDTO d : details) {
+            if (d.getMaterialId() == null) continue;
+            BigDecimal qty = nvl(d.getQtyRequested());
+            if (qty.compareTo(BigDecimal.ZERO) <= 0) continue;
+            requestedByMaterial.merge(d.getMaterialId(), qty, BigDecimal::add);
+        }
+
+        for (Map.Entry<Long, BigDecimal> entry : requestedByMaterial.entrySet()) {
+            Long materialId = entry.getKey();
+            BigDecimal requested = entry.getValue();
+
+            // Net available = sum over lots of (closingStock - activeReserved)
+            BigDecimal available = BigDecimal.ZERO;
+            List<InventoryCard> lots = inventoryCardRepository.findAvailableLotsLatestByMaterial(materialId);
+            for (InventoryCard ic : lots) {
+                String lot = safeTrim(ic.getLotNumber());
+                BigDecimal closing = nvl(ic.getClosingStock());
+                BigDecimal reserved = issueReservationRepository.sumActiveReservedByMaterialAndLot(materialId, lot);
+                BigDecimal net = closing.subtract(reserved == null ? BigDecimal.ZERO : reserved);
+                if (net.compareTo(BigDecimal.ZERO) > 0) available = available.add(net);
+            }
+
+            if (requested.compareTo(available) > 0) {
+                Material material = materialRepository.findById(materialId).orElse(null);
+                String matName = material != null
+                        ? (material.getCode() + " - " + material.getName())
+                        : ("ID=" + materialId);
+                throw new RuntimeException("Số lượng yêu cầu vượt tồn kho: " + matName
+                        + " (yêu cầu " + fmtQty(requested) + ", còn lại " + fmtQty(available) + ")");
+            }
+        }
     }
 
     private void validateCreateRequest(CreateIssueReqDTO request) {

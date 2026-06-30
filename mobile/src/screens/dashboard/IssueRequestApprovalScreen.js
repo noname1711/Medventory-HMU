@@ -163,7 +163,7 @@ export default function IssueRequestApprovalScreen() {
     setActionLoading(true);
     try {
       const res = await apiSend('POST', API_ENDPOINTS.ISSUE_REQ_APPROVE(id), { note: '' }, user.id);
-      if (res.ok) {
+      if (res.ok && res.data?.success) {
         Toast.show({ type: 'success', text1: 'Đã phê duyệt phiếu xin lĩnh!' });
         closeDetail();
         await fetchAll();

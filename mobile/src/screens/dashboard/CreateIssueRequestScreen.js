@@ -167,7 +167,7 @@ export default function CreateIssueRequestScreen() {
     const { ok, data } = await apiSend('POST', API_ENDPOINTS.ISSUE_REQ_CREATE, body, user?.id);
     setLoading(false);
 
-    if (ok) {
+    if (ok && data?.success) {
       Toast.show({ type: 'success', text1: data?.message || 'Tạo phiếu xin lĩnh thành công!' });
       // Reset form
       setSubDepartmentId('');
